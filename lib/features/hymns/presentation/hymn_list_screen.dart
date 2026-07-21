@@ -2314,14 +2314,12 @@ class _BiblicalAssistantDialogState extends ConsumerState<BiblicalAssistantDialo
       hasSearched = false;
     });
 
-    try {
-      final allHymnsGlobal = ref.read(allHymnsGlobalProvider).value ?? [];
-      
-      // Filtrar por las colecciones seleccionadas por el usuario
-      final allHymns = allHymnsGlobal
-          .where((h) => _selectedCollections.contains(h.collection))
-          .toList();
+    final allHymnsGlobal = ref.read(allHymnsGlobalProvider).value ?? [];
+    final allHymns = allHymnsGlobal
+        .where((h) => _selectedCollections.contains(h.collection))
+        .toList();
 
+    try {
       if (allHymns.isEmpty) {
         setState(() {
           errorMessage = 'No hay cantos en las colecciones seleccionadas.';
@@ -2412,9 +2410,9 @@ class _BiblicalAssistantDialogState extends ConsumerState<BiblicalAssistantDialo
       });
 
       final attempts = [
-        {'model': 'gemini-2.0-flash', 'api': 'v1'},
-        {'model': 'gemini-1.5-flash', 'api': 'v1'},
+        {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
         {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+        {'model': 'gemini-1.5-flash', 'api': 'v1'},
       ];
 
       http.Response? response;
@@ -2425,7 +2423,7 @@ class _BiblicalAssistantDialogState extends ConsumerState<BiblicalAssistantDialo
         final api = attempt['api']!;
         try {
           final url = Uri.parse('https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$geminiKey');
-          final res = await http.post(url, headers: {'Content-Type': 'application/json'}, body: requestBody).timeout(const Duration(seconds: 15));
+          final res = await http.post(url, headers: {'Content-Type': 'application/json'}, body: requestBody).timeout(const Duration(seconds: 12));
           if (res.statusCode == 200) {
             response = res;
             break;
@@ -2468,19 +2466,49 @@ class _BiblicalAssistantDialogState extends ConsumerState<BiblicalAssistantDialo
           hasSearched = true;
         });
       } else {
-        setState(() {
-          errorMessage = parseFriendlyGeminiError(errors);
-          rawErrorDetails = errors.join('\n');
-          isSearching = false;
-        });
+        // FALLBACK LOCAL: Si la API de Google falla o la clave no tiene acceso, buscar coincidencias locales
+        _performLocalFallbackSearch(userInput, allHymns);
       }
     } catch (e) {
-      setState(() {
-        errorMessage = 'No se pudo conectar con la IA de Google.\n\nRevisa tu conexión a internet o intenta de nuevo más tarde.';
-        rawErrorDetails = e.toString();
-        isSearching = false;
-      });
+      _performLocalFallbackSearch(userInput, allHymns);
     }
+  }
+
+  void _performLocalFallbackSearch(String query, List<Hymn> allHymns) {
+    final lowerQuery = query.toLowerCase();
+    final words = lowerQuery.split(RegExp(r'\s+')).where((w) => w.length > 2).toList();
+
+    List<Map<String, dynamic>> localRecs = [];
+    for (final h in allHymns) {
+      final titleLower = h.title.toLowerCase();
+      final lyricsLower = h.lyrics.toLowerCase();
+
+      int score = 0;
+      for (final word in words) {
+        if (titleLower.contains(word)) score += 3;
+        if (lyricsLower.contains(word)) score += 1;
+      }
+
+      if (score > 0) {
+        localRecs.add({
+          'id': h.id,
+          'collection': h.collection,
+          'title': h.title,
+          'reason': 'Sugerencia local basada en coincidencias de texto con "$query".'
+        });
+      }
+
+      if (localRecs.length >= 10) break;
+    }
+
+    setState(() {
+      recommendations = localRecs;
+      isSearching = false;
+      hasSearched = true;
+      if (localRecs.isEmpty) {
+        errorMessage = 'No se encontraron cantos relacionados con el término buscado.';
+      }
+    });
   }
 
   @override
