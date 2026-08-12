@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,8 @@ import '../../hymns/presentation/hymn_list_screen.dart';
 import '../../hymns/domain/hymn.dart';
 import '../../favorites/domain/favorites_notifier.dart';
 import '../../setlists/presentation/setlists_provider.dart';
+import '../../tuner/presentation/instrument_tuner_screen.dart';
+import '../../../core/widgets/app_music_icons.dart';
 
 class AdminTapCountNotifier extends Notifier<int> {
   @override
@@ -107,11 +110,10 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           
-          // Capa de desenfoque general para las auroras
+          // Capa decorativa suave (sin BackdropFilter para no bloquear GPU en Web)
           Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
-              child: const SizedBox(),
+            child: Container(
+              color: Colors.transparent,
             ),
           ),
           
@@ -173,8 +175,8 @@ class HomeScreen extends ConsumerWidget {
                               children: [
                                 Text(
                                   'Himnos & Alabanzas',
-                                  style: GoogleFonts.playfairDisplay(
-                                    fontSize: 28,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 26,
                                     fontWeight: FontWeight.bold,
                                     color: isDark ? Colors.white : theme.colorScheme.primary,
                                     letterSpacing: 0.5,
@@ -364,6 +366,26 @@ class HomeScreen extends ConsumerWidget {
                           _buildMenuItem(
                             context,
                             ref: ref,
+                            title: 'Escanear QR de Culto',
+                            subtitle: 'Unirse al Culto en Vivo escaneando el código QR',
+                            icon: Icons.qr_code_scanner_rounded,
+                            iconColor: const Color(0xFF6366F1),
+                            isQrScanner: true,
+                          ).animate().fadeIn(delay: 720.ms).slideY(begin: 0.15),
+                          const SizedBox(height: 16),
+                          _buildMenuItem(
+                            context,
+                            ref: ref,
+                            title: 'Afinador de Instrumentos',
+                            subtitle: 'Mandolina, violín, guitarra, bajo, trompeta y saxo',
+                            icon: Icons.graphic_eq_rounded,
+                            iconColor: const Color(0xFFEC4899),
+                            isTuner: true,
+                          ).animate().fadeIn(delay: 750.ms).slideY(begin: 0.15),
+                          const SizedBox(height: 16),
+                          _buildMenuItem(
+                            context,
+                            ref: ref,
                             title: 'Acerca de',
                             subtitle: 'Información de la iglesia y la app',
                             icon: Icons.info_outline_rounded,
@@ -395,6 +417,8 @@ class HomeScreen extends ConsumerWidget {
     bool isSetlists = false,
     bool isComingSoon = false,
     bool isAbout = false,
+    bool isTuner = false,
+    bool isQrScanner = false,
     String? counter,
   }) {
     final theme = Theme.of(context);
@@ -413,70 +437,81 @@ class HomeScreen extends ConsumerWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark 
-                ? Colors.white.withValues(alpha: 0.04) 
-                : Colors.white.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: isDark 
-                  ? Colors.white.withValues(alpha: 0.06) 
-                  : Colors.white.withValues(alpha: 0.5),
-                width: 1.2,
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark
+              ? (kIsWeb
+                  ? const Color(0xFF1E293B).withValues(alpha: 0.92)
+                  : Colors.white.withValues(alpha: 0.04))
+              : (kIsWeb
+                  ? Colors.white.withValues(alpha: 0.95)
+                  : Colors.white.withValues(alpha: 0.75)),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.5),
+              width: 1.2,
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: isComingSoon 
-                  ? () => _showComingSoon(context)
-                  : isAbout
-                    ? () => _showMissionInfoDialog(context, isDark, theme)
-                    : () {
-                        if (isSetlists) {
-                          context.push('/setlists');
-                          return;
-                        }
-                        if (isFavoritesOnly) {
-                          ref.read(showFavoritesProvider.notifier).setFavorites(true);
-                        } else {
-                          ref.read(activeCollectionProvider.notifier).setCollection(collection!);
-                          ref.read(showFavoritesProvider.notifier).setFavorites(false);
-                        }
-                        ref.read(searchQueryProvider.notifier).updateQuery('');
-                        ref.read(activeCategoryProvider.notifier).setCategory('Todos');
-                        context.push('/hymns');
-                      },
-                borderRadius: BorderRadius.circular(24),
-                splashColor: iconColor.withValues(alpha: 0.1),
-                highlightColor: iconColor.withValues(alpha: 0.05),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      // Icono con gradiente de fondo
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              iconColor.withValues(alpha: isDark ? 0.25 : 0.15),
-                              iconColor.withValues(alpha: isDark ? 0.08 : 0.04),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: iconColor.withValues(alpha: isDark ? 0.2 : 0.15),
-                            width: 1,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isComingSoon 
+                ? () => _showComingSoon(context)
+                : isAbout
+                  ? () => _showMissionInfoDialog(context, isDark, theme)
+                  : isTuner
+                    ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const InstrumentTunerScreen()),
+                      )
+                  : isQrScanner
+                    ? () => context.push('/scan-qr')
+                  : () {
+                      if (isSetlists) {
+                        context.push('/setlists');
+                        return;
+                      }
+                      if (isFavoritesOnly) {
+                        ref.read(showFavoritesProvider.notifier).setFavorites(true);
+                      } else {
+                        ref.read(activeCollectionProvider.notifier).setCollection(collection!);
+                        ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                      }
+                      ref.read(searchQueryProvider.notifier).updateQuery('');
+                      ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+                      context.push('/hymns');
+                    },
+              borderRadius: BorderRadius.circular(24),
+              splashColor: iconColor.withValues(alpha: 0.1),
+              highlightColor: iconColor.withValues(alpha: 0.05),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    // Icono con gradiente de fondo
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            iconColor.withValues(alpha: isDark ? 0.25 : 0.15),
+                            iconColor.withValues(alpha: isDark ? 0.08 : 0.04),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: iconColor.withValues(alpha: isDark ? 0.2 : 0.15),
+                          width: 1,
                           ),
                         ),
-                        child: Icon(icon, color: iconColor, size: 26),
+                        child: isTuner
+                            ? TuningForkIcon(size: 26, color: iconColor)
+                            : Icon(icon, color: iconColor, size: 26),
                       ),
                       const SizedBox(width: 16),
                       // Textos del Menú
@@ -540,15 +575,14 @@ class HomeScreen extends ConsumerWidget {
                           size: 12
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+                   ],
+                 ),
+               ),
+             ),
+           ),
+         ),
+       ),
+     );
   }
 
   void _showComingSoon(BuildContext context) {
@@ -820,26 +854,21 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 onPressed: () async {
                   final url = Uri.parse('https://www.youtube.com/@primeradesanbernardo');
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  try {
+                    final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+                    if (!launched) {
+                      await launchUrl(url, mode: LaunchMode.platformDefault);
+                    }
+                  } catch (e) {
+                    await launchUrl(url, mode: LaunchMode.platformDefault);
                   }
                 },
               ),
               const Divider(height: 32),
               Text(
-                'Desarrollador de la Aplicación',
-                style: GoogleFonts.nunito(
-                  fontSize: 12,
-                  color: isDark ? Colors.white30 : Colors.grey[500],
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'David Trureo Ahumada',
+                'Desarrollado por David Trureo Ahumada',
                 style: GoogleFonts.outfit(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white70 : Colors.grey[800],
                 ),

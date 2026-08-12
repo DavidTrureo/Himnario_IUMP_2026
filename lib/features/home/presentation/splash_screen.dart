@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio/just_audio.dart';
+
+import '../../hymns/presentation/widgets/metronome_audio_synth.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,15 +15,41 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  AudioPlayer? _player;
+
   @override
   void initState() {
     super.initState();
-    // Navegar a la pantalla principal después de 3 segundos
-    Timer(const Duration(milliseconds: 3000), () {
+    // Iniciar audio asíncronamente respetando las políticas de Autoplay del navegador
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _playSplashSound();
+    });
+
+    // Auto-navegación automática después de 4.8s tanto en Web como en App Móvil
+    Timer(const Duration(milliseconds: 4800), () {
       if (mounted) {
         context.go('/home');
       }
     });
+  }
+
+  Future<void> _playSplashSound() async {
+    try {
+      prepareAudioContext();
+      _player = AudioPlayer();
+      await _player!.setAsset('assets/audio/splash_chime.mp3');
+      await _player!.setVolume(0.85);
+      await _player!.play();
+    } catch (e) {
+      debugPrint('>>> Autoplay del navegador omitido o audio no disponible: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _player?.stop();
+    _player?.dispose();
+    super.dispose();
   }
 
   @override
@@ -31,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F172A), Color(0xFF020617)], // Fondo oscuro premium
+            colors: [Color(0xFF0F172A), Color(0xFF020617)],
           ),
         ),
         child: Stack(
@@ -69,91 +98,92 @@ class _SplashScreenState extends State<SplashScreen> {
                 children: [
                   const Spacer(flex: 3),
                   
-                  // 1. Ambos Logos en el Centro (Misión y Iglesia Local)
+                  // Alineación Horizontal de Ambos Logos (IZQUIERDA: Logo Oficial IUMP | DERECHA: Logo Primera San Bernardo)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo de la Misión (IUMP)
+                      // Logo Oficial IUMP (Izquierda) — fondo blanco para contraste
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        width: 90,
+                        height: 90,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
+                              color: const Color(0xFF6366F1).withValues(alpha: 0.25),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/images/mission_logo_v3.png',
-                            height: 130,
-                            width: 130,
-                            fit: BoxFit.contain,
-                          ),
+                        padding: const EdgeInsets.all(6),
+                        child: Image.asset(
+                          'assets/images/mission_logo_v3.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.church_rounded, size: 42, color: Colors.indigo),
                         ),
                       ),
-                      const SizedBox(width: 24),
-                      // Logo de la Iglesia Local (Vitral y Cruz - Sin Texto para el Círculo)
+                      const SizedBox(width: 20),
+                      // Logo IUMP Primera en San Bernardo (Derecha) — fondo blanco para contraste
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        width: 90,
+                        height: 90,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
+                              color: const Color(0xFFEC4899).withValues(alpha: 0.2),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/images/church_logo_clean.png',
-                            height: 130,
-                            width: 130,
-                            fit: BoxFit.contain,
-                          ),
+                        padding: const EdgeInsets.all(6),
+                        child: Image.asset(
+                          'assets/images/church_logo_clean.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.music_note_rounded, size: 42, color: Colors.indigo),
                         ),
                       ),
                     ],
                   )
                   .animate()
-                  .fadeIn(duration: 800.ms)
-                  .scale(delay: 200.ms, duration: 600.ms, curve: Curves.easeOutBack),
+                  .fadeIn(duration: 600.ms)
+                  .scale(begin: const Offset(0.85, 0.85), end: const Offset(1, 1)),
                   
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   
-                  // Texto de la misión
                   Text(
-                    'Himnario Oficial',
+                    'HIMNARIO IUMP',
+                    style: GoogleFonts.outfit(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(delay: 400.ms)
+                  .slideY(begin: 0.3, end: 0, duration: 600.ms),
+                  
+                  const SizedBox(height: 6),
+                  
+                  Text(
+                    'Cancionero Digital 2026',
                     style: GoogleFonts.nunito(
                       fontSize: 16,
-                      color: Colors.white38,
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ).animate().fadeIn(delay: 600.ms),
-                  const SizedBox(height: 4),
-                  Text(
-                    'IGLESIA UNIDA\nMETODISTA PENTECOSTAL',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      fontSize: 20,
+                      color: Colors.amber[400],
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1,
-                      height: 1.2,
+                      letterSpacing: 1.0,
                     ),
-                  ).animate().fadeIn(delay: 800.ms),
+                  )
+                  .animate()
+                  .fadeIn(delay: 700.ms),
                   
                   const SizedBox(height: 24),
                   
-                  // Identificación de la Iglesia Local
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -195,10 +225,10 @@ class _SplashScreenState extends State<SplashScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Desarrollado por David Trureo Ahumada',
-                    style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      color: Colors.white24,
-                      fontWeight: FontWeight.w600,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      color: Colors.white60,
+                      fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
                   ).animate().fadeIn(delay: 1400.ms),

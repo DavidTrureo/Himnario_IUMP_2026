@@ -68,6 +68,13 @@ class SetlistsListScreen extends ConsumerWidget {
                     icon: const Icon(Icons.arrow_back_ios_new_rounded),
                     onPressed: () => context.pop(),
                   ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.qr_code_scanner_rounded),
+                      tooltip: 'Escanear QR de Culto',
+                      onPressed: () => context.push('/scan-qr'),
+                    ),
+                  ],
                 ),
 
                 // Lista de repertorios

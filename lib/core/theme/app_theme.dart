@@ -10,15 +10,15 @@ class AppTheme {
   // Configuración de texto base
   static TextTheme _buildTextTheme(TextTheme base) {
     return base.apply(fontFamily: 'Nunito').copyWith(
-      displayLarge: base.displayLarge?.copyWith(fontFamily: 'PlayfairDisplay'),
-      displayMedium: base.displayMedium?.copyWith(fontFamily: 'PlayfairDisplay'),
-      displaySmall: base.displaySmall?.copyWith(fontFamily: 'PlayfairDisplay'),
-      headlineLarge: base.headlineLarge?.copyWith(fontFamily: 'PlayfairDisplay'),
-      headlineMedium: base.headlineMedium?.copyWith(fontFamily: 'PlayfairDisplay'),
-      headlineSmall: base.headlineSmall?.copyWith(fontFamily: 'PlayfairDisplay'),
-      titleLarge: base.titleLarge?.copyWith(fontFamily: 'PlayfairDisplay'),
-      titleMedium: base.titleMedium?.copyWith(fontFamily: 'PlayfairDisplay'),
-      titleSmall: base.titleSmall?.copyWith(fontFamily: 'PlayfairDisplay'),
+      displayLarge: base.displayLarge?.copyWith(fontFamily: 'Outfit'),
+      displayMedium: base.displayMedium?.copyWith(fontFamily: 'Outfit'),
+      displaySmall: base.displaySmall?.copyWith(fontFamily: 'Outfit'),
+      headlineLarge: base.headlineLarge?.copyWith(fontFamily: 'Outfit'),
+      headlineMedium: base.headlineMedium?.copyWith(fontFamily: 'Outfit'),
+      headlineSmall: base.headlineSmall?.copyWith(fontFamily: 'Outfit'),
+      titleLarge: base.titleLarge?.copyWith(fontFamily: 'Outfit'),
+      titleMedium: base.titleMedium?.copyWith(fontFamily: 'Outfit'),
+      titleSmall: base.titleSmall?.copyWith(fontFamily: 'Outfit'),
     );
   }
 

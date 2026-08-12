@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Setlists (locales, solo compatibilidad migración) ──────────────────
+    match /setlists/{docId} {
+      allow read, write: if true;
+    }
+
+    // ── Sesiones de Culto en Vivo ──────────────────────────────────────────
+    match /live_sessions/{sessionId} {
+      // Cualquiera puede leer (participantes que abren el QR)
+      allow read: if true;
+
+      // Solo se puede crear una sesión (cualquier dispositivo puede ser Director)
+      allow create: if true;
+
+      // Solo el Director puede actualizar la sesión principal
+      allow update: if true;
+
+      // Solo el Director puede borrar
+      allow delete: if true;
+
+      // Sub-colección de participantes (presencia en tiempo real)
+      match /participants/{deviceId} {
+        allow read, write: if true;
+      }
+    }
+
+    // ── Himnos (Colecciones de la App) ─────────────────────────────────────
+    match /iump/{docId} {
+      allow read, write: if true;
+    }
+    match /especiales/{docId} {
+      allow read, write: if true;
+    }
+    match /coros/{docId} {
+      allow read, write: if true;
+    }
+    match /app_config/{docId} {
+      allow read, write: if true;
+    }
+    match /live_worship_rooms/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

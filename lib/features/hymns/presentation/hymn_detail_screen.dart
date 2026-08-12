@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
@@ -13,12 +14,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../domain/hymn.dart';
+import '../../../core/services/gemini_ai_service.dart';
 import 'hymn_list_screen.dart';
+import 'notation_provider.dart';
 import 'presentation_screen.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../favorites/domain/favorites_notifier.dart';
 import '../../setlists/presentation/setlists_provider.dart';
+import '../../../core/services/chord_transposer_service.dart';
+import '../../../core/services/local_hymn_storage_service.dart';
+import 'widgets/chord_diagram_dialog.dart';
+import 'widgets/visual_metronome_widget.dart';
+import '../../../core/widgets/app_music_icons.dart';
+import '../../../core/services/hymn_pdf_service.dart';
 
 // Notifier para controlar el tamaño de la letra
 class FontSizeNotifier extends Notifier<double> {
@@ -42,6 +52,12 @@ final fontSizeProvider = NotifierProvider<FontSizeNotifier, double>(() {
   return FontSizeNotifier();
 });
 
+final ignoredDuplicatePairsProvider = FutureProvider<Set<String>>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  final list = prefs.getStringList('ignored_duplicate_pairs') ?? [];
+  return list.toSet();
+});
+
 class HymnDetailScreen extends ConsumerStatefulWidget {
   final String hymnId;
 
@@ -60,6 +76,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _showChords = true;
   String _notation = 'spanish';
   bool _showControlPanel = false; // Oculto por defecto para no tapar las letras
+  bool _showMetronome = false; // Metrónomo visual silencioso
+  bool _metronomeTop = true;
+  bool _metronomeVertical = false;
 
   // Variables de estado para reproducción de audio
   AudioPlayer? _audioPlayer;
@@ -70,18 +89,49 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   String? _currentAudioUrl;
   bool _showPlayerCard = false;
 
+  YoutubePlayerController? _youtubeController;
+
+  void _updateYoutubePlayer(Hymn hymn) {
+    final audioUrl = hymn.audioUrl;
+    if (audioUrl.isNotEmpty && (audioUrl.contains('youtube.com') || audioUrl.contains('youtu.be'))) {
+      final videoId = YoutubePlayerController.convertUrlToId(audioUrl);
+      if (videoId != null) {
+        if (_youtubeController == null) {
+          _youtubeController = YoutubePlayerController.fromVideoId(
+            videoId: videoId,
+            autoPlay: false,
+            params: const YoutubePlayerParams(showControls: true, mute: false),
+          );
+        } else {
+          _youtubeController!.loadVideoById(videoId: videoId);
+          _youtubeController!.pauseVideo();
+        }
+      }
+    } else {
+      _youtubeController?.pauseVideo();
+    }
+  }
+
   String? _lastLyricsForBlocks;
   int? _lastTransposeOffsetForBlocks;
   List<String> _cachedBlocks = [];
 
   static final Map<String, Hymn?> _similarityCache = {};
 
-  Hymn? _getSimilarHymnCached(Hymn current, List<Hymn> allHymns) {
+  Hymn? _getSimilarHymnCached(Hymn current, List<Hymn> allHymns, Set<String> ignoredPairs) {
     final key = '${current.collection}-${current.id}';
     if (_similarityCache.containsKey(key)) {
-      return _similarityCache[key];
+      final cached = _similarityCache[key];
+      if (cached != null) {
+        final pairKey2 = '${cached.collection}-${cached.id}';
+        if (ignoredPairs.contains('${key}_${pairKey2}') || ignoredPairs.contains('${pairKey2}_${key}')) {
+          _similarityCache[key] = null;
+          return null;
+        }
+      }
+      return cached;
     }
-    final result = _findSimilarHymn(current, allHymns);
+    final result = _findSimilarHymn(current, allHymns, ignoredPairs: ignoredPairs);
     _similarityCache[key] = result;
     return result;
   }
@@ -92,7 +142,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
     _lastLyricsForBlocks = lyrics;
     _lastTransposeOffsetForBlocks = transposeOffset;
-    final transposedLyrics = Hymn.transposeLyrics(lyrics, transposeOffset);
+    final sanitized = Hymn.ensureHeadersOnOwnLine(lyrics);
+    final transposedLyrics = Hymn.transposeLyrics(sanitized, transposeOffset);
     _cachedBlocks = _getMergedBlocks(transposedLyrics);
     return _cachedBlocks;
   }
@@ -121,52 +172,81 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   void dispose() {
     _pageController?.dispose();
     _audioPlayer?.dispose();
+    _youtubeController?.close();
     super.dispose();
   }
 
   void _initializeHymns(List<Hymn> hymns) {
-    if (_initialized) return;
-
-    final activeSetlist = ref.read(activeSetlistProvider);
-
     final parts = widget.hymnId.split('-');
     final collectionParam = parts.length > 1 ? parts[0] : 'iump';
     final idString = parts.length > 1 ? parts.sublist(1).join('-') : widget.hymnId;
     final id = int.tryParse(idString) ?? 0;
 
+    if (_initialized && _sortedHymns.isNotEmpty) {
+      final exists = _sortedHymns.any((h) => h.collection == collectionParam && h.id == id);
+      if (exists) return;
+    }
+
+    final activeSetlist = ref.read(activeSetlistProvider);
+
+    _sortedHymns = [];
+
     if (activeSetlist != null) {
-      _sortedHymns = [];
       for (final hId in activeSetlist.hymnIds) {
         final hParts = hId.split('-');
         final hCol = hParts[0];
         final hIdNum = int.tryParse(hParts.sublist(1).join('-')) ?? 0;
         final matching = hymns.firstWhere(
           (h) => h.collection == hCol && h.id == hIdNum,
-          orElse: () => const Hymn(id: 0, title: '', tone: '', lyrics: '', collection: ''),
+          orElse: () => Hymn(
+              id: 0,
+              title: '',
+              toneNote: '',
+              beats: '',
+              timeSignature: '',
+              lyrics: '',
+              collection: ''),
         );
         if (matching.id != 0) {
           _sortedHymns.add(matching);
         }
       }
-    } else {
-      // Filtrar y ordenar por colección normal
+    }
+
+    // Fallback 1: Si no hay cantos del setlist o el id buscado no está en el setlist, cargar la colección normal
+    var startIndex = _sortedHymns.indexWhere((h) => h.collection == collectionParam && h.id == id);
+    if (_sortedHymns.isEmpty || startIndex == -1) {
       _sortedHymns = hymns.where((h) => h.collection == collectionParam).toList();
       if (collectionParam == 'iump') {
         _sortedHymns.sort((a, b) => a.id.compareTo(b.id));
       } else {
         _sortedHymns.sort((a, b) => a.title.compareTo(b.title));
       }
+      startIndex = _sortedHymns.indexWhere((h) => h.collection == collectionParam && h.id == id);
     }
 
-    final startIndex = _sortedHymns.indexWhere((h) => h.collection == collectionParam && h.id == id);
-    if (startIndex != -1) {
+    // Fallback 2: Buscar en todo el catálogo global por id o título
+    if (_sortedHymns.isEmpty || startIndex == -1) {
+      final globalMatch = hymns.where((h) => h.id == id).toList();
+      if (globalMatch.isNotEmpty) {
+        _sortedHymns = globalMatch;
+        startIndex = 0;
+      }
+    }
+
+    if (startIndex != -1 && startIndex < _sortedHymns.length) {
       _currentIndex = startIndex;
       _pageController = PageController(initialPage: startIndex);
-    } else {
+    } else if (_sortedHymns.isNotEmpty) {
       _currentIndex = 0;
       _pageController = PageController(initialPage: 0);
     }
     _initialized = true;
+    if (_currentIndex != null && _currentIndex! < _sortedHymns.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateYoutubePlayer(_sortedHymns[_currentIndex!]);
+      });
+    }
   }
 
   @override
@@ -213,53 +293,100 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
 
     if (_sortedHymns.isEmpty || _currentIndex == null || _pageController == null) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Error')),
-            body: const Center(child: Text('Himno no encontrado')),
-          );
-        }
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Catálogo', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () {
+              context.pop();
+            },
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.music_note_outlined, size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                'Regresando al catálogo...',
+                style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Volver a la Lista'),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/hymns');
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-        final hymn = _sortedHymns[_currentIndex!];
-        final isFavorite = favorites.contains('${hymn.collection}-${hymn.id}');
+    final hymn = _sortedHymns[_currentIndex!];
+    final isFavorite = favorites.contains('${hymn.collection}-${hymn.id}');
 
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  color: isDark 
-                    ? theme.colorScheme.surface.withValues(alpha: 0.5) 
-                    : Colors.white.withValues(alpha: 0.4),
-                ),
+    final activeSetlist = ref.watch(activeSetlistProvider);
+    final String moduleBadgeText = activeSetlist != null
+        ? '📋 MODO CULTO • ${activeSetlist.title}'
+        : (hymn.collection == 'iump' 
+            ? '🏛️ HIMNARIO IUMP' 
+            : (hymn.collection == 'especiales' ? '✨ ALABANZAS ESPECIALES' : '🔥 COROS DE AVIVAMIENTO'));
+
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () {
+              context.pop();
+            },
+          ),
+          flexibleSpace: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                color: isDark 
+                  ? theme.colorScheme.surface.withValues(alpha: 0.5) 
+                  : Colors.white.withValues(alpha: 0.4),
               ),
             ),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  hymn.collection == 'iump' 
-                    ? 'Himno ${hymn.id}' 
-                    : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro'),
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Text(
-                  hymn.title,
-                  style: GoogleFonts.nunito(
-                    fontSize: 12, 
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+          ),
+          title: AutoScrollingAppBarTitle(
+            badgeText: moduleBadgeText,
+            titleText: hymn.collection == 'iump' ? 'Himno ${hymn.id} - ${hymn.title}' : hymn.title,
+            primaryColor: theme.colorScheme.primary,
+          ),
             actions: [
+              IconButton(
+                icon: const TuningForkIcon(size: 22, color: Color(0xFFEC4899)),
+                tooltip: 'Afinador de Instrumentos',
+                onPressed: () => context.push('/tuner'),
+              ),
+              IconButton(
+                icon: TraditionalMetronomeIcon(
+                  size: 22,
+                  color: _showMetronome ? theme.colorScheme.primary : (isDark ? Colors.white70 : Colors.black87),
+                ),
+                tooltip: _showMetronome ? 'Ocultar metrónomo' : 'Metrónomo silencioso',
+                onPressed: () {
+                  setState(() {
+                    _showMetronome = !_showMetronome;
+                  });
+                },
+              ),
               _buildDatabaseStatusWidget(dbStatus, theme, isDark),
               if (hymn.audioUrl.isNotEmpty)
                 IconButton(
@@ -279,11 +406,19 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   onPressed: () {
                     final isYoutube = hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be');
                     if (isYoutube) {
-                      final uri = Uri.parse(hymn.audioUrl);
-                      canLaunchUrl(uri).then((can) {
-                        if (can) {
-                          launchUrl(uri, mode: LaunchMode.externalApplication);
+                      final uri = Uri.parse(hymn.audioUrl.trim());
+                      launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) {
+                        return launchUrl(uri, mode: LaunchMode.platformDefault);
+                      }).catchError((e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('No se pudo abrir el enlace: $e'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
                         }
+                        return false;
                       });
                     } else {
                       if (_audioPlayer != null && _currentAudioUrl == hymn.audioUrl) {
@@ -302,6 +437,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   },
                 ),
               IconButton(
+                icon: const Icon(Icons.playlist_add_rounded),
+                tooltip: 'Agregar a Repertorio',
+                onPressed: () {
+                  _showAddToSetlistDialog(context, ref, hymn);
+                },
+              ),
+              IconButton(
                 icon: Icon(
                   isFavorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
                   color: isFavorite ? theme.colorScheme.primary : null,
@@ -315,6 +457,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) {
                   switch (value) {
+                    case 'pdf':
+                      _showExportPdfModal(context, hymn);
+                      break;
                     case 'projector':
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -334,6 +479,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   }
                 },
                 itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'pdf',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.picture_as_pdf_rounded, size: 20, color: Color(0xFF4F46E5)),
+                        const SizedBox(width: 10),
+                        Text('Compartir Canto en PDF', style: GoogleFonts.nunito()),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'projector',
                     child: Row(
@@ -428,6 +583,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       _transposeOffset = 0; // Resetear transposición al cambiar de himno
                       _showPlayerCard = false;
                       _audioPlayer?.stop(); // Detener el audio al cambiar de canto
+                      _updateYoutubePlayer(_sortedHymns[index]);
                     });
                   },
                   itemBuilder: (context, index) {
@@ -619,25 +775,24 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                     ),
                                   ],
                                 ),
-                                if (_showChords)
-                                  Container(
-                                    decoration: BoxDecoration(
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
                                       color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                                        width: 0.8,
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.all(2),
-                                    child: Row(
-                                      children: [
-                                        _buildNotationPill('spanish', 'Latino (DO)', theme, isDark),
-                                        const SizedBox(width: 2),
-                                        _buildNotationPill('american', 'Amer. (C)', theme, isDark),
-                                      ],
+                                      width: 0.8,
                                     ),
                                   ),
+                                  padding: const EdgeInsets.all(2),
+                                  child: Row(
+                                    children: [
+                                      _buildNotationPill('spanish', 'Latino (DO)', theme, isDark),
+                                      const SizedBox(width: 2),
+                                      _buildNotationPill('american', 'Amer. (C)', theme, isDark),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                             const Divider(height: 12),
@@ -844,9 +999,39 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     ),
                   ),
                 ).animate().fadeIn(duration: 200.ms).slideY(begin: 0.1),
+
+              // Metrónomo Flotante Interactivo (Ubicación Rápida mediante Botones Dedicados)
+              if (_showMetronome)
+                Positioned(
+                  top: _metronomeTop ? (MediaQuery.of(context).padding.top + kToolbarHeight + 4) : null,
+                  bottom: !_metronomeTop ? (85 + MediaQuery.of(context).padding.bottom) : null,
+                  left: _metronomeVertical ? (MediaQuery.of(context).size.width - 82) : 4,
+                  right: _metronomeVertical ? 6 : 4,
+                  child: VisualMetronomeWidget(
+                    initialBpm: 80,
+                    isTopPosition: _metronomeTop,
+                    isVerticalLayout: _metronomeVertical,
+                    onClose: () {
+                      setState(() {
+                        _showMetronome = false;
+                      });
+                    },
+                    onTogglePosition: () {
+                      setState(() {
+                        _metronomeTop = !_metronomeTop;
+                      });
+                    },
+                    onToggleOrientation: () {
+                      setState(() {
+                        _metronomeVertical = !_metronomeVertical;
+                      });
+                    },
+                  ),
+                ),
             ],
           ),
-        );
+        ),
+      );
   }
 
   Future<void> _initAudio(String url) async {
@@ -865,7 +1050,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       _audioPlayer = player;
       _currentAudioUrl = url;
 
-      await player.setUrl(url);
+      if (kIsWeb) {
+        await player.setUrl(url);
+      } else {
+        final audioSource = LockCachingAudioSource(Uri.parse(url));
+        await player.setAudioSource(audioSource);
+      }
 
       player.playerStateStream.listen((state) {
         if (mounted) {
@@ -987,7 +1177,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       if (!adminMode) return const SizedBox.shrink();
                       final allHymnsState = ref.watch(allHymnsGlobalProvider);
                       final allHymns = allHymnsState.value ?? [];
-                      final similarHymn = _getSimilarHymnCached(hymn, allHymns);
+                      final ignoredPairsState = ref.watch(ignoredDuplicatePairsProvider);
+                      final ignoredPairsSet = ignoredPairsState.value ?? {};
+                      final similarHymn = _getSimilarHymnCached(hymn, allHymns, ignoredPairsSet);
                       if (similarHymn == null) return const SizedBox.shrink();
                       
                       return Container(
@@ -1059,7 +1251,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       child: Text(
                         hymn.title,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.playfairDisplay(
+                        style: GoogleFonts.outfit(
                           fontSize: fontSize * 1.25,
                           fontWeight: FontWeight.bold,
                           color: isDark ? Colors.white : theme.colorScheme.primary,
@@ -1069,6 +1261,23 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  
+                  if (hymn.audioUrl.isNotEmpty && _youtubeController != null && (hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')))
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: YoutubePlayer(
+                          controller: _youtubeController!,
+                        ),
+                      ),
+                    ),
                   
                   // Chip de Tono
                   if (displayedTone.isNotEmpty)
@@ -1086,7 +1295,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         ),
                       ),
                       child: Text(
-                        Hymn.formatToneDisplay(displayedTone, _notation),
+                        Hymn.formatToneDisplay(displayedTone, ref.watch(notationProvider)),
                         style: GoogleFonts.outfit(
                           fontSize: fontSize * 0.7,
                           fontWeight: FontWeight.bold,
@@ -1429,7 +1638,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
       // 2. Acorde + texto que va directamente debajo de él
       final rawChord = match.group(1)!;
-      final displayedChord = Hymn.convertChordNotation(rawChord, _notation);
+      final transposedChord = ChordTransposerService.transposeSingleChord(rawChord, _transposeOffset);
+      final displayedChord = Hymn.convertChordNotation(transposedChord, ref.watch(notationProvider));
 
       // Fin del texto bajo este acorde: inicio del siguiente acorde (o fin de línea)
       final nextMatchStart = (i == matchesList.length - 1)
@@ -1437,29 +1647,41 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           : matchesList[i + 1].start;
 
       final textUnder = line.substring(match.end, nextMatchStart);
+      final chordFontSize = fontSize * 0.65;
+      final minChordWidth = displayedChord.length * (chordFontSize * 0.58);
 
       inlineWidgets.add(
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              displayedChord,
-              style: GoogleFonts.outfit(
-                fontSize: fontSize * 0.72,
-                fontWeight: FontWeight.w900,
-                color: Colors.amber[600],
+        ConstrainedBox(
+          constraints: BoxConstraints(minWidth: minChordWidth),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () => ChordDiagramDialog.show(context, displayedChord),
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                  child: Text(
+                    displayedChord,
+                    style: GoogleFonts.outfit(
+                      fontSize: chordFontSize,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.amber[600],
+                    ),
+                  ),
+                ),
               ),
-            ),
-            Text(
-              textUnder.isEmpty ? ' ' : textUnder,
-              style: GoogleFonts.nunito(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white.withValues(alpha: 0.85) : theme.colorScheme.onSurface,
+              Text(
+                textUnder.isEmpty ? ' ' : textUnder,
+                style: GoogleFonts.nunito(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white.withValues(alpha: 0.85) : theme.colorScheme.onSurface,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
 
@@ -1470,13 +1692,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   Widget _buildNotationPill(String notationType, String label, ThemeData theme, bool isDark) {
-    final isSelected = _notation == notationType;
+    final currentNotation = ref.watch(notationProvider);
+    final isSelected = currentNotation == notationType;
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _notation = notationType;
-          _savePreferences();
-        });
+        ref.read(notationProvider.notifier).setNotation(notationType);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -1503,7 +1723,27 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   void _showEditHymnDialog(BuildContext context, WidgetRef ref, Hymn hymn) {
     final titleController = TextEditingController(text: hymn.title);
-    final toneController = TextEditingController(text: hymn.tone.replaceAll('TONO: ', ''));
+    final parsedTone = Hymn.parseToneComponents(hymn.tone);
+    String rawToneNote = hymn.toneNote.isNotEmpty ? hymn.toneNote : (parsedTone['toneNote'] ?? '');
+    
+    bool isInitialMinor = rawToneNote.endsWith('m') ||
+        rawToneNote.toLowerCase().contains('menor') ||
+        rawToneNote.endsWith('M');
+    String selectedMode = isInitialMinor ? 'Menor' : 'Mayor';
+
+    String cleanRootNote = rawToneNote;
+    if (cleanRootNote.endsWith('m') && cleanRootNote.length > 1) {
+      cleanRootNote = cleanRootNote.substring(0, cleanRootNote.length - 1);
+    } else if (cleanRootNote.toLowerCase().endsWith('menor')) {
+      cleanRootNote = cleanRootNote.replaceAll(RegExp(r'menor', caseSensitive: false), '').trim();
+    }
+    final toneNoteController = TextEditingController(text: cleanRootNote);
+    final beatsController = TextEditingController(
+      text: hymn.beats.isNotEmpty ? hymn.beats : parsedTone['beats'],
+    );
+    final timeSignatureController = TextEditingController(
+      text: hymn.timeSignature.isNotEmpty ? hymn.timeSignature : parsedTone['timeSignature'],
+    );
     final lyricsController = TextEditingController(text: hymn.lyrics);
     final audioUrlController = TextEditingController(text: hymn.audioUrl);
     final formKey = GlobalKey<FormState>();
@@ -1515,6 +1755,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     String selectedCollection = validCollections.contains(hymn.collection)
         ? hymn.collection
         : 'iump';
+    String selectedCategory = hymn.category;
 
     // Variables de estado locales para la subida y grabación de audio
     bool isUploading = false;
@@ -1529,8 +1770,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     Future<void> pickAndUploadAudio(void Function(void Function()) dialogSetState) async {
       try {
         final result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['mp3', 'm4a'],
+          type: FileType.audio,
         );
         if (result == null || result.files.isEmpty) return;
 
@@ -1566,9 +1806,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           uploadStatusText = 'Preparando subida...';
         });
 
+        File fileToUpload = File(file.path!);
+        String ext = file.extension ?? 'mp3';
+
+        dialogSetState(() {
+          uploadStatusText = 'Subiendo a la nube...';
+        });
+
         final storageRef = FirebaseStorage.instance
             .ref()
-            .child('audios/canto_${hymn.collection}_${hymn.id}.mp3');
+            .child('audios/canto_${hymn.collection}_${hymn.id}.$ext');
 
         UploadTask uploadTask;
         if (kIsWeb) {
@@ -1584,8 +1831,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             throw Exception('Ruta de archivo no válida.');
           }
           uploadTask = storageRef.putFile(
-            File(file.path!),
-            SettableMetadata(contentType: 'audio/mpeg'),
+            fileToUpload,
+            SettableMetadata(contentType: ext == 'm4a' ? 'audio/mp4' : 'audio/mpeg'),
           );
         }
 
@@ -1627,6 +1874,35 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             ),
           );
         }
+      }
+    }
+
+    Future<void> processYoutubeUrl(void Function(void Function()) dialogSetState) async {
+      final inputUrl = audioUrlController.text.trim();
+      if (inputUrl.isEmpty || (!inputUrl.contains('youtube.com') && !inputUrl.contains('youtu.be'))) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ingresa una URL válida de YouTube.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      dialogSetState(() {
+        audioUrlController.text = inputUrl;
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎵 Enlace de YouTube guardado. Cierra y vuelve a abrir el himno para ver el reproductor.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     }
 
@@ -1703,7 +1979,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
         final storageRef = FirebaseStorage.instance
             .ref()
-            .child('audios/canto_${hymn.collection}_${hymn.id}.mp3');
+            .child('audios/canto_${hymn.collection}_${hymn.id}.m4a');
 
         final uploadTask = storageRef.putFile(
           File(path),
@@ -1822,9 +2098,37 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           builder: (context, setState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text(
-                'Editar Himno ${hymn.id}',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Editar Himno ${hymn.id}',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Mejorar Ortografía y Puntuación con IA',
+                    icon: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
+                    onPressed: () async {
+                      if (lyricsController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Ingresa la letra antes de pulir con IA')),
+                        );
+                        return;
+                      }
+                      final result = await GeminiAiService.correctHymnGrammar(
+                        context: context,
+                        title: titleController.text.trim(),
+                        lyrics: lyricsController.text.trim(),
+                      );
+                      if (result != null) {
+                        titleController.text = result['title']!;
+                        lyricsController.text = result['lyrics']!;
+                      }
+                    },
+                  ),
+                ],
               ),
               content: Form(
                 key: formKey,
@@ -1841,27 +2145,120 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           return null;
                         },
                       ),
-                      TextFormField(
-                        controller: toneController,
-                        decoration: const InputDecoration(labelText: 'Tono (ej: SOL MAYOR)'),
-                        textCapitalization: TextCapitalization.characters,
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: selectedCollection,
-                        decoration: const InputDecoration(labelText: 'Sección / Contenedor'),
-                        items: const [
-                          DropdownMenuItem(value: 'iump', child: Text('Himnario IUMP')),
-                          DropdownMenuItem(value: 'especiales', child: Text('Alabanzas Especiales')),
-                          DropdownMenuItem(value: 'coros', child: Text('Coros de Avivamiento')),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: TextFormField(
+                              controller: toneNoteController,
+                              decoration: const InputDecoration(
+                                labelText: 'Tono (ej: RE, D)',
+                                isDense: true,
+                              ),
+                              textCapitalization: TextCapitalization.characters,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 1,
+                            child: DropdownButtonFormField<String>(
+                              value: selectedMode,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Modo',
+                                isDense: true,
+                              ),
+                              items: const [
+                                DropdownMenuItem(value: 'Mayor', child: Text('Mayor (M)')),
+                                DropdownMenuItem(value: 'Menor', child: Text('Menor (m)')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    selectedMode = val;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
                         ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              selectedCollection = val;
-                            });
-                          }
-                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: TextFormField(
+                              controller: beatsController,
+                              decoration: const InputDecoration(
+                                labelText: 'Tiempos (ej: 3)',
+                                isDense: true,
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 1,
+                            child: TextFormField(
+                              controller: timeSignatureController,
+                              decoration: const InputDecoration(
+                                labelText: 'Métrica (ej: 4/4)',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: DropdownButtonFormField<String>(
+                              value: selectedCollection,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Sección',
+                                isDense: true,
+                              ),
+                              items: const [
+                                DropdownMenuItem(value: 'iump', child: Text('Himnario IUMP', overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'especiales', child: Text('Alabanzas Esp.', overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'coros', child: Text('Coros Avivamiento', overflow: TextOverflow.ellipsis)),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    selectedCollection = val;
+                                    selectedCategory = '';
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 1,
+                            child: DropdownButtonFormField<String>(
+                              value: _getValidCategoryValueForEdit(selectedCollection, selectedCategory),
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Categoría',
+                                isDense: true,
+                              ),
+                              items: _getCategoryDropdownItemsForEdit(selectedCollection),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    selectedCategory = val;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -1983,6 +2380,18 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                   label: Text('Grabar Audio', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.bold)),
                                   onPressed: () => startRecording(setState),
                                 ),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  elevation: 0,
+                                  backgroundColor: Colors.redAccent.withValues(alpha: 0.15),
+                                  foregroundColor: Colors.redAccent,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.cloud_download_rounded, size: 18),
+                                label: Text('Extraer YouTube', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.bold)),
+                                onPressed: () => processYoutubeUrl(setState),
+                              ),
                               if (audioUrlController.text.isNotEmpty)
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
@@ -2000,56 +2409,114 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           ),
                         ),
                       const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                      // Encabezado Asistente de Acordes
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.keyboard_double_arrow_right_rounded, size: 16, color: theme.colorScheme.primary),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Asistente de Acordes (Opcional):',
-                            style: GoogleFonts.nunito(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white60 : Colors.black54,
+                          Row(
+                            children: [
+                              Icon(Icons.piano_rounded, size: 18, color: theme.colorScheme.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Asistente de Acordes:',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             ),
+                            icon: const Icon(Icons.cleaning_services_rounded, size: 15),
+                            label: Text(
+                              'Borrar acordes',
+                              style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () {
+                              lyricsController.text = lyricsController.text.replaceAll(RegExp(r'\[[^\]]*\]'), '');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Se limpiaron todos los acordes del canto', style: GoogleFonts.nunito()),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
                       const SizedBox(height: 6),
+
+                      // Botón Constructor de Acordes Compuestos
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                            side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+                          ),
+                          icon: const Icon(Icons.tune_rounded, size: 16),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '🎼 Constructor de Acordes (Compuestos, Séptimas, Slash)',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          onPressed: () {
+                            _showInteractiveChordBuilderModal(context, lyricsController, theme, isDark);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Paleta Rápida de Acordes de Alabanza (1-Tap direct insert)
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
                         child: Row(
                           children: [
-                            for (final note in ['DO', 'RE', 'MI', 'FA', 'SOL', 'LA', 'SI'])
-                              Container(
-                                margin: const EdgeInsets.only(right: 6),
+                            for (final chord in [
+                              'MIm', 'LAm', 'REm', 'SIm', 'SOL', 'DO', 'RE', 'FA', 'LA', 'MI',
+                              'DO7', 'SOL7', 'FA#m', 'SI7', 'SIb', 'DOmaj7', 'SOL#m'
+                            ])
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
                                 child: InkWell(
                                   onTap: () {
                                     final text = lyricsController.text;
                                     final selection = lyricsController.selection;
+                                    final chordTag = '[$chord]';
                                     final start = selection.start;
                                     final end = selection.end;
+
                                     if (start < 0) {
-                                      lyricsController.text = '$text[$note]';
+                                      lyricsController.text = '$text$chordTag';
+                                      lyricsController.selection = TextSelection.collapsed(offset: lyricsController.text.length);
                                     } else {
-                                      final newText = text.replaceRange(start, end, '[$note]');
+                                      final newText = text.replaceRange(start, end, chordTag);
                                       lyricsController.text = newText;
-                                      lyricsController.selection = TextSelection.collapsed(offset: start + note.length + 2);
+                                      lyricsController.selection = TextSelection.collapsed(offset: start + chordTag.length);
                                     }
                                   },
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                                        width: 1,
+                                        color: theme.colorScheme.primary.withValues(alpha: 0.25),
                                       ),
                                     ),
                                     child: Text(
-                                      note,
+                                      chord,
                                       style: GoogleFonts.outfit(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.bold,
@@ -2059,84 +2526,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                   ),
                                 ),
                               ),
-                            for (final alt in ['#', 'b', 'm', '7', '9', 'sus4', 'maj7'])
-                              Container(
-                                margin: const EdgeInsets.only(right: 6),
-                                child: InkWell(
-                                  onTap: () {
-                                    final text = lyricsController.text;
-                                    final selection = lyricsController.selection;
-                                    final start = selection.start;
-                                    final end = selection.end;
-                                    if (start < 0) {
-                                      lyricsController.text = '$text$alt';
-                                    } else {
-                                      final newText = text.replaceRange(start, end, alt);
-                                      lyricsController.text = newText;
-                                      lyricsController.selection = TextSelection.collapsed(offset: start + alt.length);
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.amber.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: Colors.amber.withValues(alpha: 0.15),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      alt,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.amber[800],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            Container(
-                              margin: const EdgeInsets.only(right: 6),
-                              child: InkWell(
-                                onTap: () {
-                                  final text = lyricsController.text;
-                                  final selection = lyricsController.selection;
-                                  final start = selection.start;
-                                  final end = selection.end;
-                                  if (start < 0) {
-                                    lyricsController.text = '$text[]';
-                                    lyricsController.selection = TextSelection.collapsed(offset: lyricsController.text.length - 1);
-                                  } else {
-                                    final newText = text.replaceRange(start, end, '[]');
-                                    lyricsController.text = newText;
-                                    lyricsController.selection = TextSelection.collapsed(offset: start + 1);
-                                  }
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isDark ? Colors.white24 : Colors.black12,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    '[]',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.white70 : Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -2173,56 +2562,345 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ),
                   onPressed: (isUploading || isRecording) ? null : () async {
                     if (formKey.currentState!.validate()) {
-                      final toneText = toneController.text.trim().isNotEmpty
-                          ? (toneController.text.toUpperCase().contains('TONO')
-                              ? toneController.text.trim().toUpperCase()
-                              : 'TONO: ${toneController.text.trim().toUpperCase()}')
-                          : '';
+                      await LocalHymnStorageService.saveLocalHymnEdit(
+                        hymn.collection,
+                        hymn.id,
+                        lyricsController.text.trim(),
+                      );
 
-                      if (selectedCollection != hymn.collection) {
-                        // Se cambió el contenedor/sección
-                        await ref.read(hymnsProvider(hymn.collection).notifier).moveHymnTo(
-                          hymn.copyWith(
-                            title: titleController.text.trim(),
-                            tone: toneText,
-                            lyrics: lyricsController.text.trim(),
-                            audioUrl: audioUrlController.text.trim(),
-                          ),
-                          selectedCollection,
-                        );
-                      } else {
-                        // Mismo contenedor
-                        await ref.read(hymnsProvider(hymn.collection).notifier).saveHymn(
-                          id: hymn.id,
-                          title: titleController.text.trim(),
-                          tone: toneText,
-                          lyrics: lyricsController.text.trim(),
-                          isNew: false,
-                          audioUrl: audioUrlController.text.trim(),
-                        );
+                      String finalToneNote = toneNoteController.text.trim();
+                      if (finalToneNote.isNotEmpty) {
+                        String rootNote = finalToneNote.toUpperCase();
+                        if (rootNote.endsWith('M')) {
+                          rootNote = rootNote.substring(0, rootNote.length - 1);
+                        }
+                        if (selectedMode == 'Menor') {
+                          finalToneNote = '${rootNote}m';
+                        } else {
+                          finalToneNote = rootNote;
+                        }
                       }
-                      
+
                       final messenger = ScaffoldMessenger.of(context);
-                      
-                      Navigator.pop(context); // Cerrar diálogo
-                      
-                      if (selectedCollection != hymn.collection) {
+                      final isMoving = selectedCollection != hymn.collection;
+
+                      Navigator.pop(context); // Cerrar diálogo de inmediato
+                      if (isMoving) {
                         Navigator.pop(context); // Salir de la pantalla de detalle ya que se trasladó
                       }
-                      
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text('Himno guardado con éxito', style: GoogleFonts.nunito()),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      );
+
+                      // Ejecutar la actualización en Riverpod después de que la navegación se complete
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        if (isMoving) {
+                          ref.read(hymnsProvider(hymn.collection).notifier).moveHymnTo(
+                            hymn.copyWith(
+                              title: titleController.text.trim(),
+                              toneNote: finalToneNote,
+                              beats: beatsController.text.trim(),
+                              timeSignature: timeSignatureController.text.trim(),
+                              lyrics: lyricsController.text.trim(),
+                              audioUrl: audioUrlController.text.trim(),
+                              category: selectedCategory,
+                            ),
+                            selectedCollection,
+                          );
+                        } else {
+                          ref.read(hymnsProvider(hymn.collection).notifier).saveHymn(
+                            id: hymn.id,
+                            title: titleController.text.trim(),
+                            toneNote: finalToneNote,
+                            beats: beatsController.text.trim(),
+                            timeSignature: timeSignatureController.text.trim(),
+                            lyrics: lyricsController.text.trim(),
+                            isNew: false,
+                            audioUrl: audioUrlController.text.trim(),
+                            category: selectedCategory,
+                          );
+                        }
+
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Himno guardado con éxito', style: GoogleFonts.nunito()),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      });
                     }
                   },
                   child: Text('Guardar', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
                 ),
               ],
+
             );
+          },
+        );
+      },
+    );
+  }
+
+  List<DropdownMenuItem<String>> _getCategoryDropdownItemsForEdit(String collection) {
+    final List<Map<String, String>> categories;
+    if (collection == 'especiales') {
+      categories = [
+        {'id': '', 'name': 'Sin Categoría / Ninguna'},
+        {'id': 'Coro Nacional', 'name': 'Coro Nacional'},
+        {'id': 'Coros Unidos', 'name': 'Coros Unidos'},
+      ];
+    } else if (collection == 'coros') {
+      categories = [
+        {'id': '', 'name': 'Sin Categoría / Ninguna'},
+        {'id': 'Con Acordes', 'name': 'Con Acordes'},
+        {'id': 'DO', 'name': 'Tono DO'},
+        {'id': 'RE', 'name': 'Tono RE'},
+        {'id': 'MI', 'name': 'Tono MI'},
+        {'id': 'FA', 'name': 'Tono FA'},
+        {'id': 'SOL', 'name': 'Tono SOL'},
+        {'id': 'LA', 'name': 'Tono LA'},
+        {'id': 'SI', 'name': 'Tono SI'},
+        {'id': 'Menores', 'name': 'Ritmo Menor'},
+      ];
+    } else {
+      categories = [
+        {'id': '', 'name': 'Sin Categoría / Ninguna'},
+        {'id': 'Predicación', 'name': 'Predicación'},
+        {'id': 'Adoración', 'name': 'Adoración'},
+        {'id': 'Consagración', 'name': 'Consagración'},
+        {'id': 'Santa Cena', 'name': 'Santa Cena'},
+        {'id': 'Coritos', 'name': 'Coritos'},
+        {'id': 'Fúnebre', 'name': 'Fúnebre'},
+        {'id': 'Navidad', 'name': 'Navidad'},
+      ];
+    }
+
+    return categories.map((cat) {
+      return DropdownMenuItem<String>(
+        value: cat['id']!,
+        child: Text(cat['name']!, overflow: TextOverflow.ellipsis),
+      );
+    }).toList();
+  }
+
+  String _getValidCategoryValueForEdit(String collection, String category) {
+    final items = _getCategoryDropdownItemsForEdit(collection);
+    if (items.any((item) => item.value == category)) {
+      return category;
+    }
+    return '';
+  }
+
+  void _showInteractiveChordBuilderModal(
+    BuildContext context,
+    TextEditingController lyricsController,
+    ThemeData theme,
+    bool isDark,
+  ) {
+    String selectedRoot = 'DO';
+    String selectedAccidental = '';
+    String selectedQuality = '';
+    String selectedSlash = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final rawChord = '$selectedRoot$selectedAccidental$selectedQuality$selectedSlash';
+            final chordTag = '[$rawChord]';
+            final bottomPadding = 20.0 + MediaQuery.of(context).padding.bottom;
+
+            return SafeArea(
+              child: Container(
+                padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white24 : Colors.black12,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Constructor Interactivo de Acordes',
+                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Badge de Vista Previa
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.amber.withValues(alpha: 0.4), width: 1.5),
+                        ),
+                        child: Text(
+                          chordTag,
+                          style: GoogleFonts.outfit(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.amber[800],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 1. Tónica (Nota)
+                    Text('1. Nota Tónica:', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: ['DO', 'RE', 'MI', 'FA', 'SOL', 'LA', 'SI'].map((root) {
+                        final isSel = selectedRoot == root;
+                        return ChoiceChip(
+                          label: Text(root),
+                          labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                          selected: isSel,
+                          selectedColor: theme.colorScheme.primary,
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedRoot = root);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 2. Alteración
+                    Text('2. Alteración:', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        {'label': 'Natural ♮', 'val': ''},
+                        {'label': 'Sostenido ♯ (#)', 'val': '#'},
+                        {'label': 'Bemol ♭ (b)', 'val': 'b'},
+                      ].map((alt) {
+                        final isSel = selectedAccidental == alt['val'];
+                        return ChoiceChip(
+                          label: Text(alt['label']!),
+                          labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12),
+                          selected: isSel,
+                          selectedColor: Colors.amber[700],
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedAccidental = alt['val']!);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 3. Calidad / Modo
+                    Text('3. Tipo / Calidad del Acorde:', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        {'label': 'Mayor', 'val': ''},
+                        {'label': 'Menor (m)', 'val': 'm'},
+                        {'label': 'Séptima (7)', 'val': '7'},
+                        {'label': 'Menor 7 (m7)', 'val': 'm7'},
+                        {'label': 'Mayor 7 (maj7)', 'val': 'maj7'},
+                        {'label': 'Disminuido (dim)', 'val': 'dim'},
+                        {'label': 'Suspendido (sus4)', 'val': 'sus4'},
+                        {'label': 'Novena (9)', 'val': '9'},
+                        {'label': 'Add9', 'val': 'add9'},
+                        {'label': 'm7(b5)', 'val': 'm7(b5)'},
+                        {'label': 'Menor 6 (m6)', 'val': 'm6'},
+                      ].map((qual) {
+                        final isSel = selectedQuality == qual['val'];
+                        return ChoiceChip(
+                          label: Text(qual['label']!),
+                          labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 11.5),
+                          selected: isSel,
+                          selectedColor: theme.colorScheme.secondary,
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedQuality = qual['val']!);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 4. Bajo Alternativo (Slash Chord)
+                    Text('4. Bajo Alternativo (Slash Chord /):', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: ['', '/DO', '/RE', '/MI', '/FA', '/SOL', '/LA', '/SI', '/DO#', '/FA#', '/SOL#'].map((b) {
+                        final isSel = selectedSlash == b;
+                        return ChoiceChip(
+                          label: Text(b.isEmpty ? 'Sin Bajo' : b),
+                          labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 11.5),
+                          selected: isSel,
+                          selectedColor: Colors.teal,
+                          onSelected: (val) {
+                            if (val) setModalState(() => selectedSlash = b);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Botón Insertar con Posicionamiento Automático del Cursor
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        icon: const Icon(Icons.add_circle_outline_rounded),
+                        label: Text(
+                          'Insertar $chordTag en Cursor',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        onPressed: () {
+                          final text = lyricsController.text;
+                          final selection = lyricsController.selection;
+                          final start = selection.start;
+                          final end = selection.end;
+
+                          if (start < 0) {
+                            lyricsController.text = '$text$chordTag';
+                            lyricsController.selection = TextSelection.collapsed(offset: lyricsController.text.length);
+                          } else {
+                            final newText = text.replaceRange(start, end, chordTag);
+                            lyricsController.text = newText;
+                            lyricsController.selection = TextSelection.collapsed(offset: start + chordTag.length);
+                          }
+
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
           },
         );
       },
@@ -2291,9 +2969,14 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
   }
 
-  Hymn? _findSimilarHymn(Hymn current, List<Hymn> allHymns) {
+  Hymn? _findSimilarHymn(Hymn current, List<Hymn> allHymns, {Set<String>? ignoredPairs}) {
+    final key1 = '${current.collection}-${current.id}';
     for (final other in allHymns) {
       if (other.collection == current.collection && other.id == current.id) {
+        continue;
+      }
+      final key2 = '${other.collection}-${other.id}';
+      if (ignoredPairs != null && (ignoredPairs.contains('${key1}_${key2}') || ignoredPairs.contains('${key2}_${key1}'))) {
         continue;
       }
 
@@ -2530,7 +3213,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         const SizedBox(height: 8),
         Text(
           '${hymn.title} (ID: ${hymn.id})',
-          style: GoogleFonts.playfairDisplay(
+          style: GoogleFonts.outfit(
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -2614,7 +3297,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     
     await prefs.setStringList('ignored_duplicate_pairs', ignoredPairs);
     
+    _similarityCache.clear();
+    ref.invalidate(allHymnsGlobalProvider);
     ref.invalidate(duplicateHymnsKeysProvider);
+    ref.invalidate(ignoredDuplicatePairsProvider);
     
     if (context.mounted) {
       Navigator.of(context).pop();
@@ -2666,6 +3352,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     try {
       await ref.read(hymnsProvider(delete.collection).notifier).deleteHymn(delete.id);
       
+      _similarityCache.clear();
+      ref.invalidate(allHymnsGlobalProvider);
+      ref.invalidate(duplicateHymnsKeysProvider);
+      ref.invalidate(ignoredDuplicatePairsProvider);
+      
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2694,5 +3385,344 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       }
     }
+  }
+
+  void _showExportPdfModal(BuildContext context, Hymn hymn) {
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF4F46E5), size: 26),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Compartir Canto en PDF',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${hymn.title} · Membrete Oficial IUMP',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFEEF2FF),
+                  child: Icon(Icons.music_note_rounded, color: Color(0xFF4F46E5)),
+                ),
+                title: Text('PDF Completo (Letra y Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  _transposeOffset != 0
+                      ? 'Incluye acordes transponidos ($_transposeOffset semitono/s)'
+                      : 'Incluye tonalidad, métrica y cifrado completo',
+                  style: GoogleFonts.outfit(fontSize: 12),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  ctx.pop();
+                  await HymnPdfService.shareHymnPdf(
+                    hymn,
+                    transposeOffset: _transposeOffset,
+                    includeChords: true,
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFF0FDF4),
+                  child: Icon(Icons.description_rounded, color: Color(0xFF16A34A)),
+                ),
+                title: Text('PDF Solo Letra (Sin Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                subtitle: Text('Ideal para la congregación o imprimir folletos', style: GoogleFonts.outfit(fontSize: 12)),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  ctx.pop();
+                  await HymnPdfService.shareHymnPdf(
+                    hymn,
+                    transposeOffset: _transposeOffset,
+                    includeChords: false,
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddToSetlistDialog(BuildContext context, WidgetRef ref, Hymn hymn) {
+    final key = '${hymn.collection}-${hymn.id}';
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final setlistsAsync = ref.watch(setlistsProvider);
+        return setlistsAsync.when(
+          data: (setlists) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.playlist_add_rounded, color: Color(0xFF4F46E5), size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Agregar a Repertorio',
+                          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Selecciona la lista de culto donde deseas incluir "${hymn.title}":',
+                    style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+                  if (setlists.isEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20.0),
+                      child: Center(
+                        child: Text(
+                          'Aún no tienes listas de repertorios creadas.',
+                          style: GoogleFonts.nunito(fontSize: 14, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.4,
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: setlists.length,
+                        itemBuilder: (ctx2, i) {
+                          final setlist = setlists[i];
+                          final isInSetlist = setlist.hymnIds.contains(key);
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isInSetlist ? const Color(0xFF4F46E5).withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                isInSetlist ? Icons.check_circle_rounded : Icons.queue_music_rounded,
+                                color: isInSetlist ? const Color(0xFF4F46E5) : Colors.grey[600],
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              setlist.title,
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              '${setlist.hymnIds.length} cantos • ${setlist.date}',
+                              style: GoogleFonts.nunito(fontSize: 12),
+                            ),
+                            trailing: isInSetlist
+                                ? TextButton(
+                                    onPressed: () async {
+                                      final updatedIds = List<String>.from(setlist.hymnIds)..remove(key);
+                                      final updatedSetlist = setlist.copyWith(hymnIds: updatedIds);
+                                      await ref.read(setlistsProvider.notifier).updateSetlist(updatedSetlist);
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Removido de "${setlist.title}"'),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: const Text('Quitar', style: TextStyle(color: Colors.redAccent)),
+                                  )
+                                : ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    ),
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('Agregar'),
+                                    onPressed: () async {
+                                      final updatedIds = List<String>.from(setlist.hymnIds)..add(key);
+                                      final updatedSetlist = setlist.copyWith(hymnIds: updatedIds);
+                                      await ref.read(setlistsProvider.notifier).updateSetlist(updatedSetlist);
+                                      if (ctx.mounted) Navigator.pop(ctx);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Agregado a "${setlist.title}"'),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+          loading: () => const SizedBox(height: 150, child: Center(child: CircularProgressIndicator())),
+          error: (err, _) => SizedBox(height: 150, child: Center(child: Text('Error: $err'))),
+        );
+      },
+    );
+  }
+}
+
+class AutoScrollingAppBarTitle extends StatefulWidget {
+  final String badgeText;
+  final String titleText;
+  final Color primaryColor;
+
+  const AutoScrollingAppBarTitle({
+    super.key,
+    required this.badgeText,
+    required this.titleText,
+    required this.primaryColor,
+  });
+
+  @override
+  State<AutoScrollingAppBarTitle> createState() => _AutoScrollingAppBarTitleState();
+}
+
+class _AutoScrollingAppBarTitleState extends State<AutoScrollingAppBarTitle> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isScrolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startMarqueeLoop();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant AutoScrollingAppBarTitle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.titleText != widget.titleText) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startMarqueeLoop();
+      });
+    }
+  }
+
+  void _startMarqueeLoop() async {
+    if (_isScrolling || !mounted) return;
+    _isScrolling = true;
+
+    while (mounted && _scrollController.hasClients) {
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (maxExtent <= 5) {
+        // Si el título cabe holgadamente en el AppBar, se detiene el bucle para evitar fugas de memoria
+        break;
+      }
+
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted || !_scrollController.hasClients) break;
+
+      final durationMs = (maxExtent * 40).clamp(2000, 10000).toInt();
+
+      await _scrollController.animateTo(
+        maxExtent,
+        duration: Duration(milliseconds: durationMs),
+        curve: Curves.easeInOut,
+      );
+
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted || !_scrollController.hasClients) break;
+
+      await _scrollController.animateTo(
+        0,
+        duration: Duration(milliseconds: durationMs),
+        curve: Curves.easeInOut,
+      );
+    }
+    _isScrolling = false;
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.badgeText.toUpperCase(),
+            style: GoogleFonts.outfit(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+              color: widget.primaryColor,
+            ),
+          ),
+          Text(
+            widget.titleText,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
+            softWrap: false,
+          ),
+        ],
+      ),
+    );
   }
 }

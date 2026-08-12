@@ -9,6 +9,11 @@ import '../../hymns/presentation/hymn_list_screen.dart';
 import '../domain/setlist.dart';
 import 'setlists_provider.dart';
 
+import '../../../core/services/setlist_pdf_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import '../../../core/widgets/app_music_icons.dart';
+import '../../live_worship/presentation/live_session_provider.dart';
+
 class SetlistDetailScreen extends ConsumerStatefulWidget {
   const SetlistDetailScreen({super.key});
 
@@ -38,6 +43,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         body: Center(child: Text('Repertorio no encontrado')),
       );
     }
+
+    final allHymns = allHymnsAsync.value ?? [];
+    final setlistHymns = _getHymnsInSetlist(setlist, allHymns);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -78,24 +86,58 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                   backgroundColor: Colors.transparent,
                   actions: [
                     IconButton(
+                      icon: const TuningForkIcon(size: 22, color: Color(0xFFEC4899)),
+                      tooltip: 'Afinador de Instrumentos',
+                      onPressed: () => context.push('/tuner'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.qr_code_2_rounded),
+                      tooltip: 'Código QR del Culto',
+                      onPressed: () => _showQrCodeDialog(context, setlist, setlistHymns),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.share_rounded),
+                      tooltip: 'Compartir por WhatsApp / Texto',
+                      onPressed: () => SetlistExportService.shareSetlistText(setlist, setlistHymns),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.people_outline_rounded),
+                      tooltip: 'Asignar Nómina del Culto',
+                      onPressed: () => _showEditRosterDialog(context, ref, setlist),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.picture_as_pdf_rounded),
+                      tooltip: 'Exportar PDF / Imprimir',
+                      onPressed: () => SetlistExportService.printOrSharePdf(setlist, setlistHymns),
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
                       tooltip: 'Eliminar Repertorio',
                       onPressed: () => _confirmDeleteSetlist(context, ref, setlist),
                     ),
                   ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          setlist.title,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontSize: 18,
+                    flexibleSpace: FlexibleSpaceBar(
+                      title: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            '📋 REPERTORIOS DE CULTO',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.1,
+                              color: theme.colorScheme.primary,
+                            ),
                           ),
-                        ),
+                          Text(
+                            setlist.title,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontSize: 17,
+                            ),
+                          ),
                         Text(
                           _formatDate(setlist.date),
                           style: GoogleFonts.outfit(
@@ -212,8 +254,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.play_arrow_rounded, size: 24),
                     label: Text(
-                      'Iniciar Modo Culto',
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                      'Iniciar Modo Culto en Vivo',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,
@@ -221,9 +263,53 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    onPressed: () {
-                      final firstHymn = setlistHymns.first;
-                      context.push('/hymn/${firstHymn.collection}-${firstHymn.id}');
+                    onPressed: () async {
+                      try {
+                        // Mostrar indicador visual si tarda
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Row(
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
+                                SizedBox(width: 12),
+                                Text('Iniciando sesión en vivo...'),
+                              ],
+                            ),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+
+                        // Obtener device_id
+                        final deviceId = await ref.read(deviceIdProvider.future);
+
+                        // Crear sesión en Firestore
+                        final sessionId = await LiveSessionService.createSession(
+                          title: setlist.title,
+                          date: setlist.date,
+                          hymnIds: setlist.hymnIds,
+                          directorDeviceId: deviceId,
+                        );
+
+                        // Navegar al Modo Culto en Vivo como Director
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          context.push('/culto-en-vivo/$sessionId');
+                        }
+                      } catch (e) {
+                        debugPrint('>>> Error iniciando sesión en vivo: $e');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error al iniciar el Modo Culto: $e'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      }
                     },
                   ),
                 ),
@@ -246,7 +332,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       
       final matching = allHymns.firstWhere(
         (h) => h.collection == col && h.id == id,
-        orElse: () => const Hymn(id: 0, title: '', tone: '', lyrics: '', collection: ''),
+        orElse: () => Hymn(id: 0, title: '', toneNote: '', beats: '', timeSignature: '', lyrics: '', collection: ''),
       );
       if (matching.id != 0) {
         result.add(matching);
@@ -377,17 +463,34 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Filtrar himnos por query de búsqueda del diálogo
+            // Filtrar himnos por query de búsqueda del diálogo (solo por título o número de canto)
             final filteredList = allHymns.where((hymn) {
               if (setlist.hymnIds.contains('${hymn.collection}-${hymn.id}')) return false; // Evitar duplicados
-              if (_searchQuery.isEmpty) return true;
-              final cleanQuery = _searchQuery.toLowerCase();
-              return hymn.title.toLowerCase().contains(cleanQuery) || 
-                     hymn.id.toString().contains(cleanQuery);
+              if (_searchQuery.trim().isEmpty) return true;
+
+              final normQ = Hymn.normalizeString(_searchQuery);
+              if (normQ.isEmpty) return true;
+
+              // Buscar estrictamente en número de himno o título normalizado
+              final idMatch = hymn.id.toString() == _searchQuery.trim();
+              final titleMatch = hymn.normalizedTitle.contains(normQ);
+              return idMatch || titleMatch;
             }).toList();
 
-            // Ordenar por prioridad (Iump primero, luego especiales, luego coros)
+            // Ordenar con máxima prioridad a la coincidencia de título (Exacta -> Comienza con -> Colección)
             filteredList.sort((a, b) {
+              if (_searchQuery.trim().isNotEmpty) {
+                final normQ = Hymn.normalizeString(_searchQuery);
+                
+                final exactA = a.normalizedTitle == normQ ? 1 : 0;
+                final exactB = b.normalizedTitle == normQ ? 1 : 0;
+                if (exactA != exactB) return exactB.compareTo(exactA);
+
+                final startsA = a.normalizedTitle.startsWith(normQ) ? 1 : 0;
+                final startsB = b.normalizedTitle.startsWith(normQ) ? 1 : 0;
+                if (startsA != startsB) return startsB.compareTo(startsA);
+              }
+
               final priorityA = a.collection == 'iump' ? 1 : (a.collection == 'especiales' ? 2 : 3);
               final priorityB = b.collection == 'iump' ? 1 : (b.collection == 'especiales' ? 2 : 3);
               if (priorityA != priorityB) return priorityA.compareTo(priorityB);
@@ -505,6 +608,118 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ],
         );
       },
+    );
+  }
+
+  void _showEditRosterDialog(BuildContext context, WidgetRef ref, Setlist setlist) {
+    final leaderController = TextEditingController(text: setlist.leader);
+    final pianistController = TextEditingController(text: setlist.pianist);
+    final rosterController = TextEditingController(text: setlist.rosterInfo);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Nómina del Culto', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: leaderController,
+                decoration: const InputDecoration(labelText: 'Director de Alabanza'),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: pianistController,
+                decoration: const InputDecoration(labelText: 'Pianista / Músico Principal'),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: rosterController,
+                decoration: const InputDecoration(labelText: 'Coro / Integrantes'),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final updated = setlist.copyWith(
+                leader: leaderController.text.trim(),
+                pianist: pianistController.text.trim(),
+                rosterInfo: rosterController.text.trim(),
+              );
+              await ref.read(setlistsProvider.notifier).updateSetlist(updated);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQrCodeDialog(BuildContext context, Setlist setlist, List<Hymn> hymns) {
+    final payload = SetlistExportService.formatSetlistText(setlist, hymns);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Column(
+          children: [
+            Text('Código QR del Culto', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 4),
+            Text(setlist.title, style: GoogleFonts.nunito(fontSize: 13, color: theme.colorScheme.primary)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: QrImageView(
+                data: payload,
+                version: QrVersions.auto,
+                size: 200.0,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Escanea con cualquier cámara de teléfono para importar el programa de culto al instante.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(fontSize: 12, color: isDark ? Colors.white70 : Colors.black87),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
     );
   }
 
