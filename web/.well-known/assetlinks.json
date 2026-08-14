@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "org.iump.himnario2026",
+    "sha256_cert_fingerprints": [
+      "AF:8D:58:96:BD:66:1C:E3:4F:E4:B5:CD:8E:93:94:EF:7F:19:23:5B:9B:44:52:1A:9F:80:CC:3A:5A:52:F5:F0"
+    ]
+  }
+}]

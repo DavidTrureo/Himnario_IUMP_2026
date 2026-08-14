@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/services/local_hymn_storage_service.dart';
 
 class Hymn {
   final int id;
@@ -17,6 +18,7 @@ class Hymn {
   final String collection;
   final String audioUrl;
   final String category;
+  final bool isLocalOnly;
   final String normalizedTitle;
   final String normalizedSearchableText;
 
@@ -30,6 +32,7 @@ class Hymn {
     required this.collection,
     this.audioUrl = '',
     this.category = '',
+    this.isLocalOnly = false,
   })  : normalizedTitle = normalizeString(title),
         normalizedSearchableText = normalizeString('$id $title $lyrics');
 
@@ -893,6 +896,25 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
           final data = doc.data();
           return Hymn.fromJson(data, collection);
         }).toList();
+
+        // Mezclar cantos locales creados por el usuario
+        final localHymnsRaw = await LocalHymnStorageService.getCustomHymns();
+        final localHymns = localHymnsRaw
+            .where((h) => h['collection'] == collection)
+            .map((h) => Hymn(
+                  id: h['id'],
+                  title: h['title'],
+                  toneNote: h['key'] ?? '',
+                  beats: '',
+                  timeSignature: '',
+                  lyrics: h['lyrics'],
+                  collection: h['collection'],
+                  category: '',
+                  isLocalOnly: true,
+                ))
+            .toList();
+        
+        list.addAll(localHymns);
 
         if (collection == 'iump') {
           list.sort((a, b) => a.id.compareTo(b.id));

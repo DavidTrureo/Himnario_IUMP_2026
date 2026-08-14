@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
+
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:audio_session/audio_session.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -26,66 +30,91 @@ void main() async {
   // Se usan las fuentes del sistema o las precargadas en build.
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  // Precargar todos los catálogos en memoria RAM (0.01s)
-  await Hymn.preloadAssets();
+  try {
+    // Precargar todos los catálogos en memoria RAM (0.01s)
+    await Hymn.preloadAssets();
 
-  // Manejo Global de Errores Anti-Caídas (Fault Tolerance & Crash Prevention)
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('>>> CAPTURED FLUTTER ERROR: ${details.exception}');
-  };
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      return Material(
+        type: MaterialType.transparency,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          alignment: Alignment.center,
+          color: const Color(0xFF0F172A),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.health_and_safety_rounded, size: 54, color: Colors.indigoAccent),
+              const SizedBox(height: 14),
+              const Text(
+                'Protección Anti-Caídas Activa',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Se ha aislado un detalle visual temporal para prevenir que la aplicación se cierre.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+      );
+    };
 
-  PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('>>> CAPTURED ASYNC ERROR: $error');
-    return true; // Previene que la aplicación se cierre inesperadamente
-  };
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    return Material(
-      type: MaterialType.transparency,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        alignment: Alignment.center,
-        color: const Color(0xFF0F172A),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.health_and_safety_rounded, size: 54, color: Colors.indigoAccent),
-            const SizedBox(height: 14),
-            const Text(
-              'Protección Anti-Caídas Activa',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+
+    // Habilitar persistencia offline indefinida para Firestore
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+    // Mantener la pantalla encendida mientras la app esté abierta
+    try {
+      WakelockPlus.enable();
+    } catch (e) {
+      debugPrint('Wakelock no soportado: $e');
+    }
+
+    await AudioSession.instance.then((session) async {
+      await session.configure(const AudioSessionConfiguration.music());
+    });
+
+    runApp(
+      const ProviderScope(
+        child: MyApp(),
+      ),
+    );
+  } catch (e, stackTrace) {
+    // Si hay un error fatal antes de que inicie la app, mostramos una pantalla de error.
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 60),
+                  const SizedBox(height: 20),
+                  const Text('Error Crítico al Iniciar', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  Text(e.toString(), style: const TextStyle(color: Colors.redAccent, fontSize: 16)),
+                  const SizedBox(height: 10),
+                  Text(stackTrace.toString(), style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Se ha aislado un detalle visual temporal para prevenir que la aplicación se cierre.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.white70),
-            ),
-          ],
+          ),
         ),
       ),
     );
-  };
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
-  // Mantener la pantalla encendida mientras la app esté abierta
-  try {
-    WakelockPlus.enable();
-    debugPrint('>>> Wakelock habilitado: La pantalla no entrará en suspensión.');
-  } catch (e) {
-    debugPrint('>>> Error al habilitar Wakelock: $e');
   }
-  
-  runApp(
-    // ProviderScope es necesario para Riverpod
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
 }
 
 // Configuración de GoRouter

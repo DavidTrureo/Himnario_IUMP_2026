@@ -19,6 +19,7 @@ import 'hymn_list_screen.dart';
 import 'notation_provider.dart';
 import 'presentation_screen.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../favorites/domain/favorites_notifier.dart';
@@ -388,6 +389,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 },
               ),
               _buildDatabaseStatusWidget(dbStatus, theme, isDark),
+              if (hymn.audioUrl.isNotEmpty && !hymn.audioUrl.contains('youtube.com') && !hymn.audioUrl.contains('youtu.be'))
+                IconButton(
+                  icon: const Icon(Icons.cloud_download_rounded),
+                  tooltip: 'Descargar audio para escuchar sin internet',
+                  onPressed: () => _downloadAudio(hymn),
+                ),
               if (hymn.audioUrl.isNotEmpty)
                 IconButton(
                   icon: Icon(
@@ -1034,6 +1041,57 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       );
   }
 
+  Future<String> _getLocalAudioPath(String url) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final hash = url.hashCode.toString();
+    return '${dir.path}/hymn_audio_$hash.mp3';
+  }
+
+  Future<void> _downloadAudio(Hymn hymn) async {
+    if (hymn.audioUrl.isEmpty) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Descargando audio...'), behavior: SnackBarBehavior.floating),
+    );
+
+    try {
+      final localPath = await _getLocalAudioPath(hymn.audioUrl);
+      final file = File(localPath);
+      
+      if (await file.exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Este audio ya estaba descargado localmente.'), behavior: SnackBarBehavior.floating),
+          );
+          setState(() {});
+        }
+        return;
+      }
+      
+      final response = await http.get(Uri.parse(hymn.audioUrl));
+      if (response.statusCode == 200) {
+        await file.writeAsBytes(response.bodyBytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('¡Audio descargado con éxito para escuchar sin internet!'), behavior: SnackBarBehavior.floating),
+          );
+          setState(() {}); 
+        }
+      } else {
+        throw Exception('Código de estado HTTP: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al descargar audio: $e'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
   Future<void> _initAudio(String url) async {
     if (_audioPlayer != null && _currentAudioUrl == url) return;
 
@@ -1053,8 +1111,20 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       if (kIsWeb) {
         await player.setUrl(url);
       } else {
-        final audioSource = LockCachingAudioSource(Uri.parse(url));
-        await player.setAudioSource(audioSource);
+        final localPath = await _getLocalAudioPath(url);
+        final file = File(localPath);
+        if (await file.exists()) {
+          debugPrint('>>> Reproduciendo audio desde memoria local: $localPath');
+          await player.setFilePath(localPath);
+        } else {
+          try {
+            final audioSource = LockCachingAudioSource(Uri.parse(url));
+            await player.setAudioSource(audioSource);
+          } catch (e) {
+            debugPrint('>>> Error con LockCachingAudioSource (común en Motorola), usando fallback: $e');
+            await player.setAudioSource(AudioSource.uri(Uri.parse(url)));
+          }
+        }
       }
 
       player.playerStateStream.listen((state) {
@@ -1243,6 +1313,55 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       ).animate().shake(duration: 400.ms);
                     },
                   ),
+                  
+                  // Icono / Número Hero
+                  Hero(
+                    tag: 'hymn_icon_${hymn.collection}-${hymn.id}',
+                    child: hymn.collection == 'iump'
+                      ? Container(
+                          width: 60,
+                          height: 60,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
+                                theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            hymn.id.toString(),
+                            style: GoogleFonts.outfit(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 60,
+                          height: 60,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(
+                            hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded, 
+                            color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981), 
+                            size: 32
+                          ),
+                        ),
+                  ),
+
                   // Título Elegante
                   Hero(
                     tag: 'hymn-title-${hymn.collection}-${hymn.id}',

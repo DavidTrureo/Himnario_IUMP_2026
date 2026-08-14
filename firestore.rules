@@ -2,6 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Función para validar que el usuario sea el Administrador Oficial ──
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'admin@himnario.com';
+    }
+
     // ── Setlists (locales, solo compatibilidad migración) ──────────────────
     match /setlists/{docId} {
       allow read, write: if true;
@@ -11,17 +16,10 @@ service cloud.firestore {
     match /live_sessions/{sessionId} {
       // Cualquiera puede leer (participantes que abren el QR)
       allow read: if true;
-
-      // Solo se puede crear una sesión (cualquier dispositivo puede ser Director)
       allow create: if true;
-
-      // Solo el Director puede actualizar la sesión principal
       allow update: if true;
-
-      // Solo el Director puede borrar
       allow delete: if true;
 
-      // Sub-colección de participantes (presencia en tiempo real)
       match /participants/{deviceId} {
         allow read, write: if true;
       }
@@ -29,16 +27,20 @@ service cloud.firestore {
 
     // ── Himnos (Colecciones de la App) ─────────────────────────────────────
     match /iump/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
     match /especiales/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
     match /coros/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
     match /app_config/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
     match /live_worship_rooms/{docId} {
       allow read, write: if true;

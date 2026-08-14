@@ -17,6 +17,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../favorites/domain/favorites_notifier.dart';
 import 'notation_provider.dart';
 import 'widgets/duplicate_pairs_dialog.dart';
+import 'add_hymn_screen.dart';
 
 // Notifier para la colección activa ('iump', 'especiales', etc.)
 class ActiveCollectionNotifier extends Notifier<String> {
@@ -1244,63 +1245,71 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                         ),
                                         const SizedBox(width: 8),
                                       ],
-                                      if (hymn.collection == 'iump')
-                                        Container(
-                                          width: 46,
-                                          height: 46,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
-                                                theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
+                                      Hero(
+                                        tag: 'hymn_icon_$key',
+                                        child: hymn.collection == 'iump'
+                                          ? Container(
+                                              width: 46,
+                                              height: 46,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
+                                                    theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
+                                                  ],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                ),
+                                                borderRadius: BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
+                                                ),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                hymn.id.toString(),
+                                                style: GoogleFonts.outfit(
+                                                  color: theme.colorScheme.onPrimaryContainer,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                            )
+                                          : Container(
+                                              width: 46,
+                                              height: 46,
+                                              decoration: BoxDecoration(
+                                                color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                                                borderRadius: BorderRadius.circular(14),
+                                              ),
+                                              child: Icon(
+                                                hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded, 
+                                                color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981), 
+                                                size: 24
+                                              ),
                                             ),
-                                            borderRadius: BorderRadius.circular(14),
-                                            border: Border.all(
-                                              color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
-                                            ),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            hymn.id.toString(),
-                                            style: GoogleFonts.outfit(
-                                              color: theme.colorScheme.onPrimaryContainer,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        )
-                                      else
-                                        Container(
-                                          width: 46,
-                                          height: 46,
-                                          decoration: BoxDecoration(
-                                            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                                            borderRadius: BorderRadius.circular(14),
-                                          ),
-                                          child: Icon(
-                                            hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded, 
-                                            color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981), 
-                                            size: 24
-                                          ),
-                                        ),
+                                      ),
                                       const SizedBox(width: 14),
                                       // Detalles
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              hymn.title,
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w700,
-                                                color: theme.colorScheme.onSurface,
+                                            Hero(
+                                              tag: 'hymn-title-${hymn.collection}-${hymn.id}',
+                                              child: Material(
+                                                type: MaterialType.transparency,
+                                                child: Text(
+                                                  hymn.title,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: theme.colorScheme.onSurface,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 5),
                                             Row(
@@ -1415,20 +1424,14 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
           ),
         ],
       ),
-      floatingActionButton: () {
-        final adminMode = ref.watch(adminModeProvider);
-        if (!adminMode) return null;
-        // Si el contenedor activo no es de los tres principales ('iump', 'especiales', 'coros'),
-        // por defecto creamos el himno en 'iump'.
-        final targetCollection = (activeCollection == 'iump' || activeCollection == 'especiales' || activeCollection == 'coros')
-            ? activeCollection
-            : 'iump';
-        return FloatingActionButton(
-          tooltip: 'Agregar Himno',
-          onPressed: () => _showCreateHymnDialog(context, ref, targetCollection),
-          child: const Icon(Icons.add),
-        );
-      }(),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Añadir Canto',
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AddHymnScreen()),
+        ),
+        child: const Icon(Icons.add),
+      ),
     );
   }
 

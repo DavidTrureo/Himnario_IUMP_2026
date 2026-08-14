@@ -13,6 +13,7 @@ import '../../hymns/domain/hymn.dart';
 import '../../favorites/domain/favorites_notifier.dart';
 import '../../setlists/presentation/setlists_provider.dart';
 import '../../tuner/presentation/instrument_tuner_screen.dart';
+import '../../hymns/presentation/admin_suggestions_screen.dart';
 import '../../../core/widgets/app_music_icons.dart';
 
 class AdminTapCountNotifier extends Notifier<int> {
@@ -392,6 +393,18 @@ class HomeScreen extends ConsumerWidget {
                             iconColor: const Color(0xFF64748B),
                             isAbout: true,
                           ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.15),
+                          if (ref.watch(adminModeProvider)) ...[
+                            const SizedBox(height: 16),
+                            _buildMenuItem(
+                              context,
+                              ref: ref,
+                              title: 'Sugerencias de Cantos (Admin)',
+                              subtitle: 'Revisar cantos sugeridos por otros',
+                              icon: Icons.admin_panel_settings_rounded,
+                              iconColor: Colors.amber.shade700,
+                              isAdminSuggestions: true,
+                            ).animate().fadeIn(delay: 850.ms).slideY(begin: 0.15),
+                          ]
                         ],
                       ),
                     ),
@@ -419,6 +432,7 @@ class HomeScreen extends ConsumerWidget {
     bool isAbout = false,
     bool isTuner = false,
     bool isQrScanner = false,
+    bool isAdminSuggestions = false,
     String? counter,
   }) {
     final theme = Theme.of(context);
@@ -468,6 +482,8 @@ class HomeScreen extends ConsumerWidget {
                       )
                   : isQrScanner
                     ? () => context.push('/scan-qr')
+                  : isAdminSuggestions
+                    ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminSuggestionsScreen()))
                   : () {
                       if (isSetlists) {
                         context.push('/setlists');
