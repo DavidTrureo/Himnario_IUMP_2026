@@ -45,5 +45,13 @@ service cloud.firestore {
     match /live_worship_rooms/{docId} {
       allow read, write: if true;
     }
+    
+    // ── Sugerencias de Himnos ──────────────────────────────────────────────
+    match /cantos_sugeridos/{docId} {
+      // Cualquiera puede crear una sugerencia
+      allow create: if true;
+      // Solo el admin puede verlas, aprobarlas (actualizar) o rechazarlas (eliminar)
+      allow read, update, delete: if isAdmin();
+    }
   }
 }

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,6 +27,15 @@ class AdminTapCountNotifier extends Notifier<int> {
 
 final adminTapCountProvider = NotifierProvider<AdminTapCountNotifier, int>(() {
   return AdminTapCountNotifier();
+});
+
+
+final pendingSuggestionsProvider = StreamProvider.autoDispose<int>((ref) {
+  return FirebaseFirestore.instance
+      .collection('cantos_sugeridos')
+      .where('status', isEqualTo: 'pending')
+      .snapshots()
+      .map((snap) => snap.docs.length);
 });
 
 class HomeScreen extends ConsumerWidget {
@@ -395,14 +405,21 @@ class HomeScreen extends ConsumerWidget {
                           ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.15),
                           if (ref.watch(adminModeProvider)) ...[
                             const SizedBox(height: 16),
-                            _buildMenuItem(
-                              context,
-                              ref: ref,
-                              title: 'Sugerencias de Cantos (Admin)',
-                              subtitle: 'Revisar cantos sugeridos por otros',
-                              icon: Icons.admin_panel_settings_rounded,
-                              iconColor: Colors.amber.shade700,
-                              isAdminSuggestions: true,
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final pendingAsync = ref.watch(pendingSuggestionsProvider);
+                                final count = pendingAsync.value ?? 0;
+                                return _buildMenuItem(
+                                  context,
+                                  ref: ref,
+                                  title: 'Sugerencias de Cantos (Admin)',
+                                  subtitle: 'Revisar cantos sugeridos por otros',
+                                  icon: Icons.admin_panel_settings_rounded,
+                                  iconColor: Colors.amber.shade700,
+                                  isAdminSuggestions: true,
+                                  counter: count > 0 ? count.toString() : null,
+                                );
+                              },
                             ).animate().fadeIn(delay: 850.ms).slideY(begin: 0.15),
                           ]
                         ],

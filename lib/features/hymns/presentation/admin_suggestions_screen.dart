@@ -160,17 +160,18 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                       onPressed: () async {
                         setState(() => isProcessing = true);
                         try {
-                          // 1. Encontrar el siguiente ID disponible
-                          final snapshot = await FirebaseFirestore.instance.collection('hymns').doc(selectedCollection).get();
-                          final hymnsList = snapshot.data()?['hymns'] as List<dynamic>? ?? [];
+                          // 1. Encontrar el siguiente ID disponible en la colección seleccionada
+                          final snapshot = await FirebaseFirestore.instance
+                              .collection(selectedCollection)
+                              .orderBy('id', descending: true)
+                              .limit(1)
+                              .get();
                           
                           int nextId = 1;
-                          if (hymnsList.isNotEmpty) {
-                            for (var h in hymnsList) {
-                              if (h is Map && h['id'] != null) {
-                                int id = (h['id'] is int) ? h['id'] : int.tryParse(h['id'].toString()) ?? 0;
-                                if (id >= nextId) nextId = id + 1;
-                              }
+                          if (snapshot.docs.isNotEmpty) {
+                            final data = snapshot.docs.first.data();
+                            if (data['id'] != null) {
+                              nextId = (data['id'] as int) + 1;
                             }
                           }
 
@@ -179,6 +180,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                             'id': nextId,
                             'title': titleCtrl.text.trim(),
                             'lyrics': lyricsCtrl.text.trim(),
+                            'collection': selectedCollection,
                           };
                           
                           final tone = keyCtrl.text.trim();
@@ -187,10 +189,10 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                           }
 
                           // 3. Guardar en la colección oficial
-                          hymnsList.add(newHymn);
-                          await FirebaseFirestore.instance.collection('hymns').doc(selectedCollection).set({
-                            'hymns': hymnsList,
-                          }, SetOptions(merge: true));
+                          await FirebaseFirestore.instance
+                              .collection(selectedCollection)
+                              .doc(nextId.toString())
+                              .set(newHymn);
 
                           // 4. Marcar sugerencia como aprobada
                           await FirebaseFirestore.instance.collection('cantos_sugeridos').doc(docId).update({

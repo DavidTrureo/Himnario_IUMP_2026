@@ -1,8 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/hymn.dart';
+import '../../../core/utils/web_window_helper.dart';
 
 enum PresentationTheme {
   darkPremium,
@@ -25,8 +29,34 @@ class _PresentationScreenState extends State<PresentationScreen> {
   final PageController _pageController = PageController();
   final FocusNode _focusNode = FocusNode();
   int _currentPage = 0;
-  double _fontSize = 32.0;
+  double _fontSize = 40.0;
   PresentationTheme _currentTheme = PresentationTheme.darkPremium;
+  bool _showControls = true;
+  bool _isBlank = false;
+
+  void _broadcastState([int? slideIndex]) {
+    WebWindowHelper.broadcastProjectorState(
+      slideIndex ?? _currentPage, 
+      _currentTheme.name, 
+      _fontSize, 
+      isBlank: _isBlank,
+      hymnId: widget.hymn.id.toString(),
+      collection: widget.hymn.collection,
+    );
+  }
+
+  Future<void> _saveToPrefsAndBroadcast() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'projector_hymn_${widget.hymn.collection}_${widget.hymn.id}', 
+        jsonEncode(widget.hymn.toJson())
+      );
+    } catch (_) {}
+    if (mounted) {
+      _broadcastState();
+    }
+  }
 
   @override
   void initState() {
@@ -43,6 +73,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
     // Auto-enfocar para captura de eventos de teclado/D-pad
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
+      _saveToPrefsAndBroadcast();
     });
   }
 
@@ -61,63 +92,218 @@ class _PresentationScreenState extends State<PresentationScreen> {
 
   List<String> _getMergedBlocksWithoutChords(String lyrics) {
     final RegExp chordRegex = RegExp(r'\[[^\]]+\]');
-    final cleanLyrics = lyrics.replaceAll(chordRegex, '');
     
-    final List<String> rawBlocks = cleanLyrics.split('\n\n');
-    final List<String> initialBlocks = [];
+    // Eliminar acordes y las líneas que solo contienen barras (/, //, ///)
+    String cleanLyrics = lyrics.replaceAll(chordRegex, '');
+    cleanLyrics = cleanLyrics.split('\n').where((line) {
+      return !RegExp(r'^/+$').hasMatch(line.trim());
+    }).join('\n');
     
-    for (var i = 0; i < rawBlocks.length; i++) {
-      final block = rawBlocks[i].trim();
-      if (block.isEmpty) continue;
-      
-      final lines = block.split('\n');
-      if (lines.isEmpty) continue;
-      
-      final firstLine = lines.first.trim();
-      final isChorus = firstLine.toLowerCase().startsWith('coro');
-      final isBridge = firstLine.toLowerCase().startsWith('puente');
-      final isStanza = RegExp(r'^(stanza|\d+|i+v*x*|v\.?\s*\d+)', caseSensitive: false).hasMatch(firstLine);
-      
-      if (isChorus || isStanza || isBridge) {
-        initialBlocks.add(block);
-      } else {
-        if (initialBlocks.isNotEmpty) {
-          initialBlocks[initialBlocks.length - 1] = '${initialBlocks[initialBlocks.length - 1]}\n\n$block';
-        } else {
-          initialBlocks.add(block);
+    final List<String> lines = cleanLyrics.split('\n');
+    final List<String> rawBlocks = [];
+    List<String> currentBlock = [];
+    
+    final headerRegex = RegExp(
+      r'^(coro\s*[ivx]*|coro\s*\d*|puente|final|solista|estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
+      caseSensitive: false
+    );
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) {
+        if (currentBlock.isNotEmpty) {
+          rawBlocks.add(currentBlock.join('\n'));
+          currentBlock = [];
         }
+        continue;
+      }
+
+      final match = headerRegex.firstMatch(line);
+      if (match != null) {
+        if (currentBlock.isNotEmpty) {
+          rawBlocks.add(currentBlock.join('\n'));
+          currentBlock = [];
+        }
+        currentBlock.add(line);
+      } else {
+        currentBlock.add(line);
       }
     }
+    if (currentBlock.isNotEmpty) {
+      rawBlocks.add(currentBlock.join('\n'));
+    }
 
-    // Regla Litúrgica: Si el canto posee 1 único Coro, intercalarlo automáticamente después de cada estrofa en la proyección
-    final chorusBlocks = initialBlocks.where((b) {
+    // 1. Regla Litúrgica: Intercalar el coro único respetando trozos (saltos de línea)
+    final chorusBlocksCount = rawBlocks.where((b) {
       final firstLine = b.split('\n').first.trim().toLowerCase();
       return firstLine.startsWith('coro');
-    }).toList();
+    }).length;
 
-    if (chorusBlocks.length == 1) {
-      final singleChorus = chorusBlocks.first;
-      final List<String> sequencedBlocks = [];
-
-      for (int i = 0; i < initialBlocks.length; i++) {
-        final current = initialBlocks[i];
-        if (current == singleChorus) continue; // Intercalamos manualmente después de cada estrofa
-
-        sequencedBlocks.add(current);
-        
-        final firstLine = current.split('\n').first.trim();
-        final isStanza = RegExp(r'^(stanza|\d+|i+v*x*|v\.?\s*\d+)', caseSensitive: false).hasMatch(firstLine);
-        if (isStanza) {
-          sequencedBlocks.add(singleChorus);
+    List<String> sequencedBlocks = [];
+    if (chorusBlocksCount == 1) {
+      final List<String> chorusFragments = [];
+      int chorusStartIndex = -1;
+      for (int i = 0; i < rawBlocks.length; i++) {
+        final fl = rawBlocks[i].split('\n').first.trim().toLowerCase();
+        if (fl.startsWith('coro')) {
+          chorusStartIndex = i;
+          break;
+        }
+      }
+      
+      if (chorusStartIndex != -1) {
+        for (int i = chorusStartIndex; i < rawBlocks.length; i++) {
+          final fl = rawBlocks[i].split('\n').first.trim().toLowerCase();
+          if (i != chorusStartIndex && (fl.startsWith('coro') || fl.startsWith('puente') || fl.startsWith('final') || RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(fl))) {
+            break;
+          }
+          chorusFragments.add(rawBlocks[i]);
         }
       }
 
-      if (sequencedBlocks.isNotEmpty) {
-        return sequencedBlocks;
+      for (int i = 0; i < rawBlocks.length; i++) {
+        final current = rawBlocks[i];
+        sequencedBlocks.add(current);
+
+        String? currentHeader;
+        for (int j = i; j >= 0; j--) {
+          final b = rawBlocks[j];
+          final fl = b.split('\n').first.trim().toLowerCase();
+          if (fl.startsWith('coro')) { currentHeader = 'coro'; break; }
+          if (fl.startsWith('puente')) { currentHeader = 'puente'; break; }
+          if (fl.startsWith('final')) { currentHeader = 'final'; break; }
+          if (RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(fl)) {
+            currentHeader = 'estrofa'; break;
+          }
+        }
+
+        if (currentHeader == 'estrofa') {
+          bool isLastFragment = true;
+          if (i < rawBlocks.length - 1) {
+            final nextBlockFirstLine = rawBlocks[i + 1].split('\n').first.trim().toLowerCase();
+            final hasHeader = nextBlockFirstLine.startsWith('coro') || 
+                              nextBlockFirstLine.startsWith('puente') || 
+                              nextBlockFirstLine.startsWith('final') || 
+                              RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(nextBlockFirstLine);
+            if (!hasHeader) {
+              isLastFragment = false;
+            }
+          }
+          
+          if (isLastFragment) {
+            bool nextIsChorus = false;
+            if (i < rawBlocks.length - 1) {
+              final nextBlockFirstLine = rawBlocks[i + 1].split('\n').first.trim().toLowerCase();
+              if (nextBlockFirstLine.startsWith('coro')) {
+                nextIsChorus = true;
+              }
+            }
+            if (!nextIsChorus) {
+              sequencedBlocks.addAll(chorusFragments);
+            }
+          }
+        }
+      }
+    } else {
+      sequencedBlocks = List.from(rawBlocks);
+    }
+
+    // 2. Dividir automáticamente bloques muy extensos en 2 fragmentos
+    final List<String> finalBlocks = [];
+    for (var block in sequencedBlocks) {
+      final blockLines = block.split('\n');
+      if (blockLines.length > 8) {
+        final mid = (blockLines.length / 2).ceil();
+        finalBlocks.add(blockLines.sublist(0, mid).join('\n'));
+        finalBlocks.add(blockLines.sublist(mid).join('\n'));
+      } else {
+        finalBlocks.add(block);
       }
     }
 
-    return initialBlocks;
+    // 3. Agregar la diapositiva de Portada (Título) al principio
+    finalBlocks.insert(0, '[TITLE]');
+
+    return finalBlocks;
+  }
+
+  String _getBlockLabel(int index) {
+    if (index >= _blocks.length) return '';
+    final block = _blocks[index];
+    if (block == '[TITLE]') return 'Título';
+
+    final alphabet = ['A', 'B', 'C', 'D', 'E', 'F'];
+    String? foundHeader;
+    int blocksSinceHeader = 0;
+
+    for (int i = index; i >= 0; i--) {
+      final b = _blocks[i];
+      if (b == '[TITLE]') continue;
+      final firstLine = b.split('\n').first.trim().toLowerCase();
+      
+      if (firstLine.startsWith('coro')) {
+        foundHeader = 'Coro ';
+        break;
+      }
+      if (firstLine.startsWith('puente')) {
+        foundHeader = 'Puente ';
+        break;
+      }
+      if (firstLine.startsWith('final')) {
+        foundHeader = 'Final ';
+        break;
+      }
+      final match = RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).firstMatch(firstLine);
+      if (match != null) {
+        final text = match.group(0)!.trim().replaceAll('.', '');
+        final numMatch = RegExp(r'\d+').firstMatch(text);
+        if (numMatch != null) {
+          foundHeader = 'E${numMatch.group(0)}';
+        } else {
+          final cleanRoman = text.toUpperCase();
+          const map = {
+            'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 
+            'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10, 'XI': 11, 'XII': 12
+          };
+          final numRoman = map[cleanRoman];
+          if (numRoman != null) {
+            foundHeader = 'E$numRoman';
+          } else {
+            foundHeader = 'E?';
+          }
+        }
+        break;
+      }
+      
+      blocksSinceHeader++;
+    }
+
+    if (foundHeader == null) {
+        foundHeader = 'E1'; 
+        blocksSinceHeader = index;
+    }
+
+    int totalFragments = 0;
+    int groupStart = index - blocksSinceHeader;
+    for (int i = groupStart; i < _blocks.length; i++) {
+        final block = _blocks[i];
+        if (block == '[TITLE]') continue;
+        final firstLine = block.split('\n').first.trim().toLowerCase();
+        if (i != groupStart && (firstLine.startsWith('coro') || firstLine.startsWith('puente') || firstLine.startsWith('final') || RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(firstLine))) {
+            break;
+        }
+        totalFragments++;
+    }
+
+    if (totalFragments > 1 || blocksSinceHeader > 0) {
+        if (blocksSinceHeader < alphabet.length) {
+            return '$foundHeader${alphabet[blocksSinceHeader]}';
+        } else {
+            return '$foundHeader-${blocksSinceHeader + 1}';
+        }
+    }
+    
+    return foundHeader;
   }
 
   void _nextPage() {
@@ -217,20 +403,38 @@ class _PresentationScreenState extends State<PresentationScreen> {
             children: [
               // PageView de Letras
               Positioned.fill(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: _blocks.length,
-                  onPageChanged: (index) {
+                child: GestureDetector(
+                  onTap: () {
                     setState(() {
-                      _currentPage = index;
+                      _showControls = !_showControls;
                     });
                   },
-                  itemBuilder: (context, index) {
-                    final blockText = _blocks[index];
-                    return _buildBlockSlide(blockText);
-                  },
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _blocks.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentPage = index;
+                      });
+                      _broadcastState(index);
+                    },
+                    itemBuilder: (context, index) {
+                      final blockText = _blocks[index];
+                      return _buildBlockSlide(index, blockText);
+                    },
+                  ),
                 ),
               ),
+
+              // Controles de UI superpuestos
+              Positioned.fill(
+                child: AnimatedOpacity(
+                  opacity: _showControls ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: Stack(
+                      children: [
 
               // Botones de Navegación Lateral (Flecha Izquierda)
               if (_currentPage > 0)
@@ -288,6 +492,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                               setState(() {
                                 _currentTheme = theme;
                               });
+                              _broadcastState(_currentPage);
                             },
                             itemBuilder: (context) => [
                               const PopupMenuItem(
@@ -315,31 +520,117 @@ class _PresentationScreenState extends State<PresentationScreen> {
                             onPressed: () {
                               if (_fontSize > 20) {
                                 setState(() => _fontSize -= 2);
+                                _broadcastState(_currentPage);
                               }
                             },
                           ),
                           Text(
                             '${_fontSize.toInt()}pt',
-                            style: GoogleFonts.outfit(color: _themeUiMutedColor, fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(fontFamily: 'Nunito', color: _themeUiMutedColor, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           // Aumentar Letra
                           IconButton(
                             icon: Icon(Icons.add_circle_outline_rounded, color: _themeUiMutedColor, size: 20),
                             onPressed: () {
-                              if (_fontSize < 60) {
+                              if (_fontSize < 250) {
                                 setState(() => _fontSize += 2);
+                                _broadcastState(_currentPage);
                               }
                             },
+                          ),
+                          const SizedBox(width: 16),
+                          Container(
+                            width: 1,
+                            height: 24,
+                            color: _themeUiMutedColor.withValues(alpha: 0.3),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Pantalla Negra',
+                            child: IconButton(
+                              icon: Icon(
+                                _isBlank ? Icons.desktop_access_disabled : Icons.desktop_windows,
+                                color: _isBlank ? Colors.redAccent : _themeUiMutedColor,
+                                size: 22,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isBlank = !_isBlank;
+                                });
+                                _broadcastState();
+                              },
+                            ),
                           ),
                         ],
                       ),
 
-                      // Botón Cerrar
-                      IconButton(
-                        icon: Icon(Icons.close_rounded, color: _themeUiColor, size: 26),
-                        onPressed: () => Navigator.of(context).pop(),
+                      Row(
+                        children: [
+                          // Botón Despegar (Siempre visible para depuración)
+                          IconButton(
+                            icon: const Icon(Icons.open_in_new_rounded, color: Colors.blueAccent, size: 28),
+                            tooltip: 'Despegar Proyector',
+                            onPressed: () async {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setString(
+                                'projector_hymn_${widget.hymn.collection}_${widget.hymn.id}', 
+                                jsonEncode(widget.hymn.toJson())
+                              );
+                              WebWindowHelper.openProjectorWindow('/#/projector-view/${widget.hymn.collection}/${widget.hymn.id}');
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          // Botón Cerrar
+                          IconButton(
+                            icon: Icon(Icons.close_rounded, color: _themeUiColor, size: 26),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ],
                       ),
                     ],
+                  ),
+                ),
+              ),
+
+              // Grid/Lista Horizontal de Diapositivas (Navegación no lineal)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 60, // Encima del título
+                child: SizedBox(
+                  height: 50,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _blocks.length,
+                    itemBuilder: (context, index) {
+                      final isSelected = _currentPage == index;
+                      final blockText = _blocks[index];
+                      final firstLine = blockText.split('\n').first.trim().toLowerCase();
+                      final isChorus = firstLine.startsWith('coro');
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0, top: 5, bottom: 5),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isSelected ? Colors.blueAccent : _themeUiButtonBgColor,
+                            foregroundColor: isSelected ? Colors.white : _themeUiColor,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            _pageController.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                            );
+                          },
+                          child: Text(
+                            _getBlockLabel(index),
+                            style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -358,7 +649,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                           '📺 MODO PROYECTOR • ' + (widget.hymn.collection == 'iump'
                               ? 'Himno ${widget.hymn.id} - ${widget.hymn.title}'
                               : widget.hymn.title),
-                          style: GoogleFonts.outfit(
+                          style: TextStyle(fontFamily: 'Nunito', 
                             color: _themeUiFooterMutedColor,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -375,7 +666,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                         ),
                         child: Text(
                           '${_currentPage + 1} / ${_blocks.length}',
-                          style: GoogleFonts.outfit(
+                          style: TextStyle(fontFamily: 'Nunito', 
                             color: _themeUiColor,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -386,6 +677,11 @@ class _PresentationScreenState extends State<PresentationScreen> {
                   ),
                 ),
               ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -393,15 +689,15 @@ class _PresentationScreenState extends State<PresentationScreen> {
     );
   }
 
-  Widget _buildBlockSlide(String blockText) {
+  Widget _buildBlockSlide(int index, String blockText) {
     final lines = blockText.split('\n');
     final firstLine = lines.first.trim();
     
     final RegExp tagRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
       caseSensitive: false
     );
-    final isChorus = RegExp(r'^(coro\s+[ivx]+|coro\s+\d+|coro)', caseSensitive: false).hasMatch(firstLine);
+    final isChorus = _getBlockLabel(index).toLowerCase().startsWith('coro');
     
     String displayText = blockText;
     if (tagRegExp.hasMatch(firstLine)) {
@@ -414,55 +710,107 @@ class _PresentationScreenState extends State<PresentationScreen> {
       }
     }
     
+    if (blockText == '[TITLE]') {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40.0),
+              child: Text(
+                widget.hymn.title,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontFamily: 'Nunito', 
+                  fontSize: _fontSize * 1.5,
+                  fontWeight: FontWeight.bold,
+                  color: _getThemeTextColor(false),
+                  height: 1.2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (widget.hymn.collection == 'iump')
+              Text(
+                'Himno ${widget.hymn.id}',
+                style: TextStyle(fontFamily: 'Nunito', 
+                  fontSize: _fontSize * 0.7,
+                  color: _getThemeTextColor(false).withValues(alpha: 0.6),
+                  letterSpacing: 3.0,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 400.ms);
+    }
+
     final textColor = _getThemeTextColor(isChorus);
 
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 20.0),
         constraints: const BoxConstraints(maxWidth: 1000),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (isChorus) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: textColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: textColor.withValues(alpha: 0.3), width: 1),
-                  ),
-                  child: Text(
-                    'CORO',
-                    style: GoogleFonts.outfit(
-                      color: textColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Spacer(),
+            SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (isChorus) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: textColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: textColor.withValues(alpha: 0.3), width: 1),
+                      ),
+                      child: Text(
+                        'CORO',
+                        style: TextStyle(fontFamily: 'Nunito', 
+                          color: textColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      displayText,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: 'Nunito', 
+                        fontSize: _fontSize,
+                        fontWeight: FontWeight.bold,
+                        fontStyle: isChorus ? FontStyle.italic : FontStyle.normal,
+                        color: textColor,
+                        height: 1.45,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
-              ],
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  displayText,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.nunito(
-                    fontSize: _fontSize,
-                    fontWeight: FontWeight.bold,
-                    fontStyle: isChorus ? FontStyle.italic : FontStyle.normal,
-                    color: textColor,
-                    height: 1.45,
-                  ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const Spacer(),
+            Text(
+              widget.hymn.collection == 'iump' ? '${widget.hymn.id}. ${widget.hymn.title}' : widget.hymn.title,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'Nunito', 
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: _getThemeTextColor(false).withValues(alpha: 0.25),
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
         ),
       ),
     ).animate().fadeIn(duration: 200.ms);
   }
 }
+

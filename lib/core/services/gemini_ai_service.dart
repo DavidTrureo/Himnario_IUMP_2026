@@ -126,8 +126,8 @@ class GeminiAiService {
     // Si hay clave API, consultar Gemini para perfeccionamiento contextual adicional
     if (apiKey.isNotEmpty) {
       try {
-        final promptText = '''Eres un corrector ortográfico y literario experto en himnos, cantos y alabanzas cristianas en español.
-Analiza y perfecciona la ortografía, tildes, vocativos y puntuación del siguiente título y letra:
+        final promptText = '''Eres un corrector ortográfico y literario experto en poesía y métrica de himnos cristianos.
+DEBES ANALIZAR LA TOTALIDAD DE CADA ESTROFA para entender el contexto semántico completo ANTES de aplicar cualquier corrección. No trates cada línea de forma aislada.
 
 TÍTULO:
 $currentTitle
@@ -136,22 +136,21 @@ LETRA:
 $currentLyrics
 
 REGLAS ESTRICTAS OBLIGATORIAS:
-1. ANÁLISIS DE CONTEXTO SEMÁNTICO (ACENTUACIÓN DIACRÍTICA Y TIEMPOS VERBALES):
-   Distingue con rigor semántico el significado de las palabras según su entorno en la frase:
-   - "amo" (del verbo amar en presente, ej: "yo te amo", "cuanto te amo") frente a "amó" (verbo amar en pasado, ej: "Él me amó", "Jesús nos amó").
-   - "Él" (pronombre personal referente a Dios o Jesús, ej: "Él vive", "confío en Él") frente a "el" (artículo masculino, ej: "el camino", "el Salvador").
-   - "Tú" (pronombre referente a Dios, ej: "Tú estás conmigo") frente a "tu" (posesivo, ej: "tu amor me hizo nacer").
-   - "más" (adverbio de cantidad, ej: "más, más quiero sentirte") frente a "mas" (conjunción que equivale a 'pero', ej: "mas yo sé que resucitó").
-   - "está" (del verbo estar, ej: "Tú estás conmigo") frente a "esta" (demostrativo, ej: "esta vida").
-2. VOCATIVOS Y PUNTUACIÓN: Asegura vocativos correctos como ¡Oh, Señor!, ¡Oh, Dios! y comas/puntos de verso.
-3. CONSERVA ACORDES INTACTOS: Mantiene intactas las etiquetas entre corchetes como [DO], [SOL/SI], [RE7], etc. NO elimines ni alteres ningún corchete.
-4. MAYÚSCULAS: Primera letra de cada verso y nombres divinos (Dios, Jesús, Espíritu Santo, Señor) siempre en Mayúscula.
-5. FORMATO JSON: Retorna estrictamente un objeto JSON con los campos "title" y "lyrics". No agregues bloques markdown ni explicaciones.
+1. PUNTUACIÓN POÉTICA LÓGICA: DEBES ELIMINAR los puntos finales (.) y comas al final de los versos si la idea continúa en el siguiente verso (encabalgamiento poético). Solo deja o agrega puntos finales cuando termine verdaderamente la idea o la estrofa. BAJO NINGÚN MOTIVO dejes un punto final al final de cada línea de forma sistemática.
+2. ANÁLISIS DE CONTEXTO SEMÁNTICO (ACENTUACIÓN DIACRÍTICA Y TIEMPOS VERBALES):
+   - "amo" (presente, ej: "yo te amo") vs "amó" (pasado, ej: "Él me amó"). Revisa si la frase habla de la historia de Jesús en la cruz o del sentir actual del creyente.
+   - "Él" / "Tú" / "Mí" (pronombre referente a Dios) siempre con tilde y mayúscula frente a "el" / "tu" / "mi" (posesivos/artículos).
+   - "más" (cantidad) frente a "mas" (conjunción "pero").
+3. ESTRUCTURA INTACTA: Mantén la estructura de líneas y estrofas original. Si hay un "1.", "CORO:", etc., respétalo.
+4. MAYÚSCULAS: La primera letra de cada verso debe ir en Mayúscula obligatoriamente, al igual que los nombres divinos (Dios, Señor, Rey, Salvador).
+5. ACORDES INTACTOS: Mantén intactas las etiquetas de acordes como [DO]. NO elimines ni alteres ningún corchete.
+6. ORTOGRAFÍA Y SIGNOS INTERNOS: Corrige y agrega las tildes (´), signos de interrogación (¿?) y exclamación (¡!) correspondientes. Si dentro de un verso hace falta una coma (,), o si en lugar de un punto corresponde un punto y coma (;), cámbialo.
+7. FORMATO JSON: Retorna estrictamente un objeto JSON con los campos "title" y "lyrics". No agregues bloques markdown ni explicaciones.
 
 JSON esperado:
 {
   "title": "$currentTitle",
-  "lyrics": "Letra perfectamente acentuada y corregida"
+  "lyrics": "Letra corregida contextualmente"
 }
 ''';
 
@@ -249,15 +248,27 @@ JSON esperado:
     final bool hasChanges = originalTitle != suggestedTitle || originalLyrics != suggestedLyrics;
 
     if (!hasChanges) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '✨ El texto ya cuenta con una ortografía y acentuación impecables.',
-            style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.bold),
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.teal),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Ortografía Impecable', style: GoogleFonts.outfit(fontWeight: FontWeight.bold))),
+            ],
           ),
-          backgroundColor: Colors.teal[700],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(
+            'El texto ya cuenta con una excelente ortografía y puntuación según las reglas establecidas. No se requiere ninguna corrección adicional.',
+            style: GoogleFonts.nunito(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Entendido', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       );
       return null;

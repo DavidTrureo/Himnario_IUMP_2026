@@ -103,6 +103,9 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    try {
+      _controller.stop(); // Fuerza el apagado de la cámara, especialmente en web
+    } catch (_) {}
     _controller.dispose();
     _manualController.dispose();
     super.dispose();

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import 'package:himnario_iump/core/services/local_hymn_storage_service.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
@@ -22,49 +22,51 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
   final _titleController = TextEditingController();
   final _lyricsController = TextEditingController();
   final _keyController = TextEditingController();
+  final _beatsController = TextEditingController();
+  final _timeSignatureController = TextEditingController();
   final _nameController = TextEditingController();
   final _churchController = TextEditingController();
+
   String _selectedCollection = 'especiales';
   bool _isLoading = false;
 
-  final List<String> _collections = ['iump', 'coros', 'especiales'];
+  final List<String> _collections = ['iump', 'especiales', 'coros'];
 
   @override
   void dispose() {
     _titleController.dispose();
     _lyricsController.dispose();
     _keyController.dispose();
+    _beatsController.dispose();
+    _timeSignatureController.dispose();
     _nameController.dispose();
     _churchController.dispose();
     super.dispose();
   }
 
   Future<String?> _showGeminiKeyInputDialog(BuildContext context) async {
-    String? key = '';
-    await showDialog(
+    final controller = TextEditingController();
+    return showDialog<String>(
       context: context,
-      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('API Key de Gemini'),
+        title: const Text('Llave de API de Gemini'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Para usar el escáner inteligente, necesitas ingresar tu API Key de Gemini. Puedes obtenerla gratis en Google AI Studio.'),
+            const Text('Para usar el escáner OCR con IA necesitas tu propia llave de API gratuita de Google AI Studio.'),
             const SizedBox(height: 16),
             TextField(
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'API Key', border: OutlineInputBorder()),
-              onChanged: (val) => key = val,
+              controller: controller,
+              decoration: const InputDecoration(labelText: 'Ingresa tu API Key', border: OutlineInputBorder()),
             ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, key), child: const Text('Guardar')),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Guardar y Usar')),
         ],
       ),
     );
-    return key;
   }
 
   Future<void> _scanText() async {
@@ -136,17 +138,17 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
         'contents': [{
           'parts': [
             {
-              'text': 'Analiza esta imagen y extrae el texto del canto, himno o alabanza cristiana. '
-                      'Identifica el título oficial del canto (si no está, infiérelo de la letra), '
-                      'los acordes iniciales / tono (ej: RE / 2 TIEMPOS, SOLm / 3 TIEMPOS) si vienen escritos en alguna parte (si no vienen, deja el tono vacío), '
-                      'y la letra completa del canto organizada de forma prolija en estrofas y coros claros, '
-                      'eliminando cualquier acorde escrito entre medio de la letra (queremos solo el texto limpio de la letra). \n'
-                      'Retorna el resultado estrictamente en este formato JSON, sin bloques de código markdown, sin explicaciones ni textos decorativos, solo el JSON:\n'
-                      '{\n'
-                      '  "title": "Título del canto",\n'
-                      '  "tone": "Acorde / N tiempos (dejar vacío si no hay indicación)",\n'
-                      '  "lyrics": "Letra completa limpia"\n'
-                      '}'
+              'text': '''Analiza esta imagen y extrae el texto del canto, himno o alabanza cristiana. 
+Identifica el título oficial del canto (si no está, infiérelo de la letra), 
+los acordes iniciales / tono (ej: RE / 2 TIEMPOS, SOLm / 3 TIEMPOS) si vienen escritos en alguna parte (si no vienen, deja el tono vacío), 
+y la letra completa del canto organizada de forma prolija en estrofas y coros claros, 
+eliminando cualquier acorde escrito entre medio de la letra (queremos solo el texto limpio de la letra). 
+Retorna el resultado estrictamente en este formato JSON, sin bloques de código markdown, sin explicaciones ni textos decorativos, solo el JSON:
+{
+  "title": "Título del canto",
+  "tone": "Acorde / N tiempos (dejar vacío si no hay indicación)",
+  "lyrics": "Letra completa limpia"
+}'''
             },
             {
               'inlineData': {
@@ -163,7 +165,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
 
       for (final model in modelsToTry) {
         try {
-          final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey');
+          final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey);
           final res = await http.post(
             url,
             headers: {'Content-Type': 'application/json'},
@@ -178,7 +180,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
 
         if (response == null) {
           try {
-            final url = Uri.parse('https://generativelanguage.googleapis.com/v1/models/$model:generateContent?key=$apiKey');
+            final url = Uri.parse('https://generativelanguage.googleapis.com/v1/models/' + model + ':generateContent?key=' + apiKey);
             final res = await http.post(
               url,
               headers: {'Content-Type': 'application/json'},
@@ -253,7 +255,6 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
   bool _isDuplicate(String newLyrics, List<Hymn> existingHymns) {
     if (newLyrics.trim().length < 20) return false;
 
-    // Normalizar
     String normalize(String s) => s.replaceAll(RegExp(r'[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]'), '').toLowerCase();
     
     final cleanNew = normalize(newLyrics);
@@ -280,7 +281,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
 
       final similarity = (2.0 * intersection) / (newTrigrams.length + existingTrigrams.length);
       if (similarity > 0.8) {
-        return true; // Se parece demasiado a uno existente
+        return true; 
       }
     }
     return false;
@@ -323,6 +324,9 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
           title, 
           lyrics, 
           _selectedCollection,
+          key: _keyController.text.trim(),
+          beats: _beatsController.text.trim(),
+          timeSignature: _timeSignatureController.text.trim(),
         );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Guardado localmente.')),
@@ -333,6 +337,8 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
           'lyrics': lyrics,
           'collection': _selectedCollection,
           'key': _keyController.text.trim(),
+          'beats': _beatsController.text.trim(),
+          'timeSignature': _timeSignatureController.text.trim(),
           'requesterName': _nameController.text.trim(),
           'requesterChurch': _churchController.text.trim(),
           'timestamp': FieldValue.serverTimestamp(),
@@ -352,11 +358,36 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
     }
   }
 
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark ? const Color(0xFF0F172A) : Colors.grey[50];
+    
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text('Añadir Canto'),
+        title: Text('Añadir Canto', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+        centerTitle: true,
+        elevation: 0,
         actions: [
           if (_isLoading)
             const Padding(
@@ -366,75 +397,212 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedCollection,
-                    decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
-                    items: _collections.map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase()))).toList(),
-                    onChanged: (v) => setState(() => _selectedCollection = v!),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _keyController,
-                    decoration: const InputDecoration(labelText: 'Tono (Ej: Do Mayor)', border: OutlineInputBorder()),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Título del canto', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _lyricsController,
-              maxLines: 12,
-              decoration: InputDecoration(
-                labelText: 'Letra del canto', 
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.camera_alt),
-                  tooltip: 'Escanear con OCR',
-                  onPressed: _scanText,
+            
+            // CARD 1: INFORMACIÓN PRINCIPAL
+            Card(
+              elevation: 2,
+              shadowColor: Colors.black12,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Información Básica', Icons.info_outline),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCollection,
+                      decoration: InputDecoration(
+                        labelText: 'Categoría',
+                        prefixIcon: const Icon(Icons.folder_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: isDark ? Colors.grey[900] : Colors.grey[100],
+                      ),
+                      items: _collections.map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase()))).toList(),
+                      onChanged: (v) => setState(() => _selectedCollection = v!),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _titleController,
+                      decoration: InputDecoration(
+                        labelText: 'Título del canto',
+                        prefixIcon: const Icon(Icons.text_fields),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: isDark ? Colors.grey[900] : Colors.grey[100],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
-            Text('Datos del sugeridor (Opcional, solo si vas a Sugerir Oficial)', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Tu Nombre', border: OutlineInputBorder()),
-                  ),
+
+            // CARD 2: MUSICALIZACIÓN
+            Card(
+              elevation: 2,
+              shadowColor: Colors.black12,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Musicalización', Icons.music_note_outlined),
+                    TextField(
+                      controller: _keyController,
+                      decoration: InputDecoration(
+                        labelText: 'Tono (Ej: Do Mayor, Sol)',
+                        prefixIcon: const Icon(Icons.piano),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: isDark ? Colors.grey[900] : Colors.grey[100],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _beatsController,
+                            decoration: InputDecoration(
+                              labelText: 'Tiempo (Ej: 120)',
+                              prefixIcon: const Icon(Icons.speed),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              filled: true,
+                              fillColor: isDark ? Colors.grey[900] : Colors.grey[100],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _timeSignatureController,
+                            decoration: InputDecoration(
+                              labelText: 'Métrica (Ej: 4/4)',
+                              prefixIcon: const Icon(Icons.straighten),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              filled: true,
+                              fillColor: isDark ? Colors.grey[900] : Colors.grey[100],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _churchController,
-                    decoration: const InputDecoration(labelText: 'Tu Iglesia / Local', border: OutlineInputBorder()),
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // CARD 3: LETRA
+            Card(
+              elevation: 2,
+              shadowColor: Colors.black12,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildSectionTitle('Letra del Canto', Icons.article_outlined),
+                        IconButton(
+                          icon: const Icon(Icons.document_scanner),
+                          tooltip: 'Escanear con OCR',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                          onPressed: _scanText,
+                        ),
+                      ],
+                    ),
+                    TextField(
+                      controller: _lyricsController,
+                      maxLines: 12,
+                      decoration: InputDecoration(
+                        hintText: 'Pega la letra aquí o escanea una foto con el botón superior.',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: isDark ? Colors.grey[900] : Colors.grey[100],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // CARD 4: DATOS DEL SUGERIDOR
+            Card(
+              elevation: 0,
+              color: isDark ? const Color(0xFF1E293B) : Colors.blueGrey[50],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: isDark ? Colors.blueGrey[800]! : Colors.blueGrey[200]!, width: 1),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Datos del Sugeridor', Icons.person_outline),
+                    Text(
+                      'Opcional. Se enviarán junto a la letra si eliges "Sugerir Oficial".',
+                      style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              labelText: 'Tu Nombre',
+                              prefixIcon: const Icon(Icons.badge_outlined),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              filled: true,
+                              fillColor: isDark ? Colors.grey[900] : Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _churchController,
+                            decoration: InputDecoration(
+                              labelText: 'Iglesia/Local',
+                              prefixIcon: const Icon(Icons.church_outlined),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              filled: true,
+                              fillColor: isDark ? Colors.grey[900] : Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // BOTONES DE ACCIÓN
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     onPressed: _isLoading ? null : () => _saveHymn(true),
                     icon: const Icon(Icons.save_alt),
                     label: const Text('Guardar Local'),
@@ -443,6 +611,10 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     onPressed: _isLoading ? null : () => _saveHymn(false),
                     icon: const Icon(Icons.cloud_upload),
                     label: const Text('Sugerir Oficial'),
@@ -450,6 +622,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 32),
           ],
         ),
       ),

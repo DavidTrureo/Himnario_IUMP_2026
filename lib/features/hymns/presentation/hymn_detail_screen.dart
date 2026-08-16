@@ -91,6 +91,47 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _showPlayerCard = false;
 
   YoutubePlayerController? _youtubeController;
+  final ScrollController _scrollController = ScrollController();
+  bool _isAutoScrolling = false;
+  double _autoScrollSpeed = 30.0;
+
+  void _toggleAutoScroll() {
+    setState(() {
+      _isAutoScrolling = !_isAutoScrolling;
+    });
+    if (_isAutoScrolling) {
+      _startAutoScroll();
+    }
+  }
+
+  void _startAutoScroll() async {
+    while (_isAutoScrolling) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (_scrollController.hasClients && _isAutoScrolling) {
+        final double maxScroll = _scrollController.position.maxScrollExtent;
+        final double currentScroll = _scrollController.offset;
+        final double delta = _autoScrollSpeed / 10.0; // Píxeles por iteración
+
+        if (currentScroll + delta >= maxScroll) {
+          // Llegamos al final
+          _scrollController.jumpTo(maxScroll);
+          setState(() {
+            _isAutoScrolling = false;
+          });
+          break;
+        } else {
+          _scrollController.animateTo(
+            currentScroll + delta,
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.linear,
+          );
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
 
   void _updateYoutubePlayer(Hymn hymn) {
     final audioUrl = hymn.audioUrl;
@@ -171,6 +212,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
+
     _pageController?.dispose();
     _audioPlayer?.dispose();
     _youtubeController?.close();
@@ -870,6 +913,25 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ),
                 ).animate().fadeIn(delay: 200.ms).scale(),
 
+              // Botón flotante para Autoscroll
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                right: 20,
+                bottom: (_showControlPanel 
+                    ? 280.0 
+                    : (_showPlayerCard ? 150.0 : 20.0) + (_showControlPanel ? 0 : 60)) + MediaQuery.of(context).padding.bottom,
+                child: FloatingActionButton(
+                  heroTag: 'autoscroll-fab',
+                  backgroundColor: isDark ? const Color(0xFF6366F1) : theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 4,
+                  onPressed: _toggleAutoScroll,
+                  tooltip: _isAutoScrolling ? 'Pausar autoscroll' : 'Iniciar autoscroll',
+                  child: Icon(_isAutoScrolling ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                ),
+              ),
+
               // Reproductor de Audio Flotante (Glassmorphic)
               if (_showPlayerCard && _audioPlayer != null)
                 Positioned(
@@ -1228,6 +1290,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       child: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
+          controller: _scrollController,
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
             20.0, 
@@ -3600,6 +3663,46 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     );
   }
 
+  void _showCreateSetlistDialog(BuildContext context, WidgetRef ref, String hymnKey) {
+    final titleCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Nuevo Repertorio', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: titleCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Nombre del Repertorio',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final title = titleCtrl.text.trim();
+              if (title.isNotEmpty) {
+                final date = DateTime.now().toIso8601String().split('T')[0];
+                await ref.read(setlistsProvider.notifier).addSetlist(title, date, [hymnKey]);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Repertorio creado y canto agregado')),
+                  );
+                }
+              }
+            },
+            child: const Text('Crear y Agregar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAddToSetlistDialog(BuildContext context, WidgetRef ref, Hymn hymn) {
     final key = '${hymn.collection}-${hymn.id}';
     showModalBottomSheet(
@@ -3723,6 +3826,24 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       ),
                     ),
                   ],
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.grey.withValues(alpha: 0.2)),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add_rounded, color: Color(0xFF4F46E5)),
+                    ),
+                    title: Text('Crear Nuevo Repertorio', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5))),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showCreateSetlistDialog(context, ref, key);
+                    },
+                  ),
                 ],
               ),
             );
@@ -3812,6 +3933,8 @@ class _AutoScrollingAppBarTitleState extends State<AutoScrollingAppBarTitle> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
+
     _scrollController.dispose();
     super.dispose();
   }

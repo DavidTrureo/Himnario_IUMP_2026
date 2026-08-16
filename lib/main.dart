@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,6 +21,7 @@ import 'features/setlists/presentation/setlist_detail_screen.dart';
 import 'features/tuner/presentation/instrument_tuner_screen.dart';
 import 'features/live_worship/presentation/live_worship_screen.dart';
 import 'features/live_worship/presentation/qr_scanner_screen.dart';
+import 'features/hymns/presentation/detached_projector_screen.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'features/hymns/domain/hymn.dart';
@@ -66,6 +68,22 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    // Initialize FCM safely
+    try {
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      messaging.getToken().then((token) {
+        debugPrint('FCM Token: $token');
+      }).catchError((e) {
+        debugPrint('Error getting FCM token: $e');
+      });
+    } catch (e) {
+      debugPrint('Error initializing Firebase Messaging: $e');
+    }
 
     // Habilitar persistencia offline indefinida para Firestore
     FirebaseFirestore.instance.settings = const Settings(
@@ -138,6 +156,14 @@ final _router = GoRouter(
       builder: (context, state) {
         final hymnId = state.pathParameters['id']!;
         return HymnDetailScreen(hymnId: hymnId);
+      },
+    ),
+    GoRoute(
+      path: '/projector-view/:collection/:id',
+      builder: (context, state) {
+        final collection = state.pathParameters['collection']!;
+        final hymnId = state.pathParameters['id']!;
+        return DetachedProjectorScreen(collection: collection, hymnId: hymnId);
       },
     ),
     GoRoute(

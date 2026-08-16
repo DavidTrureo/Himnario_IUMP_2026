@@ -814,12 +814,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
 
     final currentQuery = ref.watch(searchQueryProvider);
-    if (_searchBarController.text != currentQuery) {
-      _searchBarController.value = TextEditingValue(
-        text: currentQuery,
-        selection: TextSelection.collapsed(offset: currentQuery.length),
-      );
-    }
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,

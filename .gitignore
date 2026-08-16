@@ -58,3 +58,4 @@ __pycache__/
 # Archivos temporales de macOS
 .DS_Store
 
+*.apk

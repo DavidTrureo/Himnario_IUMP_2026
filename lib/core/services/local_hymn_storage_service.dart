@@ -52,7 +52,14 @@ class LocalHymnStorageService {
   static const String _keyLocalCustomHymns = 'local_custom_hymns_v1';
 
   /// Guarda un nuevo canto local. Retorna el ID asignado (basado en timestamp).
-  static Future<int> saveCustomHymn(String title, String lyrics, String collection) async {
+  static Future<int> saveCustomHymn(
+    String title, 
+    String lyrics, 
+    String collection, {
+    String key = '',
+    String beats = '',
+    String timeSignature = '',
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final customHymns = await _getCustomHymnsRaw();
 
@@ -64,6 +71,9 @@ class LocalHymnStorageService {
       'title': title,
       'lyrics': lyrics,
       'collection': collection,
+      'key': key,
+      'beats': beats,
+      'timeSignature': timeSignature,
       'isLocalOnly': true,
       'timestamp': DateTime.now().toIso8601String(),
     });
