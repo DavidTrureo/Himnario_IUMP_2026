@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'hymn_list_screen.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/services/gemini_ai_service.dart';
+import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -20,6 +24,7 @@ class AddHymnScreen extends ConsumerStatefulWidget {
 
 class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
   final _titleController = TextEditingController();
+  final _artistController = TextEditingController();
   final _lyricsController = TextEditingController();
   final _keyController = TextEditingController();
   final _beatsController = TextEditingController();
@@ -44,37 +49,14 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
     super.dispose();
   }
 
-  Future<String?> _showGeminiKeyInputDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Llave de API de Gemini'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Para usar el escáner OCR con IA necesitas tu propia llave de API gratuita de Google AI Studio.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(labelText: 'Ingresa tu API Key', border: OutlineInputBorder()),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Guardar y Usar')),
-        ],
-      ),
-    );
-  }
+
 
   Future<void> _scanText() async {
     final prefs = await SharedPreferences.getInstance();
     String apiKey = prefs.getString('gemini_api_key') ?? '';
     if (apiKey.isEmpty) {
       if (!mounted) return;
-      final enteredKey = await _showGeminiKeyInputDialog(context);
+      final enteredKey = await GeminiAiService.showApiKeyInputDialog(context, reason: 'Para usar el escáner OCR con IA necesitas tu propia llave de API gratuita de Google AI Studio.');
       if (enteredKey == null || enteredKey.trim().isEmpty) return;
       apiKey = enteredKey.trim();
       await prefs.setString('gemini_api_key', apiKey);
@@ -358,20 +340,23 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
     }
   }
 
-  Widget _buildSectionTitle(String title, IconData icon) {
+  Widget _buildSectionTitle(String title, IconData icon, {Widget? trailing}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
         children: [
           Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
-          Text(
-            title,
-            style: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              title,
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
+          if (trailing != null) trailing,
         ],
       ),
     );
@@ -428,6 +413,15 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
                     const SizedBox(height: 16),
                     TextField(
                       controller: _titleController,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [
+                        TextInputFormatter.withFunction((oldValue, newValue) {
+                          return TextEditingValue(
+                            text: newValue.text.toUpperCase(),
+                            selection: newValue.selection,
+                          );
+                        }),
+                      ],
                       decoration: InputDecoration(
                         labelText: 'Título del canto',
                         prefixIcon: const Icon(Icons.text_fields),
@@ -512,7 +506,11 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildSectionTitle('Letra del Canto', Icons.article_outlined),
+                        _buildSectionTitle('Letra del Canto', Icons.article_outlined, trailing: IconButton(
+                      icon: const Icon(Icons.travel_explore_rounded, color: Colors.blueAccent),
+                      tooltip: 'Buscar Letra en Internet (IA)',
+                      onPressed: () => _searchLyricsWithAI(context),
+                    )),
                         IconButton(
                           icon: const Icon(Icons.document_scanner),
                           tooltip: 'Escanear con OCR',
@@ -628,4 +626,32 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
       ),
     );
   }
+
+  Future<void> _searchLyricsWithAI(BuildContext context) async {
+    final title = _titleController.text.trim();
+    
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => OnlineSearchDialog(
+        initialQuery: title,
+        returnResults: true,
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        if (result['title'] != null && result['title'].toString().isNotEmpty) {
+          _titleController.text = result['title'];
+        }
+        if (result['lyrics'] != null && result['lyrics'].toString().isNotEmpty) {
+          _lyricsController.text = result['lyrics'];
+        }
+        if (result['key'] != null && result['key'].toString().isNotEmpty) {
+          _keyController.text = result['key'];
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datos importados exitosamente.')));
+    }
+  }
+
 }

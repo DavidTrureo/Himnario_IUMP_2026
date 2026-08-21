@@ -17,9 +17,22 @@ class SetlistsListScreen extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          // Fondo base gradiente
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: isDark 
+                  ? [const Color(0xFF0F172A), const Color(0xFF020617)]
+                  : [const Color(0xFFF0F9FF), const Color(0xFFE0F2FE)],
+              ),
+            ),
+          ),
+
           // Auroras decorativas de fondo
           Positioned(
             top: -100,
@@ -64,10 +77,7 @@ class SetlistsListScreen extends ConsumerWidget {
                     ),
                     centerTitle: true,
                   ),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                    onPressed: () => context.pop(),
-                  ),
+                  automaticallyImplyLeading: false,
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.qr_code_scanner_rounded),
@@ -82,35 +92,67 @@ class SetlistsListScreen extends ConsumerWidget {
                   data: (setlists) {
                     if (setlists.isEmpty) {
                       return SliverFillRemaining(
+                        hasScrollBody: false,
                         child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.queue_music_rounded,
-                                size: 64,
-                                color: isDark ? Colors.white30 : Colors.black26,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No hay repertorios creados',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white60 : Colors.black45,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 120,
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(
+                                      colors: [
+                                        theme.colorScheme.primary.withValues(alpha: isDark ? 0.3 : 0.15),
+                                        theme.colorScheme.primary.withValues(alpha: 0.0),
+                                      ],
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.queue_music_rounded,
+                                    size: 64,
+                                    color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.8 : 0.6),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.add_rounded),
-                                label: const Text('Crear Primer Repertorio'),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                const SizedBox(height: 24),
+                                Text(
+                                  'Aún no hay repertorios',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : Colors.black87,
+                                  ),
                                 ),
-                                onPressed: () => _showAddSetlistDialog(context, ref),
-                              ),
-                            ],
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Organiza tus cantos para el próximo culto creando tu primer repertorio.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 16,
+                                    color: isDark ? Colors.white60 : Colors.black54,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.add_rounded),
+                                  label: Text(
+                                    'Crear Repertorio',
+                                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: () => _showAddSetlistDialog(context, ref),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -144,12 +186,18 @@ class SetlistsListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.add_rounded),
-        label: Text('Nuevo Repertorio', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onPressed: () => _showAddSetlistDialog(context, ref),
-      ).animate().scale(delay: 200.ms),
+      floatingActionButton: setlistsAsync.maybeWhen(
+        data: (setlists) => setlists.isEmpty ? null : Padding(
+          padding: const EdgeInsets.only(bottom: 140.0),
+          child: FloatingActionButton.extended(
+            icon: const Icon(Icons.add_rounded),
+            label: Text('Nuevo Repertorio', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            onPressed: () => _showAddSetlistDialog(context, ref),
+          ),
+        ).animate().scale(delay: 200.ms),
+        orElse: () => null,
+      ),
     );
   }
 
@@ -163,12 +211,17 @@ class SetlistsListScreen extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.03),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.08 : 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),

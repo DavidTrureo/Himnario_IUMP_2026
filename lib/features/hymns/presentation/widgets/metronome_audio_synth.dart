@@ -12,11 +12,3 @@ void prepareAudioContext() {
 void playTonePitch(double frequency, {double durationSeconds = 1.5}) {
   playMusicalTone(frequency, durationSeconds: durationSeconds);
 }
-
-void listenToPitch(void Function(double frequencyHz) onPitchDetected) {
-  startMicrophonePitchDetector(onPitchDetected);
-}
-
-void stopPitchDetector() {
-  stopMicrophonePitchDetector();
-}

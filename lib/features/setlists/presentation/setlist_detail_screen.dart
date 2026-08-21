@@ -10,8 +10,6 @@ import '../domain/setlist.dart';
 import 'setlists_provider.dart';
 
 import '../../../core/services/setlist_pdf_service.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '../../../core/widgets/app_music_icons.dart';
 import '../../live_worship/presentation/live_session_provider.dart';
 
 class SetlistDetailScreen extends ConsumerStatefulWidget {
@@ -29,6 +27,54 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _showPdfOptionsBottomSheet(BuildContext context, Setlist setlist, List<Hymn> hymns) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Exportar PDF / Imprimir', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.list_alt_rounded),
+                  title: const Text('Solo Programa (Tabla Resumen)'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    SetlistExportService.printOrSharePdf(setlist, hymns, mode: ExportMode.summaryOnly);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.menu_book_rounded),
+                  title: const Text('Cantos Completos (1 por página)'),
+                  subtitle: const Text('Letra grande, ideal para director'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    SetlistExportService.printOrSharePdf(setlist, hymns, mode: ExportMode.fullHymns1PerPage);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.chrome_reader_mode_rounded),
+                  title: const Text('Cantos Completos (2 por página)'),
+                  subtitle: const Text('Ahorro de papel (dividido horizontalmente)'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    SetlistExportService.printOrSharePdf(setlist, hymns, mode: ExportMode.fullHymns2PerPage);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -86,21 +132,6 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                   backgroundColor: Colors.transparent,
                   actions: [
                     IconButton(
-                      icon: const TuningForkIcon(size: 22, color: Color(0xFFEC4899)),
-                      tooltip: 'Afinador de Instrumentos',
-                      onPressed: () => context.push('/tuner'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.qr_code_2_rounded),
-                      tooltip: 'Código QR del Culto',
-                      onPressed: () => _showQrCodeDialog(context, setlist, setlistHymns),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.share_rounded),
-                      tooltip: 'Compartir por WhatsApp / Texto',
-                      onPressed: () => SetlistExportService.shareSetlistText(setlist, setlistHymns),
-                    ),
-                    IconButton(
                       icon: const Icon(Icons.people_outline_rounded),
                       tooltip: 'Asignar Nómina del Culto',
                       onPressed: () => _showEditRosterDialog(context, ref, setlist),
@@ -108,7 +139,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     IconButton(
                       icon: const Icon(Icons.picture_as_pdf_rounded),
                       tooltip: 'Exportar PDF / Imprimir',
-                      onPressed: () => SetlistExportService.printOrSharePdf(setlist, setlistHymns),
+                      onPressed: () => _showPdfOptionsBottomSheet(context, setlist, setlistHymns),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
@@ -665,63 +696,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  void _showQrCodeDialog(BuildContext context, Setlist setlist, List<Hymn> hymns) {
-    final payload = SetlistExportService.formatSetlistText(setlist, hymns);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        title: Column(
-          children: [
-            Text('Código QR del Culto', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 4),
-            Text(setlist.title, style: GoogleFonts.nunito(fontSize: 13, color: theme.colorScheme.primary)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: QrImageView(
-                data: payload,
-                version: QrVersions.auto,
-                size: 200.0,
-                backgroundColor: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Escanea con cualquier cámara de teléfono para importar el programa de culto al instante.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(fontSize: 12, color: isDark ? Colors.white70 : Colors.black87),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Convierte una fecha almacenada a formato DD-MM-YYYY para mostrar.
   String _formatDate(String raw) {

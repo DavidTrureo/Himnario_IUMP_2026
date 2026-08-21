@@ -1,9 +1,10 @@
+import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,28 +13,25 @@ import 'package:audio_session/audio_session.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
-import 'features/home/presentation/home_screen.dart';
-import 'features/home/presentation/splash_screen.dart';
-import 'features/hymns/presentation/hymn_list_screen.dart';
-import 'features/hymns/presentation/hymn_detail_screen.dart';
-import 'features/setlists/presentation/setlists_list_screen.dart';
-import 'features/setlists/presentation/setlist_detail_screen.dart';
-import 'features/tuner/presentation/instrument_tuner_screen.dart';
-import 'features/live_worship/presentation/live_worship_screen.dart';
-import 'features/live_worship/presentation/qr_scanner_screen.dart';
-import 'features/hymns/presentation/detached_projector_screen.dart';
+import 'core/routing/app_router.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'features/hymns/domain/hymn.dart';
 
 void main() async {
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF0F172A), // Slate 900
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
+
   WidgetsFlutterBinding.ensureInitialized();
-  // En Web no descargamos fuentes en runtime: causa peticiones bloqueantes.
-  // Se usan las fuentes del sistema o las precargadas en build.
   GoogleFonts.config.allowRuntimeFetching = false;
 
   try {
-    // Precargar todos los catálogos en memoria RAM (0.01s)
     await Hymn.preloadAssets();
 
     ErrorWidget.builder = (FlutterErrorDetails details) {
@@ -68,7 +66,17 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Initialize FCM safely
+    try {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+        appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
+        // reCAPTCHA v3 site key para la web
+        webProvider: ReCaptchaV3Provider('6LeCoostAAAAADjlTZgUZk3KXlf0neU9S-FV3so5'),
+      );
+    } catch (e) {
+      debugPrint('Error inicializando Firebase App Check: $e');
+    }
+
     try {
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission(
@@ -85,12 +93,11 @@ void main() async {
       debugPrint('Error initializing Firebase Messaging: $e');
     }
 
-    // Habilitar persistencia offline indefinida para Firestore
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
-    // Mantener la pantalla encendida mientras la app esté abierta
+    
     try {
       WakelockPlus.enable();
     } catch (e) {
@@ -107,7 +114,6 @@ void main() async {
       ),
     );
   } catch (e, stackTrace) {
-    // Si hay un error fatal antes de que inicie la app, mostramos una pantalla de error.
     runApp(
       MaterialApp(
         home: Scaffold(
@@ -135,63 +141,6 @@ void main() async {
   }
 }
 
-// Configuración de GoRouter
-final _router = GoRouter(
-  initialLocation: '/',
-  routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: '/home',
-      builder: (context, state) => const HomeScreen(),
-    ),
-    GoRoute(
-      path: '/hymns',
-      builder: (context, state) => const HymnListScreen(),
-    ),
-    GoRoute(
-      path: '/hymn/:id',
-      builder: (context, state) {
-        final hymnId = state.pathParameters['id']!;
-        return HymnDetailScreen(hymnId: hymnId);
-      },
-    ),
-    GoRoute(
-      path: '/projector-view/:collection/:id',
-      builder: (context, state) {
-        final collection = state.pathParameters['collection']!;
-        final hymnId = state.pathParameters['id']!;
-        return DetachedProjectorScreen(collection: collection, hymnId: hymnId);
-      },
-    ),
-    GoRoute(
-      path: '/setlists',
-      builder: (context, state) => const SetlistsListScreen(),
-    ),
-    GoRoute(
-      path: '/setlist-detail',
-      builder: (context, state) => const SetlistDetailScreen(),
-    ),
-    GoRoute(
-      path: '/tuner',
-      builder: (context, state) => const InstrumentTunerScreen(),
-    ),
-    GoRoute(
-      path: '/scan-qr',
-      builder: (context, state) => const QrScannerScreen(),
-    ),
-    GoRoute(
-      path: '/culto-en-vivo/:sessionId',
-      builder: (context, state) {
-        final sessionId = state.pathParameters['sessionId']!;
-        return LiveWorshipScreen(sessionId: sessionId);
-      },
-    ),
-  ],
-);
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -201,8 +150,8 @@ class MyApp extends StatelessWidget {
       title: 'Himnario IUMP',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system, // Cambia automáticamente según el OS
-      routerConfig: _router,
+      themeMode: ThemeMode.dark,
+      routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
     );
   }

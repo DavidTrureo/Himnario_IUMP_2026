@@ -4,12 +4,9 @@ import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:audio_streamer/audio_streamer.dart';
-import '../../../../core/services/yin_pitch_engine.dart';
 
 AudioPlayer? _nativePlayer;
 AudioPlayer? _nativeTonePlayer;
-StreamSubscription<List<double>>? _audioStreamSub;
 
 Uint8List _generateClaveWavBytes({required double frequency, required double durationSeconds, double sampleRate = 22050}) {
   final numSamples = (durationSeconds * sampleRate).toInt();
@@ -117,90 +114,4 @@ void playMusicalTone(double frequency, {double durationSeconds = 1.5}) async {
       SystemSound.play(SystemSoundType.click);
     } catch (_) {}
   }
-}
-
-// Algoritmo de Autocorrelación Preciso Estándar para Instrumentos
-double _autoCorrelateFloat(List<double> samples, int sampleRate) {
-  if (samples.length < 256) return -1.0;
-  final numSamples = samples.length;
-
-  double rms = 0;
-  for (int i = 0; i < numSamples; i++) {
-    final val = samples[i];
-    rms += val * val;
-  }
-  rms = math.sqrt(rms / numSamples);
-  if (rms < 0.005) return -1.0; // Umbral de silencio bajo
-
-  int size = numSamples;
-  int r1 = 0, r2 = size - 1;
-  const thres = 0.2;
-  for (int i = 0; i < size ~/ 2; i++) {
-    if (samples[i].abs() < thres) { r1 = i; break; }
-  }
-  for (int i = 1; i < size ~/ 2; i++) {
-    if (samples[size - i].abs() < thres) { r2 = size - i; break; }
-  }
-
-  final sliced = samples.sublist(r1, r2);
-  size = sliced.length;
-  if (size < 60) return -1.0;
-
-  final c = Float32List(size);
-  for (int i = 0; i < size; i++) {
-    for (int j = 0; j < size - i; j++) {
-      c[i] = c[i] + sliced[j] * sliced[j + i];
-    }
-  }
-
-  int d = 0;
-  while (d < size - 1 && c[d] > c[d + 1]) {
-    d++;
-  }
-  double maxval = -1;
-  int maxpos = -1;
-  for (int i = d; i < size; i++) {
-    if (c[i] > maxval) {
-      maxval = c[i];
-      maxpos = i;
-    }
-  }
-
-  int t0 = maxpos;
-  if (t0 <= 0 || t0 >= size - 1) return -1.0;
-
-  final x1 = c[t0 - 1], x2 = c[t0], x3 = c[t0 + 1];
-  final a = (x1 + x3 - 2 * x2) / 2;
-  final b = (x3 - x1) / 2;
-  double refinedT0 = t0.toDouble();
-  if (a != 0) refinedT0 = t0 - b / (2 * a);
-
-  return sampleRate / refinedT0;
-}
-
-YinPitchEngine? _yinPitchEngine;
-
-void startMicrophonePitchDetector(void Function(double frequencyHz) onPitchDetected) async {
-  try {
-    stopMicrophonePitchDetector();
-    _yinPitchEngine = YinPitchEngine();
-    await _yinPitchEngine!.start(onPitchDetected);
-
-    final streamer = AudioStreamer();
-    _audioStreamSub = streamer.audioStream.listen((buffer) {
-      final sampleRate = (streamer.sampleRate ?? 44100).toDouble();
-      _yinPitchEngine?.processBuffer(buffer, sampleRate);
-    }, onError: (_) {
-      stopMicrophonePitchDetector();
-    });
-  } catch (_) {}
-}
-
-void stopMicrophonePitchDetector() {
-  try {
-    _audioStreamSub?.cancel();
-    _audioStreamSub = null;
-    _yinPitchEngine?.stop();
-    _yinPitchEngine = null;
-  } catch (_) {}
 }

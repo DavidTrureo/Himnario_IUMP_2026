@@ -1,3 +1,6 @@
+import 'package:himnario_iump/core/services/local_hymn_storage_service.dart';
+import 'dart:ui' as dart_ui;
+import 'package:himnario_iump/features/hymns/domain/hymn.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,13 +16,53 @@ class AdminSuggestionsScreen extends ConsumerStatefulWidget {
 class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen> {
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Sugerencias Pendientes'),
-        backgroundColor: Colors.amber.shade700,
-        foregroundColor: Colors.white,
+        title: Text(
+          'Sugerencias Pendientes',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: dart_ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              color: isDark 
+                  ? Colors.black.withValues(alpha: 0.3) 
+                  : Colors.white.withValues(alpha: 0.3),
+            ),
+          ),
+        ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // Fondo degradado y auroras
+          Positioned(
+            top: -100,
+            right: -50,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.15 : 0.1),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: dart_ui.ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: const SizedBox(),
+            ),
+          ),
+          SafeArea(
+            child: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('cantos_sugeridos')
             .where('status', isEqualTo: 'pending')
@@ -65,31 +108,75 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                             '${requesterChurch.isNotEmpty ? ' ($requesterChurch)' : ''}';
               }
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Colors.amber,
-                    child: Icon(Icons.assignment_rounded, color: Colors.white),
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark 
+                      ? Colors.white.withValues(alpha: 0.05) 
+                      : Colors.black.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark 
+                        ? Colors.white.withValues(alpha: 0.1) 
+                        : Colors.black.withValues(alpha: 0.05),
                   ),
-                  title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(subtitle),
-                  isThreeLine: requesterName.isNotEmpty || requesterChurch.isNotEmpty,
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _reviewSuggestion(context, doc.id, data),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: dart_ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      leading: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.assignment_rounded, color: Color(0xFFF59E0B)),
+                      ),
+                      title: Text(title, style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 16)),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(subtitle, style: GoogleFonts.nunito(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)),
+                      ),
+                      isThreeLine: requesterName.isNotEmpty || requesterChurch.isNotEmpty,
+                      trailing: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.chevron_right_rounded, size: 20),
+                      ),
+                      onTap: () => _reviewSuggestion(context, ref, doc.id, data),
+                    ),
+                  ),
                 ),
               );
             },
           );
         },
       ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _reviewSuggestion(BuildContext context, String docId, Map<String, dynamic> data) {
+  void _reviewSuggestion(BuildContext context, WidgetRef ref, String docId, Map<String, dynamic> data) {
     final titleCtrl = TextEditingController(text: data['title'] ?? '');
     final lyricsCtrl = TextEditingController(text: data['lyrics'] ?? '');
     final keyCtrl = TextEditingController(text: data['key'] ?? '');
+    final beatsCtrl = TextEditingController(text: data['beats'] ?? '');
+    final timeSignatureCtrl = TextEditingController(text: data['timeSignature'] ?? '');
     String selectedCollection = data['collection'] ?? 'especiales';
     bool isProcessing = false;
 
@@ -106,7 +193,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: ['iump', 'coros', 'especiales'].contains(selectedCollection) 
+                      initialValue: ['iump', 'coros', 'especiales'].contains(selectedCollection) 
                           ? selectedCollection 
                           : 'especiales',
                       decoration: const InputDecoration(labelText: 'Colección Destino', border: OutlineInputBorder()),
@@ -124,6 +211,14 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                     TextField(
                       controller: keyCtrl,
                       decoration: const InputDecoration(labelText: 'Tono (Ej: Do Mayor)', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: beatsCtrl, decoration: const InputDecoration(labelText: 'Tiempo (BPM)', border: OutlineInputBorder()))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextField(controller: timeSignatureCtrl, decoration: const InputDecoration(labelText: 'Métrica', border: OutlineInputBorder()))),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -187,12 +282,20 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                           if (tone.isNotEmpty) {
                             newHymn['toneNote'] = tone;
                           }
+                          final beats = beatsCtrl.text.trim();
+                          if (beats.isNotEmpty) newHymn['beats'] = beats;
+                          final timeSig = timeSignatureCtrl.text.trim();
+                          if (timeSig.isNotEmpty) newHymn['timeSignature'] = timeSig;
 
-                          // 3. Guardar en la colección oficial
+                          // 3. Guardar en la colección oficial de Firestore
                           await FirebaseFirestore.instance
                               .collection(selectedCollection)
                               .doc(nextId.toString())
                               .set(newHymn);
+                          
+                          // Refrescar el provider de la colección para mostrar el nuevo canto
+                          ref.invalidate(hymnsProvider(selectedCollection));
+                          
 
                           // 4. Marcar sugerencia como aprobada
                           await FirebaseFirestore.instance.collection('cantos_sugeridos').doc(docId).update({

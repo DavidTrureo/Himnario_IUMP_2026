@@ -30,6 +30,7 @@ import 'widgets/chord_diagram_dialog.dart';
 import 'widgets/visual_metronome_widget.dart';
 import '../../../core/widgets/app_music_icons.dart';
 import '../../../core/services/hymn_pdf_service.dart';
+import 'widgets/sheet_music_viewer.dart';
 
 // Notifier para controlar el tamaño de la letra
 class FontSizeNotifier extends Notifier<double> {
@@ -80,6 +81,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _showMetronome = false; // Metrónomo visual silencioso
   bool _metronomeTop = true;
   bool _metronomeVertical = false;
+
+  // Modo de vista: 'texto' o 'partitura'
+  String _viewMode = 'texto';
 
   // Variables de estado para reproducción de audio
   AudioPlayer? _audioPlayer;
@@ -414,24 +418,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             primaryColor: theme.colorScheme.primary,
           ),
             actions: [
-              IconButton(
-                icon: const TuningForkIcon(size: 22, color: Color(0xFFEC4899)),
-                tooltip: 'Afinador de Instrumentos',
-                onPressed: () => context.push('/tuner'),
-              ),
-              IconButton(
-                icon: TraditionalMetronomeIcon(
-                  size: 22,
-                  color: _showMetronome ? theme.colorScheme.primary : (isDark ? Colors.white70 : Colors.black87),
-                ),
-                tooltip: _showMetronome ? 'Ocultar metrónomo' : 'Metrónomo silencioso',
-                onPressed: () {
-                  setState(() {
-                    _showMetronome = !_showMetronome;
-                  });
-                },
-              ),
               _buildDatabaseStatusWidget(dbStatus, theme, isDark),
+
               if (hymn.audioUrl.isNotEmpty && !hymn.audioUrl.contains('youtube.com') && !hymn.audioUrl.contains('youtu.be'))
                 IconButton(
                   icon: const Icon(Icons.cloud_download_rounded),
@@ -495,8 +483,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               ),
               IconButton(
                 icon: Icon(
-                  isFavorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                  color: isFavorite ? theme.colorScheme.primary : null,
+                  isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  color: isFavorite ? Colors.red : (isDark ? Colors.white60 : Colors.black54),
                 ),
                 tooltip: isFavorite ? 'Quitar marcador' : 'Guardar himno',
                 onPressed: () {
@@ -507,6 +495,17 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) {
                   switch (value) {
+                    case 'metronome':
+                      setState(() {
+                        _showMetronome = !_showMetronome;
+                      });
+                      break;
+                    case 'sheet_music':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => SheetMusicViewer(hymn: hymn)),
+                      );
+                      break;
                     case 'pdf':
                       _showExportPdfModal(context, hymn);
                       break;
@@ -529,6 +528,51 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   }
                 },
                 itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'metronome',
+                    child: Row(
+                      children: [
+                        TraditionalMetronomeIcon(
+                          size: 20,
+                          color: _showMetronome ? theme.colorScheme.primary : (isDark ? Colors.white70 : Colors.black87),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(_showMetronome ? 'Ocultar metrónomo' : 'Metrónomo silencioso', style: GoogleFonts.nunito()),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'sheet_music',
+                    child: Row(
+                      children: [
+                        Stack(
+                          children: [
+                            Icon(
+                              Icons.library_music_rounded,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
+                            if (hymn.sheetMusicUrls.isNotEmpty)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(minWidth: 6, minHeight: 6),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(width: 10),
+                        Text('Gestionar Partituras', style: GoogleFonts.nunito()),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
                   PopupMenuItem(
                     value: 'pdf',
                     child: Row(
@@ -1282,225 +1326,315 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     return 'TONO: $transposed';
   }
 
-  Widget _buildHymnPage(BuildContext context, Hymn hymn, double fontSize, bool isDark, ThemeData theme) {
-    final hasChords = hymn.lyrics.contains('[');
-    final displayedTone = _getTransposedTone(hymn.tone, _transposeOffset);
+  Widget _buildViewToggle(String mode, String label, IconData icon, bool isDark, ThemeData theme) {
+    final isSelected = _viewMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _viewMode = mode;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? theme.colorScheme.onPrimary : (isDark ? Colors.white70 : Colors.black54),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? theme.colorScheme.onPrimary : (isDark ? Colors.white70 : Colors.black54),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    return SizedBox.expand(
-      child: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            20.0, 
-            16.0, 
-            20.0, 
-            (hasChords ? 165.0 : 110.0) + MediaQuery.of(context).padding.bottom
-          ),
-          child: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 700),
+  Widget _buildHymnHeader(Hymn hymn, double fontSize, bool isDark, ThemeData theme, String displayedTone) {
+    return Column(
+      children: [
+        // Alerta inteligente de duplicados / similitud
+        Builder(
+          builder: (context) {
+            final adminMode = ref.watch(adminModeProvider);
+            if (!adminMode) return const SizedBox.shrink();
+            final allHymnsState = ref.watch(allHymnsGlobalProvider);
+            final allHymns = allHymnsState.value ?? [];
+            final ignoredPairsState = ref.watch(ignoredDuplicatePairsProvider);
+            final ignoredPairsSet = ignoredPairsState.value ?? {};
+            final similarHymn = _getSimilarHymnCached(hymn, allHymns, ignoredPairsSet);
+            if (similarHymn == null) return const SizedBox.shrink();
+            
+            return Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: isDark ? 0.15 : 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.amber.withValues(alpha: isDark ? 0.3 : 0.2),
+                  width: 1.2,
+                ),
+              ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Alerta inteligente de duplicados / similitud
-                  Builder(
-                    builder: (context) {
-                      final adminMode = ref.watch(adminModeProvider);
-                      if (!adminMode) return const SizedBox.shrink();
-                      final allHymnsState = ref.watch(allHymnsGlobalProvider);
-                      final allHymns = allHymnsState.value ?? [];
-                      final ignoredPairsState = ref.watch(ignoredDuplicatePairsProvider);
-                      final ignoredPairsSet = ignoredPairsState.value ?? {};
-                      final similarHymn = _getSimilarHymnCached(hymn, allHymns, ignoredPairsSet);
-                      if (similarHymn == null) return const SizedBox.shrink();
-                      
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 24),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: isDark ? 0.15 : 0.08),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.amber.withValues(alpha: isDark ? 0.3 : 0.2),
-                            width: 1.2,
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '¡Canto similar detectado!',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: isDark ? Colors.amber[200] : Colors.amber[900],
                           ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    '¡Canto similar detectado!',
-                                    style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: isDark ? Colors.amber[200] : Colors.amber[900],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Este canto (de ${_getCollectionName(hymn.collection)}) es muy similar o idéntico a "${similarHymn.title}" en la sección "${_getCollectionName(similarHymn.collection)}" (ID: ${similarHymn.id}).',
-                              style: GoogleFonts.nunito(
-                                fontSize: 13,
-                                color: isDark ? Colors.white70 : Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amber,
-                                foregroundColor: Colors.black87,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              ),
-                              icon: const Icon(Icons.compare_rounded, size: 16),
-                              label: Text(
-                                'Comparar y Resolver',
-                                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () => _openComparisonView(context, hymn, similarHymn),
-                            ),
-                          ],
-                        ),
-                      ).animate().shake(duration: 400.ms);
-                    },
-                  ),
-                  
-                  // Icono / Número Hero
-                  Hero(
-                    tag: 'hymn_icon_${hymn.collection}-${hymn.id}',
-                    child: hymn.collection == 'iump'
-                      ? Container(
-                          width: 60,
-                          height: 60,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
-                                theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            hymn.id.toString(),
-                            style: GoogleFonts.outfit(
-                              color: theme.colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          width: 60,
-                          height: 60,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Icon(
-                            hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded, 
-                            color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981), 
-                            size: 32
-                          ),
-                        ),
-                  ),
-
-                  // Título Elegante
-                  Hero(
-                    tag: 'hymn-title-${hymn.collection}-${hymn.id}',
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Text(
-                        hymn.title,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: fontSize * 1.25,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : theme.colorScheme.primary,
-                          height: 1.25,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Este canto (de ${_getCollectionName(hymn.collection)}) es muy similar o idéntico a "${similarHymn.title}" en la sección "${_getCollectionName(similarHymn.collection)}" (ID: ${similarHymn.id}).',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      color: isDark ? Colors.white70 : Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  
-                  if (hymn.audioUrl.isNotEmpty && _youtubeController != null && (hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')))
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
-                        ],
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      foregroundColor: Colors.black87,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: YoutubePlayer(
-                          controller: _youtubeController!,
-                        ),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     ),
-                  
-                  // Chip de Tono
-                  if (displayedTone.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: isDark 
-                          ? Colors.white.withValues(alpha: 0.05) 
-                          : theme.colorScheme.primary.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isDark 
-                            ? Colors.white.withValues(alpha: 0.08) 
-                            : theme.colorScheme.primary.withValues(alpha: 0.1),
-                        ),
-                      ),
-                      child: Text(
-                        Hymn.formatToneDisplay(displayedTone, ref.watch(notationProvider)),
-                        style: GoogleFonts.outfit(
-                          fontSize: fontSize * 0.7,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFF818CF8) : theme.colorScheme.primary,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ).animate().fadeIn(delay: 150.ms).scale(),
-                  
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24.0),
-                    child: Divider(indent: 80, endIndent: 80, thickness: 1, color: Colors.black12),
-                  ).animate().fadeIn(delay: 200.ms),
-                  
-                  // Bloques de Letras Renderizados Individualmente
-                  ..._getMergedBlocksCached(hymn.lyrics, _transposeOffset).map(
-                    (block) => _buildLyricsBlock(context, hymn, block, fontSize, isDark, theme)
+                    icon: const Icon(Icons.compare_rounded, size: 16),
+                    label: Text(
+                      'Comparar y Resolver',
+                      style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () => _openComparisonView(context, hymn, similarHymn),
                   ),
                 ],
+              ),
+            ).animate().shake(duration: 400.ms);
+          },
+        ),
+        
+        // Icono / Número Hero
+        Hero(
+          tag: 'hymn_icon_${hymn.collection}-${hymn.id}',
+          child: hymn.collection == 'iump'
+            ? Container(
+                width: 60,
+                height: 60,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
+                      theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  hymn.id.toString(),
+                  style: GoogleFonts.outfit(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                  ),
+                ),
+              )
+            : Container(
+                width: 60,
+                height: 60,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded, 
+                  color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981), 
+                  size: 32
+                ),
+              ),
+        ),
+
+        // Título Elegante
+        Hero(
+          tag: 'hymn-title-${hymn.collection}-${hymn.id}',
+          child: Material(
+            type: MaterialType.transparency,
+            child: Text(
+              hymn.title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: fontSize * 1.25,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : theme.colorScheme.primary,
+                height: 1.25,
               ),
             ),
           ),
         ),
+        const SizedBox(height: 14),
+        
+        if (hymn.audioUrl.isNotEmpty && _youtubeController != null && (hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')))
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: YoutubePlayer(
+                controller: _youtubeController!,
+              ),
+            ),
+          ),
+        
+        // Chip de Tono
+        if (displayedTone.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              color: isDark 
+                ? Colors.white.withValues(alpha: 0.05) 
+                : theme.colorScheme.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark 
+                  ? Colors.white.withValues(alpha: 0.08) 
+                  : theme.colorScheme.primary.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Text(
+              Hymn.formatToneDisplay(displayedTone, ref.watch(notationProvider)),
+              style: GoogleFonts.outfit(
+                fontSize: fontSize * 0.7,
+                fontWeight: FontWeight.bold,
+                color: isDark ? const Color(0xFF818CF8) : theme.colorScheme.primary,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ).animate().fadeIn(delay: 150.ms).scale(),
+
+        // Toggle Letra / Partitura
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildViewToggle('texto', 'Letra y Acordes', Icons.text_format_rounded, isDark, theme),
+              _buildViewToggle('partitura', 'Partitura Oficial', Icons.library_music_rounded, isDark, theme),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHymnPage(BuildContext context, Hymn hymn, double fontSize, bool isDark, ThemeData theme) {
+    final hasChords = hymn.lyrics.contains('[');
+    final displayedTone = _getTransposedTone(hymn.tone, _transposeOffset);
+    final header = _buildHymnHeader(hymn, fontSize, isDark, theme, displayedTone);
+
+    return SizedBox.expand(
+      child: SafeArea(
+        bottom: false,
+        child: _viewMode == 'texto'
+            ? SingleChildScrollView(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  20.0, 
+                  16.0, 
+                  20.0, 
+                  (hasChords ? 165.0 : 110.0) + MediaQuery.of(context).padding.bottom
+                ),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 700),
+                    child: Column(
+                      children: [
+                        header,
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24.0),
+                          child: Divider(indent: 80, endIndent: 80, thickness: 1, color: Colors.black12),
+                        ).animate().fadeIn(delay: 200.ms),
+                        ..._getMergedBlocksCached(hymn.lyrics, _transposeOffset).map(
+                          (block) => _buildLyricsBlock(context, hymn, block, fontSize, isDark, theme)
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20.0, 
+                  16.0, 
+                  20.0, 
+                  MediaQuery.of(context).padding.bottom
+                ),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 700),
+                    child: Column(
+                      children: [
+                        header,
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              color: isDark ? Colors.black26 : Colors.white70,
+                              child: SheetMusicViewer(hymn: hymn, isEmbedded: true),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -3577,14 +3711,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).padding.bottom),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0F172A) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               Container(
                 width: 40,
                 height: 4,
@@ -3634,6 +3769,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     hymn,
                     transposeOffset: _transposeOffset,
                     includeChords: true,
+                    notation: ref.read(notationProvider),
                   );
                 },
               ),
@@ -3652,11 +3788,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     hymn,
                     transposeOffset: _transposeOffset,
                     includeChords: false,
+                    notation: ref.read(notationProvider),
                   );
                 },
               ),
               const SizedBox(height: 12),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -3715,7 +3853,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         return setlistsAsync.when(
           data: (setlists) {
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              padding: EdgeInsets.fromLTRB(20, 24, 20, 24 + MediaQuery.of(ctx).padding.bottom),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

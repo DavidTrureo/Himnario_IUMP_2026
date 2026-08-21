@@ -30,6 +30,19 @@ class FavoritesNotifier extends Notifier<Set<String>> {
     }
   }
 
+
+  void reorder(int oldIndex, int newIndex) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = state.toList();
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    final item = list.removeAt(oldIndex);
+    list.insert(newIndex, item);
+    state = list.toSet();
+    await prefs.setStringList(_prefsKey, list);
+  }
+
   Future<void> toggleFavorite(String idKey) async {
     final prefs = await SharedPreferences.getInstance();
     final currentFavorites = Set<String>.from(state);

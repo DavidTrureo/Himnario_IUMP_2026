@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../hymns/presentation/hymn_scanner_screen.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 
@@ -13,7 +14,6 @@ import '../../hymns/presentation/hymn_list_screen.dart';
 import '../../hymns/domain/hymn.dart';
 import '../../favorites/domain/favorites_notifier.dart';
 import '../../setlists/presentation/setlists_provider.dart';
-import '../../tuner/presentation/instrument_tuner_screen.dart';
 import '../../hymns/presentation/admin_suggestions_screen.dart';
 import '../../../core/widgets/app_music_icons.dart';
 
@@ -340,17 +340,7 @@ class HomeScreen extends ConsumerWidget {
                             collection: 'coros',
                             counter: corosCount,
                           ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.15),
-                          const SizedBox(height: 16),
-                          _buildMenuItem(
-                            context,
-                            ref: ref,
-                            title: 'Mis Favoritos',
-                            subtitle: 'Tus himnos preferidos guardados',
-                            icon: Icons.bookmark_rounded,
-                            iconColor: const Color(0xFFEF4444),
-                            isFavoritesOnly: true,
-                            counter: favoritesCount,
-                          ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.15),
+
                           const SizedBox(height: 16),
                           _buildMenuItem(
                             context,
@@ -362,66 +352,7 @@ class HomeScreen extends ConsumerWidget {
                             collection: 'acordes',
                             counter: acordesCount,
                           ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.15),
-                          const SizedBox(height: 16),
-                          _buildMenuItem(
-                            context,
-                            ref: ref,
-                            title: 'Repertorios de Culto',
-                            subtitle: 'Listas de cantos organizadas para hoy',
-                            icon: Icons.playlist_play_rounded,
-                            iconColor: const Color(0xFF10B981),
-                            isSetlists: true,
-                            counter: setlistsCount,
-                          ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.15),
-                          const SizedBox(height: 16),
-                          _buildMenuItem(
-                            context,
-                            ref: ref,
-                            title: 'Escanear QR de Culto',
-                            subtitle: 'Unirse al Culto en Vivo escaneando el código QR',
-                            icon: Icons.qr_code_scanner_rounded,
-                            iconColor: const Color(0xFF6366F1),
-                            isQrScanner: true,
-                          ).animate().fadeIn(delay: 720.ms).slideY(begin: 0.15),
-                          const SizedBox(height: 16),
-                          _buildMenuItem(
-                            context,
-                            ref: ref,
-                            title: 'Afinador de Instrumentos',
-                            subtitle: 'Mandolina, violín, guitarra, bajo, trompeta y saxo',
-                            icon: Icons.graphic_eq_rounded,
-                            iconColor: const Color(0xFFEC4899),
-                            isTuner: true,
-                          ).animate().fadeIn(delay: 750.ms).slideY(begin: 0.15),
-                          const SizedBox(height: 16),
-                          _buildMenuItem(
-                            context,
-                            ref: ref,
-                            title: 'Acerca de',
-                            subtitle: 'Información de la iglesia y la app',
-                            icon: Icons.info_outline_rounded,
-                            iconColor: const Color(0xFF64748B),
-                            isAbout: true,
-                          ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.15),
-                          if (ref.watch(adminModeProvider)) ...[
-                            const SizedBox(height: 16),
-                            Consumer(
-                              builder: (context, ref, child) {
-                                final pendingAsync = ref.watch(pendingSuggestionsProvider);
-                                final count = pendingAsync.value ?? 0;
-                                return _buildMenuItem(
-                                  context,
-                                  ref: ref,
-                                  title: 'Sugerencias de Cantos (Admin)',
-                                  subtitle: 'Revisar cantos sugeridos por otros',
-                                  icon: Icons.admin_panel_settings_rounded,
-                                  iconColor: Colors.amber.shade700,
-                                  isAdminSuggestions: true,
-                                  counter: count > 0 ? count.toString() : null,
-                                );
-                              },
-                            ).animate().fadeIn(delay: 850.ms).slideY(begin: 0.15),
-                          ]
+
                         ],
                       ),
                     ),
@@ -447,7 +378,7 @@ class HomeScreen extends ConsumerWidget {
     bool isSetlists = false,
     bool isComingSoon = false,
     bool isAbout = false,
-    bool isTuner = false,
+    bool isScanner = false,
     bool isQrScanner = false,
     bool isAdminSuggestions = false,
     String? counter,
@@ -490,17 +421,8 @@ class HomeScreen extends ConsumerWidget {
             child: InkWell(
               onTap: isComingSoon 
                 ? () => _showComingSoon(context)
-                : isAbout
-                  ? () => _showMissionInfoDialog(context, isDark, theme)
-                  : isTuner
-                    ? () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const InstrumentTunerScreen()),
-                      )
-                  : isQrScanner
-                    ? () => context.push('/scan-qr')
-                  : isAdminSuggestions
-                    ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminSuggestionsScreen()))
+                : isScanner
+                  ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HymnScannerScreen()))
                   : () {
                       if (isSetlists) {
                         context.push('/setlists');
@@ -542,9 +464,7 @@ class HomeScreen extends ConsumerWidget {
                           width: 1,
                           ),
                         ),
-                        child: isTuner
-                            ? TuningForkIcon(size: 26, color: iconColor)
-                            : Icon(icon, color: iconColor, size: 26),
+                        child: Icon(icon, color: iconColor, size: 26),
                       ),
                       const SizedBox(width: 16),
                       // Textos del Menú

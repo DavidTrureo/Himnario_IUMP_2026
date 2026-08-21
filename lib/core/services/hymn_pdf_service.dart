@@ -1,3 +1,5 @@
+
+import 'package:himnario_iump/core/services/chord_transposer_service.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -12,6 +14,7 @@ class HymnPdfService {
     Hymn hymn, {
     int transposeOffset = 0,
     bool includeChords = true,
+    String notation = 'spanish',
   }) async {
     final doc = pw.Document();
 
@@ -227,7 +230,7 @@ class HymnPdfService {
             pw.SizedBox(height: 18),
 
             // Cuerpo de la Letra
-            _buildLyricsPdfWidget(lyricsToRender, fontRegular, fontBold),
+            buildLyricsPdfWidget(lyricsToRender, fontRegular, fontBold, transposeOffset, notation),
           ];
         },
       ),
@@ -274,19 +277,46 @@ class HymnPdfService {
     );
   }
 
-  static pw.Widget _buildLyricsPdfWidget(
+  static pw.Widget buildLyricsPdfWidget(
     String lyrics,
     pw.Font fontRegular,
     pw.Font fontBold,
+    int transposeOffset,
+    String notation,
+    {bool forceSingleColumn = false}
   ) {
     final blocks = lyrics.trim().split(RegExp(r'\n\s*\n')).where((b) => b.trim().isNotEmpty).toList();
     final totalLines = lyrics.split('\n').where((l) => l.trim().isNotEmpty).length;
 
-    // Si la letra es extensa (más de 12 líneas o más de 3 bloques), organizamos en 2 columnas para caber en 1 sola hoja
-    if (totalLines > 12 || blocks.length > 3) {
+    // Determinar si cada bloque es parte de un coro
+    final List<bool> isChorusList = [];
+    bool currentIsChorus = false;
+    for (final b in blocks) {
+      final lines = b.trim().split('\n');
+      if (lines.isNotEmpty) {
+        final firstLine = lines.first.trim().toLowerCase();
+        final hasExplicitChorusHeader = firstLine.contains('coro') || 
+                                        firstLine.contains('puente') || 
+                                        firstLine.contains('interludio');
+        final isVerseHeader = RegExp(r'^(estrofa|\d+\.|\d+\b)', caseSensitive: false).hasMatch(firstLine);
+
+        if (hasExplicitChorusHeader) {
+          currentIsChorus = true;
+        } else if (isVerseHeader) {
+          currentIsChorus = false;
+        }
+      }
+      isChorusList.add(currentIsChorus);
+    }
+
+    // Si la letra es extensa (18 líneas o más de 3 bloques), organizamos en 2 columnas para caber en 1 sola hoja
+    if (!forceSingleColumn && (totalLines >= 18 || blocks.length > 3)) {
       final int halfIndex = (blocks.length / 2).ceil();
       final leftBlocks = blocks.sublist(0, halfIndex);
       final rightBlocks = blocks.sublist(halfIndex);
+      
+      final leftChorusState = isChorusList.sublist(0, halfIndex);
+      final rightChorusState = isChorusList.sublist(halfIndex);
 
       return pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -294,7 +324,7 @@ class HymnPdfService {
           pw.Expanded(
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: leftBlocks.map((b) => _buildBlockWidget(b, fontRegular, fontBold)).toList(),
+              children: List.generate(leftBlocks.length, (i) => buildBlockWidget(leftBlocks[i], fontRegular, fontBold, leftChorusState[i], transposeOffset, notation)),
             ),
           ),
           pw.SizedBox(width: 14),
@@ -307,7 +337,7 @@ class HymnPdfService {
           pw.Expanded(
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: rightBlocks.map((b) => _buildBlockWidget(b, fontRegular, fontBold)).toList(),
+              children: List.generate(rightBlocks.length, (i) => buildBlockWidget(rightBlocks[i], fontRegular, fontBold, rightChorusState[i], transposeOffset, notation)),
             ),
           ),
         ],
@@ -317,22 +347,25 @@ class HymnPdfService {
     // Si es corto, se muestra en 1 sola columna
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: blocks.map((b) => _buildBlockWidget(b, fontRegular, fontBold)).toList(),
+      children: List.generate(blocks.length, (i) => buildBlockWidget(blocks[i], fontRegular, fontBold, isChorusList[i], transposeOffset, notation)),
     );
   }
 
-  static pw.Widget _buildBlockWidget(
+  static pw.Widget buildBlockWidget(
     String blockText,
     pw.Font fontRegular,
     pw.Font fontBold,
+    bool isChorusBlock,
+    int transposeOffset,
+    String notation,
   ) {
     final lines = blockText.trim().split('\n');
     if (lines.isEmpty) return pw.SizedBox();
 
     final firstLine = lines.first.trim();
-    final isChorus = firstLine.toLowerCase().contains('coro') ||
-                     firstLine.toLowerCase().contains('puente') ||
-                     firstLine.toLowerCase().contains('interludio');
+    final hasExplicitChorusHeader = firstLine.toLowerCase().contains('coro') ||
+                                    firstLine.toLowerCase().contains('puente') ||
+                                    firstLine.toLowerCase().contains('interludio');
 
     final isVerseHeader = RegExp(r'^(estrofa|\d+\.|\d+\b)', caseSensitive: false).hasMatch(firstLine);
 
@@ -341,7 +374,7 @@ class HymnPdfService {
     int startIdx = 0;
     pw.Widget? headerWidget;
 
-    if (isChorus) {
+    if (hasExplicitChorusHeader) {
       headerWidget = pw.Container(
         padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         margin: const pw.EdgeInsets.only(bottom: 6),
@@ -360,7 +393,7 @@ class HymnPdfService {
         ),
       );
       startIdx = 1;
-    } else if (isVerseHeader) {
+    } else if (isVerseHeader && !isChorusBlock) {
       headerWidget = pw.Padding(
         padding: const pw.EdgeInsets.only(top: 4, bottom: 4),
         child: pw.Text(
@@ -381,7 +414,7 @@ class HymnPdfService {
       if (trimmed.isEmpty) continue;
 
       if (trimmed.contains('[') && trimmed.contains(']')) {
-        lineWidgets.add(_buildLineWithChords(trimmed, fontRegular, fontBold));
+        lineWidgets.add(buildLineWithChords(Hymn.formatLineCasing(trimmed), fontRegular, fontBold, transposeOffset, notation));
       } else {
         lineWidgets.add(
           pw.Padding(
@@ -400,7 +433,7 @@ class HymnPdfService {
       }
     }
 
-    if (isChorus) {
+    if (isChorusBlock) {
       // Tarjeta destacada elegante para el Coro
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 10),
@@ -439,68 +472,86 @@ class HymnPdfService {
   }
 
   /// Procesa una línea de letra con acordes embebidos tipo "Señor [DO] mi Dios [SOL] al contemplar"
-  static pw.Widget _buildLineWithChords(String line, pw.Font fontRegular, pw.Font fontBold) {
-    final RegExp chordRegex = RegExp(r'\[([^\]]+)\]');
-    final matches = chordRegex.allMatches(line);
+  static pw.Widget buildLineWithChords(
+    String line,
+    pw.Font fontRegular,
+    pw.Font fontBold,
+    int transposeOffset,
+    String notation,
+  ) {
+    final RegExp regExp = RegExp(r'\[([^\]]+)\]');
+    final matchesList = regExp.allMatches(line).toList();
 
-    if (matches.isEmpty) {
+    if (matchesList.isEmpty) {
       return pw.Text(
         line,
         style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
       );
     }
 
-    final List<pw.InlineSpan> spans = [];
-    int lastIndex = 0;
+    final List<pw.Widget> inlineWidgets = [];
+    int lastMatchEnd = 0;
 
-    for (final match in matches) {
-      if (match.start > lastIndex) {
-        spans.add(
-          pw.TextSpan(
-            text: line.substring(lastIndex, match.start),
-            style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
-          ),
-        );
-      }
+    for (int i = 0; i < matchesList.length; i++) {
+      final match = matchesList[i];
 
-      final chordName = match.group(1)!;
-      spans.add(
-        pw.WidgetSpan(
-          child: pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            margin: const pw.EdgeInsets.symmetric(horizontal: 2),
-            decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('#EEF2FF'),
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
-              border: pw.Border.all(color: PdfColor.fromHex('#C7D2FE'), width: 0.5),
-            ),
-            child: pw.Text(
-              chordName,
-              style: pw.TextStyle(
-                font: fontBold,
-                fontSize: 10,
-                color: PdfColor.fromHex('#3730A3'),
+      // 1. Texto antes del acorde
+      if (match.start > lastMatchEnd) {
+        final textBefore = line.substring(lastMatchEnd, match.start);
+        if (textBefore.isNotEmpty) {
+          inlineWidgets.add(
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 0.5), // Para alinear con el texto debajo del acorde
+              child: pw.Text(
+                textBefore,
+                style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
               ),
             ),
-          ),
+          );
+        }
+      }
+
+      // 2. Acorde + texto bajo él
+      final rawChord = match.group(1)!;
+      final transposedChord = ChordTransposerService.transposeSingleChord(rawChord, transposeOffset);
+      final displayedChord = Hymn.convertChordNotation(transposedChord, notation);
+
+      final nextMatchStart = (i == matchesList.length - 1) ? line.length : matchesList[i + 1].start;
+      final textUnder = line.substring(match.end, nextMatchStart);
+
+      inlineWidgets.add(
+        pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            pw.Text(
+              displayedChord,
+              style: pw.TextStyle(
+                font: fontBold,
+                fontSize: 8.5,
+                color: PdfColor.fromHex('#4F46E5'),
+              ),
+            ),
+            if (textUnder.isNotEmpty)
+              pw.Text(
+                textUnder,
+                style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
+              )
+            else
+              pw.SizedBox(height: 12), // Espaciador si no hay texto debajo para mantener alineación vertical
+          ],
         ),
       );
 
-      lastIndex = match.end;
-    }
-
-    if (lastIndex < line.length) {
-      spans.add(
-        pw.TextSpan(
-          text: line.substring(lastIndex),
-          style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
-        ),
-      );
+      lastMatchEnd = nextMatchStart;
     }
 
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 3),
-      child: pw.RichText(text: pw.TextSpan(children: spans)),
+      padding: const pw.EdgeInsets.only(top: 2, bottom: 2),
+      child: pw.Wrap(
+        crossAxisAlignment: pw.WrapCrossAlignment.end,
+        children: inlineWidgets,
+      ),
     );
   }
 
@@ -509,11 +560,13 @@ class HymnPdfService {
     Hymn hymn, {
     int transposeOffset = 0,
     bool includeChords = true,
+    String notation = 'spanish',
   }) async {
     final pdfBytes = await generateHymnPdf(
       hymn,
       transposeOffset: transposeOffset,
       includeChords: includeChords,
+      notation: notation,
     );
 
     final String filename = '${hymn.collection}_${hymn.id}_${_cleanFilename(hymn.title)}.pdf';

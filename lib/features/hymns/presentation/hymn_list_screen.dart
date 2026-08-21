@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/services/gemini_ai_service.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -18,6 +20,18 @@ import '../../favorites/domain/favorites_notifier.dart';
 import 'notation_provider.dart';
 import 'widgets/duplicate_pairs_dialog.dart';
 import 'add_hymn_screen.dart';
+import 'package:flutter/services.dart';
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
+}
+
 
 // Notifier para la colección activa ('iump', 'especiales', etc.)
 class ActiveCollectionNotifier extends Notifier<String> {
@@ -249,8 +263,8 @@ final onlyChordsFilterProvider = NotifierProvider<OnlyChordsFilterNotifier, bool
 });
 
 // Provider para filtrar los himnos cargados
-final filteredHymnsProvider = Provider<AsyncValue<List<Hymn>>>((ref) {
-  final showFavorites = ref.watch(showFavoritesProvider);
+final filteredHymnsProvider = Provider.family<AsyncValue<List<Hymn>>, bool>((ref, isFavoritesTab) {
+  final showFavorites = isFavoritesTab || ref.watch(showFavoritesProvider);
   final activeCollection = ref.watch(activeCollectionProvider);
 
   final hymnsAsyncValue = (showFavorites || activeCollection == 'all' || activeCollection == 'acordes')
@@ -291,8 +305,10 @@ final filteredHymnsProvider = Provider<AsyncValue<List<Hymn>>>((ref) {
     }
 
     if (showFavorites) {
-      result = result.where((hymn) => favorites.contains('${hymn.collection}-${hymn.id}')).toList();
-      result.sort((a, b) => a.title.compareTo(b.title));
+      // Map based on the order of 'favorites' which is a LinkedHashSet preserving order
+      final favoritesList = favorites.toList();
+      final hymnsMap = { for (var h in result) '${h.collection}-${h.id}': h };
+      result = favoritesList.where((fav) => hymnsMap.containsKey(fav)).map<Hymn>((fav) => hymnsMap[fav]!).toList();
     } else if (activeCollection == 'all') {
       result.sort((a, b) {
         final priorityA = a.collection == 'iump' ? 1 : (a.collection == 'especiales' ? 2 : 3);
@@ -396,7 +412,8 @@ final filteredHymnsProvider = Provider<AsyncValue<List<Hymn>>>((ref) {
 });
 
 class HymnListScreen extends ConsumerStatefulWidget {
-  const HymnListScreen({super.key});
+  final bool isFavoritesTab;
+  const HymnListScreen({super.key, this.isFavoritesTab = false});
 
   @override
   ConsumerState<HymnListScreen> createState() => _HymnListScreenState();
@@ -529,7 +546,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
               padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
               child: Row(
                 children: [
-                  const Icon(Icons.bookmark_outline, size: 20),
+                  const Icon(Icons.favorite_border_rounded, size: 20),
                   const SizedBox(width: 12),
                   Text('Himnario IUMP', style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.bold)),
                 ],
@@ -786,10 +803,10 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredHymnsAsync = ref.watch(filteredHymnsProvider);
+    final filteredHymnsAsync = ref.watch(filteredHymnsProvider(widget.isFavoritesTab));
     final favorites = ref.watch(favoritesProvider);
     final activeCollection = ref.watch(activeCollectionProvider);
-    final showFavorites = ref.watch(showFavoritesProvider);
+    final showFavorites = widget.isFavoritesTab || ref.watch(showFavoritesProvider);
     final activeCategory = ref.watch(activeCategoryProvider);
     final selectedTone = ref.watch(selectedToneFilterProvider);
     final onlyChords = ref.watch(onlyChordsFilterProvider);
@@ -816,9 +833,22 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     final currentQuery = ref.watch(searchQueryProvider);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          // Fondo base gradiente
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: isDark 
+                  ? [const Color(0xFF0F172A), const Color(0xFF020617)]
+                  : [const Color(0xFFF0F9FF), const Color(0xFFE0F2FE)],
+              ),
+            ),
+          ),
+
           // Auroras decorativas de fondo
           Positioned(
             top: -100,
@@ -936,11 +966,13 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(Icons.auto_stories_rounded),
-                                tooltip: 'Asistente por Predicación/Palabra',
-                                onPressed: () => _showBiblicalAssistantDialog(context, ref),
-                              ),
+                              if (!showFavorites)
+                                if (!kIsWeb || adminMode)
+                                  IconButton(
+                                    icon: const Icon(Icons.auto_stories_rounded),
+                                    tooltip: 'Asistente por Predicación/Palabra',
+                                    onPressed: () => _showBiblicalAssistantDialog(context, ref),
+                                  ),
                             ],
                             if (_isMultiSelectMode) ...[
                               IconButton(
@@ -1054,7 +1086,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                   minimumSize: const Size(50, 50),
                                 ),
                               icon: Icon(
-                                showFavorites ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                                showFavorites ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                                 color: showFavorites ? theme.colorScheme.primary : (isDark ? Colors.white70 : Colors.black54),
                               ),
                             ),
@@ -1123,13 +1155,13 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.search_off_rounded, size: 64, color: isDark ? Colors.white24 : Colors.black12),
+                                Icon(showFavorites ? Icons.heart_broken_rounded : Icons.search_off_rounded, size: 64, color: isDark ? Colors.white24 : Colors.black12),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'No se encontraron himnos locales', 
+                                  showFavorites ? 'No tienes cantos en tus favoritos' : 'No se encontraron himnos locales', 
                                   style: GoogleFonts.nunito(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)
                                 ),
-                                if (query.isNotEmpty) ...[
+                                if (query.isNotEmpty && (!kIsWeb || adminMode)) ...[
                                   const SizedBox(height: 24),
                                   ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
@@ -1150,11 +1182,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                         );
                       }
 
-                      return ListView.builder(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 80.0),
-                        itemCount: hymns.length,
-                        itemBuilder: (context, index) {
+                      Widget buildHymnItem(BuildContext context, int index) {
                           final hymn = hymns[index];
                           final key = '${hymn.collection}-${hymn.id}';
                           final isSelected = _selectedKeys.contains(key);
@@ -1169,6 +1197,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                 : defaultCardColor);
 
                           return Container(
+                            key: ValueKey(key),
                             margin: const EdgeInsets.only(bottom: 12.0),
                             decoration: BoxDecoration(
                               color: cardColor,
@@ -1263,7 +1292,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               child: Text(
                                                 hymn.id.toString(),
                                                 style: GoogleFonts.outfit(
-                                                  color: theme.colorScheme.onPrimaryContainer,
+                                                  color: isDark ? Colors.white : theme.colorScheme.onPrimaryContainer,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 16,
                                                 ),
@@ -1386,7 +1415,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                         children: [
                                           IconButton(
                                             icon: Icon(
-                                              isFavorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                                              isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                                               color: isFavorite ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                                               size: 20,
                                             ),
@@ -1394,10 +1423,19 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               ref.read(favoritesProvider.notifier).toggleFavorite(key);
                                             },
                                           ),
-                                          Icon(
-                                            Icons.chevron_right_rounded,
-                                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                                          ),
+                                          if (showFavorites && !_isMultiSelectMode && ref.watch(searchQueryProvider).isEmpty)
+                                            ReorderableDragStartListener(
+                                              index: index,
+                                              child: Icon(
+                                                Icons.drag_handle_rounded,
+                                                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                              ),
+                                            )
+                                          else
+                                            Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                                            ),
                                         ],
                                       ),
                                     ],
@@ -1406,7 +1444,25 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                               ),
                             ),
                           );
-                        },
+                      }
+
+                      if (showFavorites && !_isMultiSelectMode && ref.watch(searchQueryProvider).isEmpty) {
+                        return ReorderableListView.builder(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 80.0),
+                          itemCount: hymns.length,
+                          onReorder: (oldIndex, newIndex) {
+                            ref.read(favoritesProvider.notifier).reorder(oldIndex, newIndex);
+                          },
+                          itemBuilder: buildHymnItem,
+                        );
+                      }
+
+                      return ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 80.0),
+                        itemCount: hymns.length,
+                        itemBuilder: buildHymnItem,
                       );
                     },
                     loading: () => const Center(child: CircularProgressIndicator()),
@@ -1418,7 +1474,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: (widget.isFavoritesTab || (kIsWeb && !adminMode)) ? null : FloatingActionButton(
         tooltip: 'Añadir Canto',
         onPressed: () => Navigator.push(
           context,
@@ -1843,24 +1899,40 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                       style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Escanear Letra con IA',
-                    icon: const Icon(Icons.document_scanner_rounded, color: Colors.blue),
-                    onPressed: () async {
-                      final dummyToneController = TextEditingController();
-                      await _handleImageOcr(
-                        context,
-                        titleController,
-                        dummyToneController,
-                        lyricsController,
-                      );
-                      if (dummyToneController.text.isNotEmpty) {
-                        final parsed = Hymn.parseToneComponents(dummyToneController.text.trim());
-                        toneNoteController.text = parsed['toneNote'] ?? '';
-                        beatsController.text = parsed['beats'] ?? '';
-                        timeSignatureController.text = parsed['timeSignature'] ?? '';
-                      }
-                    },
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Buscar Letra en Internet',
+                        icon: const Icon(Icons.travel_explore_rounded, color: Colors.teal),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          showDialog(
+                            context: context,
+                            builder: (context) => OnlineSearchDialog(initialQuery: titleController.text),
+                          );
+                        },
+                      ),
+                      IconButton(
+                        tooltip: 'Escanear Letra con IA',
+                        icon: const Icon(Icons.document_scanner_rounded, color: Colors.blue),
+                        onPressed: () async {
+                          final dummyToneController = TextEditingController();
+                          await _handleImageOcr(
+                            context,
+                            titleController,
+                            dummyToneController,
+                            lyricsController,
+                          );
+                          if (dummyToneController.text.isNotEmpty) {
+                            final parsed = Hymn.parseToneComponents(dummyToneController.text.trim());
+                            toneNoteController.text = parsed['toneNote'] ?? '';
+                            beatsController.text = parsed['beats'] ?? '';
+                            timeSignatureController.text = parsed['timeSignature'] ?? '';
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1888,7 +1960,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                       TextFormField(
                         controller: titleController,
                         decoration: const InputDecoration(labelText: 'Título'),
-                        textCapitalization: TextCapitalization.sentences,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [UpperCaseTextFormatter()],
                         validator: (value) {
                           if (value == null || value.isEmpty) return 'Requerido';
                           return null;
@@ -2329,7 +2402,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
 class OnlineSearchDialog extends ConsumerStatefulWidget {
   final String initialQuery;
-  const OnlineSearchDialog({super.key, required this.initialQuery});
+  final bool returnResults;
+  const OnlineSearchDialog({super.key, required this.initialQuery, this.returnResults = false});
 
   @override
   ConsumerState<OnlineSearchDialog> createState() => _OnlineSearchDialogState();
@@ -2352,6 +2426,8 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
   final lyricsController = TextEditingController();
   final keyController = TextEditingController();
   final idController = TextEditingController();
+  final searchTitleController = TextEditingController();
+  final searchAuthorController = TextEditingController();
 
   @override
   void initState() {
@@ -2367,6 +2443,8 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
     lyricsController.dispose();
     keyController.dispose();
     idController.dispose();
+    searchTitleController.dispose();
+    searchAuthorController.dispose();
     super.dispose();
   }
 
@@ -2379,7 +2457,7 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
         isLoadingKey = false;
       });
       if (geminiKey.isNotEmpty) {
-        _performSearch();
+        searchTitleController.text = query;
       }
     }
   }
@@ -2405,7 +2483,8 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
       final requestBody = jsonEncode({
         'contents': [{
           'parts': [{
-            'text': 'Encuentra la letra oficial de la alabanza, himno o coro de iglesia cristiano titulado: "$query". \n'
+            'text': 'Encuentra la letra oficial de la alabanza, himno o coro de iglesia cristiano titulado: "${searchTitleController.text}"'
+                    '${searchAuthorController.text.trim().isNotEmpty ? ' del cantante o autor: "${searchAuthorController.text}"' : ''}. \n'
                     'REGLA DE FILTRADO TEMÁTICO: Si la canción solicitada es de carácter claramente comercial, popular o secular (es decir, amor romántico de pareja, reggaetón comercial, pop secular, rock secular, etc. sin ninguna relación con la fe, Dios, Jesucristo o la iglesia), debes retornar el JSON con los campos vacíos: {"title": "", "lyrics": ""}. \n'
                     'Si es un canto cristiano de adoración, alabanza, coro o himnario, devuelve el resultado ESTRICTAMENTE en este formato JSON, sin bloques de código markdown, sin explicaciones ni textos decorativos, solo el JSON:\n'
                     '{\n'
@@ -2567,48 +2646,54 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
       );
     }
 
-    // Vista 1: Ingreso de API Key (si no hay guardada)
-    if (geminiKey.trim().isEmpty && !hasSearched) {
+    
+    // Vista 1.5: Formulario de Búsqueda (si hay API Key pero aún no se busca)
+    if (geminiKey.trim().isNotEmpty && !isSearching && !hasSearched) {
       return AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
-          'Buscar en Internet',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Buscar en Internet', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            IconButton(
+              icon: const Icon(Icons.vpn_key_rounded, size: 20),
+              tooltip: 'Cambiar API Key',
+              onPressed: () {
+                setState(() {
+                  geminiKey = '';
+                  hasSearched = false;
+                });
+              },
+            ),
+          ],
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Para buscar letras de manera inteligente en internet, la app utiliza la Inteligencia Artificial (Gemini API).',
+                'Ingresa los detalles para realizar una búsqueda más precisa en la web.',
                 style: GoogleFonts.nunito(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: searchTitleController,
+                decoration: InputDecoration(
+                  labelText: 'Título o letra del canto',
+                  labelStyle: GoogleFonts.nunito(),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  prefixIcon: const Icon(Icons.music_note_rounded),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: keyController,
+                controller: searchAuthorController,
                 decoration: InputDecoration(
-                  labelText: 'API Key de Gemini',
+                  labelText: 'Cantante / Autor (Opcional)',
                   labelStyle: GoogleFonts.nunito(),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  hintText: 'AIzaSy...',
-                ),
-              ),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () async {
-                  final uri = Uri.parse('https://aistudio.google.com/');
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                child: Text(
-                  'Obtener API Key gratuita de Google AI Studio',
-                  style: GoogleFonts.nunito(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    decoration: TextDecoration.underline,
-                  ),
+                  hintText: 'Ej. Marcos Witt, Miel San Marcos...',
+                  prefixIcon: const Icon(Icons.person_rounded),
                 ),
               ),
               if (errorMessage.isNotEmpty) ...[
@@ -2616,21 +2701,8 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
                 Text(
                   errorMessage,
                   style: GoogleFonts.nunito(color: Colors.red, fontSize: 13),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
-                if (rawErrorDetails.isNotEmpty)
-                  ExpansionTile(
-                    title: Text('Ver detalles técnicos para soporte', style: GoogleFonts.nunito(color: Colors.grey, fontSize: 12)),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(rawErrorDetails, style: const TextStyle(fontFamily: 'monospace', color: Colors.redAccent, fontSize: 11)),
-                        ),
-                      ),
-                    ],
-                  ),
               ],
             ],
           ),
@@ -2638,29 +2710,55 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cerrar', style: GoogleFonts.nunito()),
+            child: Text('Cancelar', style: GoogleFonts.nunito()),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              if (searchTitleController.text.trim().isEmpty) {
+                setState(() => errorMessage = 'Debes ingresar al menos el título o letra.');
+                return;
+              }
+              setState(() => query = searchTitleController.text.trim());
+              _performSearch();
+            },
+            child: Text('Buscar ahora', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      );
+    }
+
+    // Vista 1: Ingreso de API Key (si no hay guardada)
+    if (geminiKey.trim().isEmpty && !hasSearched) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text('Clave de API Requerida', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text(
+          'Para buscar letras de manera inteligente en internet, la app utiliza Gemini. Por favor configura tu API Key.',
+          style: GoogleFonts.nunito(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar', style: GoogleFonts.nunito()),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () async {
-              final key = keyController.text.trim();
-              if (key.isNotEmpty) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('gemini_api_key', key);
+              final newKey = await GeminiAiService.showApiKeyInputDialog(context, reason: 'Para buscar letras de manera inteligente en internet, la app utiliza la Inteligencia Artificial (Gemini API).');
+              if (newKey != null && newKey.isNotEmpty) {
                 setState(() {
-                  geminiKey = key;
+                  geminiKey = newKey;
                   errorMessage = '';
-                });
-                _performSearch();
-              } else {
-                setState(() {
-                  errorMessage = 'Ingresa una llave válida.';
+                  searchTitleController.text = query;
                 });
               }
             },
-            child: Text('Guardar y Buscar', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+            child: Text('Configurar Clave', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
           ),
         ],
       );
@@ -2789,7 +2887,7 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
                 ),
                 maxLines: 6,
               ),
-              if (selectedCollection == 'iump') ...[
+              if (selectedCollection == 'iump' && !widget.returnResults) ...[
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: idController,
@@ -2800,14 +2898,15 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
                   keyboardType: TextInputType.number,
                 ),
               ],
-              const SizedBox(height: 16),
-              // Selector de colección
-              Text(
-                '¿Dónde deseas agregar esta alabanza?',
-                style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
+              if (!widget.returnResults) ...[
+                const SizedBox(height: 16),
+                // Selector de colección
+                Text(
+                  '¿Dónde deseas agregar esta alabanza?',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
@@ -2854,7 +2953,8 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
                   ),
                 ],
               ),
-              if (!isAdmin) ...[
+              ],
+              if (!isAdmin && !widget.returnResults) ...[
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -2898,6 +2998,21 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
           onPressed: () => Navigator.pop(context),
           child: Text('Cancelar', style: GoogleFonts.nunito()),
         ),
+        if (widget.returnResults)
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(context, {
+                'title': titleController.text,
+                'lyrics': lyricsController.text,
+                'key': toneController.text,
+              });
+            },
+            child: Text('Usar Letra', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+          )
+        else
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -3251,6 +3366,23 @@ class _BiblicalAssistantDialogState extends ConsumerState<BiblicalAssistantDialo
                 style: GoogleFonts.nunito(fontSize: 14),
               ),
               const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                label: const Text('Obtener API Key (Gratis y Segura)'),
+                onPressed: () async {
+                  final url = Uri.parse('https://aistudio.google.com/app/apikey');
+                  try {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    debugPrint('Error launching url: $e');
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _keyController,
                 decoration: InputDecoration(
@@ -3258,14 +3390,7 @@ class _BiblicalAssistantDialogState extends ConsumerState<BiblicalAssistantDialo
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () => launchUrl(Uri.parse('https://aistudio.google.com/'), mode: LaunchMode.externalApplication),
-                child: Text(
-                  'Obtén tu API Key gratis aquí',
-                  style: GoogleFonts.nunito(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
-                ),
-              ),
+
             ],
           ),
         ),
@@ -3482,7 +3607,7 @@ class _BiblicalAssistantDialogState extends ConsumerState<BiblicalAssistantDialo
                                       style: GoogleFonts.outfit(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: theme.colorScheme.onPrimaryContainer,
+                                        color: isDark ? Colors.white : theme.colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                   ),

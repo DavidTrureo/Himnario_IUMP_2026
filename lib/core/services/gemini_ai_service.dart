@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +19,7 @@ class GeminiAiService {
     await prefs.setString(_keyPref, apiKey.trim());
   }
 
-  static Future<String?> showApiKeyInputDialog(BuildContext context) async {
+  static Future<String?> showApiKeyInputDialog(BuildContext context, {String? reason}) async {
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -28,42 +29,60 @@ class GeminiAiService {
           children: [
             const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
             const SizedBox(width: 8),
-            Text('Clave API de Gemini', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            Expanded(child: Text('Clave API de Gemini', style: GoogleFonts.outfit(fontWeight: FontWeight.bold))),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Para potenciar la Inteligencia Artificial con escaneo de fotos y afinación contextual avanzada, ingresa tu API Key gratuita de Google Gemini.',
-              style: GoogleFonts.nunito(fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'API Key (ej: AIzaSy...)',
-                border: OutlineInputBorder(),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                reason ?? 'Esta app utiliza Inteligencia Artificial (Gemini API). Ingresa tu API Key para continuar.',
+                style: GoogleFonts.nunito(fontSize: 14),
               ),
-              obscureText: true,
-            ),
-          ],
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                label: const Text('Obtener API Key (Gratis)'),
+                onPressed: () async {
+                  final url = Uri.parse('https://aistudio.google.com/app/apikey');
+                  try {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    debugPrint('Error launching url: $e');
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  labelText: 'API Key (ej: AIzaSy...)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Omitir (Usar Motor Local)'),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final key = controller.text.trim();
               if (key.isNotEmpty) {
-                saveApiKey(key);
-                Navigator.pop(context, key);
+                await saveApiKey(key);
+                if (context.mounted) Navigator.pop(context, key);
               }
             },
-            child: const Text('Guardar Clave'),
+            child: const Text('Guardar'),
           ),
         ],
       ),
@@ -165,7 +184,7 @@ JSON esperado:
         });
 
         http.Response? response;
-        final modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+        final modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro-vision'];
 
         for (final model in modelsToTry) {
           try {
@@ -426,4 +445,160 @@ JSON esperado:
       },
     );
   }
+
+  /// Analiza una imagen (fotografía de partitura o guía de acordes) y extrae la información musical
+  static Future<Map<String, dynamic>?> transcribeSheetMusic(String base64Image, {String mimeType = 'image/jpeg'}) async {
+    String apiKey = await getApiKey();
+    if (apiKey.isEmpty) return null;
+
+    final promptText = '''Eres un experto transcriptor. Analiza la imagen adjunta, que contiene la letra de un canto, probablemente con acordes escritos arriba de las palabras.
+Extrae la información y devuélvela ESTRICTAMENTE en formato JSON:
+1. "title": Título de la canción (o "Título Desconocido").
+2. "key": Tonalidad (ej: "G Mayor", "Am", "Desconocida").
+3. "timeSignature": Métrica (ej: "4/4", "Desconocida").
+4. "lyrics": Extrae ÚNICAMENTE LA LETRA del canto. IGNORA COMPLETAMENTE TODOS LOS ACORDES que aparezcan arriba de las palabras (por ejemplo, ignora letras sueltas como C, D, Em, LAm, DO, RE, SOL, etc. que estén solas en una línea superior). Tu objetivo es devolver un texto limpio, ordenado en estrofas, que contenga solo el texto cantable. No incluyas ningún corchete ni acorde en el resultado.
+
+JSON esperado:
+{
+  "title": "...",
+  "key": "...",
+  "timeSignature": "...",
+  "lyrics": "..."
+}''';
+
+    final requestBody = jsonEncode({
+      'contents': [
+        {
+          'parts': [
+            {'text': promptText},
+            {
+              'inline_data': {
+                'mime_type': mimeType,
+                'data': base64Image
+              }
+            }
+          ]
+        }
+      ],
+      'generationConfig': {
+        'response_mime_type': 'application/json',
+      }
+    });
+
+    final modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro-vision'];
+    
+    List<String> errors = [];
+
+    for (final model in modelsToTry) {
+      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey');
+
+      try {
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: requestBody,
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final text = data['candidates'][0]['content']['parts'][0]['text'];
+          
+          var cleanText = text.toString().trim();
+          if (cleanText.startsWith('```json')) {
+            cleanText = cleanText.substring(7);
+          } else if (cleanText.startsWith('```')) {
+            cleanText = cleanText.substring(3);
+          }
+          if (cleanText.endsWith('```')) {
+            cleanText = cleanText.substring(0, cleanText.length - 3);
+          }
+          
+          final parsed = jsonDecode(cleanText.trim());
+          return {
+            'title': parsed['title']?.toString() ?? '',
+            'key': parsed['key']?.toString() ?? '',
+            'timeSignature': parsed['timeSignature']?.toString() ?? '',
+            'lyrics': parsed['lyrics']?.toString() ?? '',
+          };
+        } else {
+          errors.add('$model failed: ${response.body}');
+        }
+      } catch (e) {
+        errors.add('$model exception: $e');
+      }
+    }
+    
+    String availableModels = "No se pudieron obtener";
+    try {
+      final modelsUrl = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey');
+      final modelsRes = await http.get(modelsUrl);
+      if (modelsRes.statusCode == 200) {
+        final data = jsonDecode(modelsRes.body);
+        final models = data['models'] as List?;
+        if (models != null) {
+          availableModels = models.map((m) => m['name']).join(', ');
+        }
+      } else {
+        availableModels = "Error ${modelsRes.statusCode}: ${modelsRes.body}";
+      }
+    } catch (_) {}
+    
+    throw Exception('Fallaron todos los modelos. \nModelos disponibles para tu Clave API: $availableModels\n\nErrores:\n' + errors.join('\n'));
+  }
+
+  static Future<String?> generateText(String prompt) async {
+    try {
+      final apiKey = await getApiKey();
+      if (apiKey.isEmpty) throw Exception('API Key no configurada');
+
+      final requestBody = jsonEncode({
+        'contents': [
+          {
+            'parts': [
+              {'text': prompt}
+            ]
+          }
+        ]
+      });
+
+      http.Response? response;
+      final modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+
+      for (final model in modelsToTry) {
+        if (response != null && response.statusCode == 200) break;
+        final endpoints = ['v1beta', 'v1'];
+        for (final endpoint in endpoints) {
+          try {
+            final url = Uri.parse('https://generativelanguage.googleapis.com/$endpoint/models/$model:generateContent?key=$apiKey');
+            final res = await http.post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: requestBody,
+            ).timeout(const Duration(seconds: 15));
+            
+            if (res.statusCode == 200) {
+              response = res;
+              break;
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (response != null && response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final candidates = data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final parts = candidates[0]['content']['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            return parts[0]['text'] as String?;
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error en generateText: $e');
+      return null;
+    }
+  }
+
 }

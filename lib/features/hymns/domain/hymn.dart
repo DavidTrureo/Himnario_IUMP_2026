@@ -18,6 +18,7 @@ class Hymn {
   final String collection;
   final String audioUrl;
   final String category;
+  final List<String> sheetMusicUrls;
   final bool isLocalOnly;
   final String normalizedTitle;
   final String normalizedSearchableText;
@@ -32,6 +33,7 @@ class Hymn {
     required this.collection,
     this.audioUrl = '',
     this.category = '',
+    this.sheetMusicUrls = const [],
     this.isLocalOnly = false,
   })  : normalizedTitle = normalizeString(title),
         normalizedSearchableText = normalizeString('$id $title $lyrics');
@@ -99,6 +101,7 @@ class Hymn {
       collection: collection,
       audioUrl: json['audioUrl'] as String? ?? '',
       category: json['category'] as String? ?? '',
+      sheetMusicUrls: (json['sheetMusicUrls'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 
@@ -112,6 +115,7 @@ class Hymn {
       'tone': tone,
       'lyrics': lyrics,
       'audioUrl': audioUrl,
+      'sheetMusicUrls': sheetMusicUrls,
       'category': category,
     };
   }
@@ -124,6 +128,7 @@ class Hymn {
     String? lyrics,
     String? audioUrl,
     String? category,
+    List<String>? sheetMusicUrls,
   }) {
     return Hymn(
       id: id,
@@ -260,17 +265,53 @@ class Hymn {
       if (verseMatch != null) {
         final header = verseMatch.group(1)!.trim();
         final rest = verseMatch.group(2)!.trim();
-        resultLines.add(header);
+        
+        final parsedNum = _parseVerseNumber(header);
+        if (parsedNum != null) {
+          resultLines.add('$parsedNum.');
+        } else {
+          resultLines.add(header);
+        }
+        
         if (rest.isNotEmpty) {
           resultLines.add(rest);
         }
         continue;
       }
 
+      // Además, si la línea ya es un header por sí sola, la normalizamos
+      final standaloneMatch = RegExp(r'^((?:\d+|[IVXivx]+|Estrofa\s*\d+)\s*[\.\-:]?)$', caseSensitive: false).firstMatch(trimmed);
+      if (standaloneMatch != null && trimmed.length <= 15) {
+        final header = standaloneMatch.group(1)!.trim();
+        final parsedNum = _parseVerseNumber(header);
+        if (parsedNum != null) {
+          resultLines.add('$parsedNum.');
+          continue;
+        }
+      }
+
       resultLines.add(line);
     }
 
     return resultLines.join('\n');
+  }
+
+  static int? _parseVerseNumber(String header) {
+    final clean = header.replaceAll(RegExp(r'[^0-9a-zA-Z]'), '').toLowerCase();
+    if (clean.startsWith('estrofa')) {
+      final numStr = clean.replaceAll('estrofa', '');
+      return int.tryParse(numStr);
+    }
+    if (int.tryParse(clean) != null) {
+      return int.parse(clean);
+    }
+    const romanMap = {
+      'i': 1, 'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 
+      'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10,
+      'xi': 11, 'xii': 12, 'xiii': 13, 'xiv': 14, 'xv': 15,
+      'xvi': 16, 'xvii': 17, 'xviii': 18, 'xix': 19, 'xx': 20
+    };
+    return romanMap[clean];
   }
 
   /// Sanitiza y embellece cualquier texto de letra para su despliegue visual
@@ -1044,6 +1085,7 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
     required bool isNew,
     String? audioUrl,
     String? category,
+    List<String>? sheetMusicUrls,
   }) async {
     final firestore = FirebaseFirestore.instance;
     final formattedLyrics = Hymn.formatLyricsForSaving(lyrics, collection);
@@ -1064,6 +1106,7 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
       'collection': collection,
       'audioUrl': audioUrl ?? '',
       'category': category ?? '',
+      'sheetMusicUrls': sheetMusicUrls ?? [],
     };
     
     // Actualización optimista inmediata en memoria (0 ms)
@@ -1077,6 +1120,7 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
       collection: collection,
       audioUrl: audioUrl ?? '',
       category: category ?? '',
+      sheetMusicUrls: sheetMusicUrls ?? [],
     );
 
     if (state.hasValue) {
@@ -1149,6 +1193,7 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
       'lyrics': formattedLyrics,
       'collection': targetCollection,
       'audioUrl': hymn.audioUrl,
+      'sheetMusicUrls': hymn.sheetMusicUrls,
     };
     
     try {

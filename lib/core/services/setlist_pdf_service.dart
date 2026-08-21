@@ -6,6 +6,14 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../features/hymns/domain/hymn.dart';
 import '../../features/setlists/domain/setlist.dart';
+import 'hymn_pdf_service.dart';
+import 'chord_transposer_service.dart';
+
+enum ExportMode {
+  summaryOnly,
+  fullHymns1PerPage,
+  fullHymns2PerPage,
+}
 
 class SetlistExportService {
   /// Genera el texto formateado de un Setlist para WhatsApp o Telegram
@@ -45,15 +53,22 @@ class SetlistExportService {
   }
 
   /// Genera un documento PDF elegante listo para imprimir o guardar
-  static Future<Uint8List> generateSetlistPdf(Setlist setlist, List<Hymn> hymns) async {
+  static Future<Uint8List> generateSetlistPdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
     final doc = pw.Document();
 
     final logoBytes = await rootBundle.load('assets/images/church_logo_clean.png');
     final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+    
+    pw.MemoryImage? missionLogo;
+    try {
+      final missionBytes = await rootBundle.load('assets/images/mission_logo_v3.png');
+      missionLogo = pw.MemoryImage(missionBytes.buffer.asUint8List());
+    } catch (_) {}
 
     final fontRegular = await PdfGoogleFonts.nunitoRegular();
     final fontBold = await PdfGoogleFonts.outfitBold();
 
+    // 1. PÁGINA DE RESUMEN (Siempre se incluye como portada)
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -267,15 +282,260 @@ class SetlistExportService {
       ),
     );
 
+    // Si solo es resumen, retornamos aquí.
+    if (mode == ExportMode.summaryOnly) {
+      return doc.save();
+    }
+
+    // 2. PÁGINAS DE CANTOS
+    
+    // Función auxiliar para generar el widget de un canto
+    pw.Widget _buildSingleHymnWidget(Hymn hymn, {bool compact = false}) {
+      String lyricsToRender = Hymn.ensureHeadersOnOwnLine(hymn.lyrics);
+      
+      String currentTone = hymn.toneNote.trim();
+      if (currentTone.isEmpty && hymn.tone.isNotEmpty) {
+        final match = RegExp(r'^(DO#|DO|RE#|REb|RE|MIB|MI|FA#|FA|SOL#|SOLB|SOL|LAB|LA#|LAb|LA|SIB|SI|C#|Db|C|D#|Eb|D|E|F#|F|G#|Ab|G|A#|Bb|A|B)', caseSensitive: false).firstMatch(hymn.tone.trim());
+        if (match != null) {
+          currentTone = match.group(1)!;
+        }
+      }
+      final validNoteRegex = RegExp(r'^(DO|RE|MI|FA|SOL|LA|SI|[A-G])', caseSensitive: false);
+      if (!validNoteRegex.hasMatch(currentTone) || currentTone.toLowerCase().contains('tiempo')) {
+        currentTone = '';
+      }
+
+      String collectionLabel = 'HIMNARIO IUMP';
+      if (hymn.collection == 'especiales') collectionLabel = 'ALABANZA ESPECIAL';
+      else if (hymn.collection == 'coros') collectionLabel = 'CORO DE AVIVAMIENTO';
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      collectionLabel,
+                      style: pw.TextStyle(
+                        font: fontBold,
+                        fontSize: compact ? 9 : 11,
+                        color: PdfColor.fromHex('#4F46E5'),
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      hymn.title,
+                      style: pw.TextStyle(
+                        font: fontBold,
+                        fontSize: compact ? 20 : 24,
+                        color: PdfColor.fromHex('#0F172A'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (currentTone.isNotEmpty)
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#EEF2FF'),
+                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(color: PdfColor.fromHex('#C7D2FE'), width: 1),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        'TONO',
+                        style: pw.TextStyle(
+                          font: fontBold,
+                          fontSize: compact ? 7 : 8,
+                          color: PdfColor.fromHex('#6366F1'),
+                        ),
+                      ),
+                      pw.Text(
+                        currentTone,
+                        style: pw.TextStyle(
+                          font: fontBold,
+                          fontSize: compact ? 12 : 14,
+                          color: PdfColor.fromHex('#312E81'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          pw.SizedBox(height: compact ? 12 : 16),
+          // Usamos el buildHymnContent de HymnPdfService!
+          // Pasamos transposeOffset = 0, y notation = 'spanish' (por defecto)
+          HymnPdfService.buildLyricsPdfWidget(lyricsToRender, fontRegular, fontBold, 0, 'spanish', forceSingleColumn: compact),
+        ],
+      );
+    }
+
+    if (mode == ExportMode.fullHymns1PerPage) {
+      for (var hymn in hymns) {
+        doc.addPage(
+          pw.MultiPage(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+            header: (pw.Context context) {
+              return pw.Column(
+                children: [
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      if (missionLogo != null)
+                        pw.Container(width: 44, height: 44, child: pw.Image(missionLogo))
+                      else
+                        pw.SizedBox(width: 44),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.Text('IGLESIA UNIDA METODISTA PENTECOSTAL', style: pw.TextStyle(font: fontBold, fontSize: 12, color: PdfColor.fromHex('#1E1B4B'))),
+                          pw.SizedBox(height: 2),
+                          pw.Text('Primera de San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 9, color: PdfColor.fromHex('#475569'))),
+                        ],
+                      ),
+                      pw.SizedBox(width: 44),
+                    ],
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Divider(color: PdfColor.fromHex('#CBD5E1'), thickness: 0.8),
+                  pw.SizedBox(height: 12),
+                ],
+              );
+            },
+            footer: (pw.Context context) {
+              return pw.Column(
+                children: [
+                  pw.Divider(color: PdfColor.fromHex('#E2E8F0'), thickness: 0.5),
+                  pw.SizedBox(height: 6),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Himnario IUMP · Primera en San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 8, color: PdfColor.fromHex('#94A3B8'))),
+                      pw.Text('Página ${context.pageNumber} de ${context.pagesCount}', style: pw.TextStyle(font: fontBold, fontSize: 8, color: PdfColor.fromHex('#64748B'))),
+                    ],
+                  ),
+                ],
+              );
+            },
+            build: (pw.Context context) {
+              return [
+                _buildSingleHymnWidget(hymn, compact: false),
+              ];
+            }
+          ),
+        );
+      }
+    } else if (mode == ExportMode.fullHymns2PerPage) {
+      for (int i = 0; i < hymns.length; i += 2) {
+        final hymn1 = hymns[i];
+        final hymn2 = (i + 1 < hymns.length) ? hymns[i + 1] : null;
+
+        doc.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+            build: (pw.Context context) {
+              final contentWidget = pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: _buildSingleHymnWidget(hymn1, compact: true),
+                  ),
+                  if (hymn2 != null) ...[
+                    pw.SizedBox(width: 24),
+                    pw.Container(
+                      width: 0.5,
+                      height: 700, // aproximado de la página
+                      color: PdfColor.fromHex('#E2E8F0'),
+                    ),
+                    pw.SizedBox(width: 24),
+                    pw.Expanded(
+                      child: _buildSingleHymnWidget(hymn2, compact: true),
+                    ),
+                  ] else ...[
+                    pw.Expanded(child: pw.SizedBox()), // espacio vacío
+                  ],
+                ],
+              );
+
+              return pw.Column(
+                children: [
+                  // HEADER
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('IGLESIA UNIDA METODISTA PENTECOSTAL', style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColor.fromHex('#1E1B4B'))),
+                          pw.SizedBox(height: 2),
+                          pw.Text('Primera de San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 8, color: PdfColor.fromHex('#475569'))),
+                        ],
+                      ),
+                      pw.Text('Programa de Culto', style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColor.fromHex('#4F46E5'))),
+                    ],
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Divider(color: PdfColor.fromHex('#CBD5E1'), thickness: 0.8),
+                  pw.SizedBox(height: 12),
+                  
+                  // BODY
+                  pw.Expanded(
+                    child: pw.FittedBox(
+                      fit: pw.BoxFit.scaleDown,
+                      alignment: pw.Alignment.topLeft,
+                      child: pw.Container(
+                        width: PdfPageFormat.a4.width - 72, // ancho de la página menos márgenes
+                        child: contentWidget,
+                      ),
+                    ),
+                  ),
+                  
+                  // FOOTER
+                  pw.SizedBox(height: 12),
+                  pw.Divider(color: PdfColor.fromHex('#E2E8F0'), thickness: 0.5),
+                  pw.SizedBox(height: 6),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Himnario IUMP · Primera en San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 8, color: PdfColor.fromHex('#94A3B8'))),
+                      pw.Text('Página ${i ~/ 2 + 1} de ${(hymns.length / 2).ceil()}', style: pw.TextStyle(font: fontBold, fontSize: 8, color: PdfColor.fromHex('#64748B'))),
+                    ],
+                  ),
+                ],
+              );
+            }
+          )
+        );
+      }
+    }
+
     return doc.save();
   }
 
   /// Abrir la vista de impresión / exportar PDF
-  static Future<void> printOrSharePdf(Setlist setlist, List<Hymn> hymns) async {
-    final pdfBytes = await generateSetlistPdf(setlist, hymns);
+  static Future<void> printOrSharePdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
+    final pdfBytes = await generateSetlistPdf(setlist, hymns, mode: mode);
+    String filenameMode = '';
+    if (mode == ExportMode.fullHymns1PerPage) filenameMode = '_1xPagina';
+    if (mode == ExportMode.fullHymns2PerPage) filenameMode = '_2xPagina';
+    
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdfBytes,
-      name: 'Programa_Culto_${setlist.title.replaceAll(' ', '_')}.pdf',
+      name: 'Programa_Culto_${setlist.title.replaceAll(' ', '_')}$filenameMode.pdf',
     );
   }
 }
