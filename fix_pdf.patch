@@ -1,0 +1,32 @@
+--- lib/core/services/setlist_pdf_service.dart
++++ lib/core/services/setlist_pdf_service.dart
+@@ -382,15 +382,23 @@
+     if (mode == ExportMode.fullHymns1PerPage) {
+       for (var hymn in hymns) {
+         doc.addPage(
+-          pw.MultiPage(
++          pw.Page(
+             pageFormat: PdfPageFormat.a4,
+             margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+             build: (pw.Context context) {
+-              return [
+-                _buildSingleHymnWidget(hymn, compact: false),
+-              ];
++              return pw.Column(
++                children: [
++                  pw.Expanded(
++                    child: pw.FittedBox(
++                      fit: pw.BoxFit.scaleDown,
++                      alignment: pw.Alignment.topLeft,
++                      child: pw.Container(
++                        width: PdfPageFormat.a4.width - 72,
++                        child: _buildSingleHymnWidget(hymn, compact: false),
++                      ),
++                    ),
++                  ),
++                ],
++              );
+             },
+           ),
+         );
+       }

@@ -509,12 +509,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     case 'pdf':
                       _showExportPdfModal(context, hymn);
                       break;
-                    case 'projector':
+                    case 'projector_pc':
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => PresentationScreen(hymn: hymn),
                         ),
                       );
+                      break;
+                    case 'projector_tv':
+                      _showConnectToTvDialog(context, hymn);
                       break;
                     case 'youtube':
                       _launchYouTubeSearch(hymn.title);
@@ -584,12 +587,22 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     ),
                   ),
                   PopupMenuItem(
-                    value: 'projector',
+                    value: 'projector_pc',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.computer_rounded, size: 20),
+                        const SizedBox(width: 10),
+                        Text('Modo Proyector (PC/Mac)', style: GoogleFonts.nunito()),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'projector_tv',
                     child: Row(
                       children: [
                         const Icon(Icons.tv_rounded, size: 20),
                         const SizedBox(width: 10),
-                        Text('Modo Proyector', style: GoogleFonts.nunito()),
+                        Text('Control Remoto (Smart TV)', style: GoogleFonts.nunito()),
                       ],
                     ),
                   ),
@@ -3701,6 +3714,47 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       }
     }
+  }
+
+  void _showConnectToTvDialog(BuildContext context, Hymn hymn) {
+    final codeController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Conectar a Smart TV'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ingresa el código de 4 dígitos que aparece en la pantalla del TV/Proyector (himnario-vito-2026.web.app/tv):'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: codeController,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: '1234',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              final code = codeController.text.trim();
+              if (code.length == 4) {
+                Navigator.pop(ctx);
+                GoRouter.of(context).push('/remote', extra: {'hymn': hymn, 'roomId': code});
+              }
+            },
+            child: const Text('Conectar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showExportPdfModal(BuildContext context, Hymn hymn) {

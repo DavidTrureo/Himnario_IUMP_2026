@@ -15,6 +15,9 @@ import '../widgets/main_layout_screen.dart';
 import '../../features/home/presentation/tools_screen.dart';
 import '../../features/hymns/presentation/hymn_scanner_screen.dart';
 import '../../features/hymns/presentation/admin_suggestions_screen.dart';
+import '../../features/hymns/presentation/hymn_tv_receiver_screen.dart';
+import '../../features/hymns/presentation/tv_remote_control_screen.dart';
+import '../../features/hymns/domain/hymn.dart';
 
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -111,6 +114,24 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/admin-suggestions',
       builder: (context, state) => AdminSuggestionsScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/tv',
+      builder: (context, state) => const HymnTvReceiverScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/remote',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        if (extra == null) {
+          return const Scaffold(body: Center(child: Text('Error: Falta información extra')));
+        }
+        final hymn = extra['hymn'] as Hymn;
+        final roomId = extra['roomId'] as String;
+        return TvRemoteControlScreen(hymn: hymn, roomId: roomId);
+      },
     ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,

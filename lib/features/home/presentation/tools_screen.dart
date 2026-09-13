@@ -304,7 +304,7 @@ class _PremiumAboutDialog extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildLogoBox('assets/images/church_logo_clean.png', isDark),
+                        _buildLogoBox(context, 'assets/images/church_logo_clean.png', isDark),
                         const SizedBox(width: 16),
                         Container(
                           width: 1.5,
@@ -322,7 +322,7 @@ class _PremiumAboutDialog extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        _buildLogoBox('assets/images/mission_logo_v3.png', isDark),
+                        _buildLogoBox(context, 'assets/images/mission_logo_v3.png', isDark),
                       ],
                     ),
                     const SizedBox(height: 28),
@@ -544,26 +544,53 @@ class _PremiumAboutDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildLogoBox(String path, bool isDark) {
-    return Container(
-      width: 72,
-      height: 72,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          )
-        ],
-        border: Border.all(color: Colors.black.withValues(alpha: 0.03)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.asset(path, fit: BoxFit.contain),
+  Widget _buildLogoBox(BuildContext context, String path, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        showGeneralDialog(
+          context: context,
+          barrierColor: Colors.black.withValues(alpha: 0.9),
+          barrierDismissible: true,
+          barrierLabel: 'Cerrar',
+          pageBuilder: (context, animation, secondaryAnimation) {
+            return GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: SafeArea(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Image.asset(path, fit: BoxFit.contain),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+      child: Container(
+        width: 72,
+        height: 72,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.08),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            )
+          ],
+          border: Border.all(color: Colors.black.withValues(alpha: 0.03)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset(path, fit: BoxFit.contain),
+        ),
       ),
     );
   }

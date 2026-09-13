@@ -54,6 +54,10 @@
       100% { transform: rotate(360deg); }
     }
   </style>
+  <script>
+    // Capture the initial hash BEFORE Flutter routing (usePathUrlStrategy) clears it
+    window._initialWebHash = window.location.hash;
+  </script>
 </head>
 <body>
   <div id="loading" class="loading-container">

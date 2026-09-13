@@ -134,7 +134,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
     ThemeData theme,
   ) {
     final liveUrl =
-        'https://himnario-vito-2026.web.app/#/culto-en-vivo/${session.sessionId}';
+        'https://himnario-vito-2026.web.app/culto-en-vivo/${session.sessionId}';
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -188,7 +188,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           // Título del culto
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   session.title,
@@ -252,13 +252,17 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
         ? hymn.lyrics
         : _stripChords(hymn.lyrics);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return InteractiveViewer(
+      minScale: 1.0,
+      maxScale: 3.5,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Número e información básica
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 padding:
@@ -268,7 +272,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${session.currentIndex + 1} / ${session.hymnIds.length}',
+                  '${session.currentIndex + 1} de ${session.hymnIds.length}',
                   style: GoogleFonts.outfit(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
@@ -298,18 +302,32 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
 
           // Título del himno
           Text(
-            hymn.title,
+            hymn.collection == 'iump' ? '${hymn.id} - ${hymn.title}' : hymn.title,
             style: GoogleFonts.outfit(
               fontSize: 22,
               fontWeight: FontWeight.w900,
               color: isDark ? Colors.white : Colors.black87,
             ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hymn.collection == 'iump' 
+                ? 'Himnario IUMP' 
+                : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro de Avivamiento'),
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              color: isDark ? Colors.white60 : Colors.black54,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
 
           // Letra sanitizada y formateada profesionalmente
           _buildFormattedLyricsDisplay(rawLyrics, hymn.title, isDark, theme),
         ],
+      ),
       ),
     ).animate().fadeIn(duration: 300.ms);
   }
@@ -366,7 +384,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
     );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: blocks.map((block) {
         final trimmed = block.trim();
         if (trimmed.isEmpty) return const SizedBox();
@@ -412,7 +430,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
               ),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -435,6 +453,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Text(
                     Hymn.formatLineCasing(line),
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
                       fontSize: 16,
                       height: 1.6,
@@ -459,6 +478,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
             padding: const EdgeInsets.only(bottom: 4, top: 4),
             child: Text(
               '$numStr.',
+              textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -498,7 +518,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           width: double.infinity,
           margin: const EdgeInsets.only(bottom: 16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (numberWidget != null) numberWidget,
               ...bodyLines.map((line) {
@@ -506,6 +526,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Text(
                     Hymn.formatLineCasing(line),
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
                       fontSize: 16,
                       height: 1.6,
@@ -909,7 +930,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                       itemBuilder: (_, i) {
                         final h = filtered[i];
                         return ListTile(
-                          title: Text(h.title,
+                          title: Text(h.collection == 'iump' ? '${h.id} - ${h.title}' : h.title,
                               style: GoogleFonts.outfit(
                                   fontWeight: FontWeight.w600)),
                           subtitle: Text(

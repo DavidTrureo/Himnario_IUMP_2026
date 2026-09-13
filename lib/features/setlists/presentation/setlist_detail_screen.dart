@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../hymns/domain/hymn.dart';
 import '../../hymns/presentation/hymn_list_screen.dart';
 import '../domain/setlist.dart';
@@ -228,17 +227,31 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
 
                     return SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final hymn = setlistHymns[index];
-                            return _buildHymnItem(context, ref, setlist, hymn, index, isDark, theme)
-                                .animate()
-                                .fadeIn(delay: (index * 50).ms)
-                                .slideY(begin: 0.05);
-                          },
-                          childCount: setlistHymns.length,
-                        ),
+                      sliver: SliverReorderableList(
+                        itemCount: setlistHymns.length,
+                        proxyDecorator: (Widget child, int index, Animation<double> animation) {
+                          return Material(
+                            elevation: 4,
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                            child: child,
+                          );
+                        },
+                        onReorder: (oldIndex, newIndex) {
+                          if (oldIndex < newIndex) {
+                            newIndex -= 1;
+                          }
+                          final newHymns = List<String>.from(setlist.hymnIds);
+                          final item = newHymns.removeAt(oldIndex);
+                          newHymns.insert(newIndex, item);
+                          final updated = setlist.copyWith(hymnIds: newHymns);
+                          ref.read(setlistsProvider.notifier).updateSetlist(updated);
+                          ref.read(activeSetlistProvider.notifier).setSetlist(updated);
+                        },
+                        itemBuilder: (context, index) {
+                          final hymn = setlistHymns[index];
+                          return _buildHymnItem(context, ref, setlist, hymn, index, isDark, theme);
+                        },
                       ),
                     );
                   },
@@ -382,6 +395,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     ThemeData theme,
   ) {
     return Container(
+      key: ValueKey('${hymn.collection}-${hymn.id}'),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
@@ -413,7 +427,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         ),
         subtitle: Text(
           hymn.collection == 'iump' 
-            ? 'Himnario IUMP #${hymn.id}' 
+            ? 'Himnario IUMP' 
             : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro de Avivamiento'),
           style: GoogleFonts.outfit(
             fontSize: 12,
@@ -423,23 +437,20 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Botones de reordenamiento
-            IconButton(
-              icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
-              onPressed: index > 0 
-                ? () => _moveHymnInSetlist(ref, setlist, index, -1)
-                : null,
-            ),
-            IconButton(
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-              onPressed: index < setlist.hymnIds.length - 1 
-                ? () => _moveHymnInSetlist(ref, setlist, index, 1)
-                : null,
-            ),
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.redAccent),
               onPressed: () => _removeHymnFromSetlist(ref, setlist, index),
             ),
+            if (setlist.hymnIds.length > 1)
+              ReorderableDragStartListener(
+                index: index,
+                child: Icon(
+                  Icons.drag_handle_rounded,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              )
+            else
+              const SizedBox(width: 24),
           ],
         ),
         onTap: () {
@@ -449,22 +460,6 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  void _moveHymnInSetlist(WidgetRef ref, Setlist setlist, int index, int direction) {
-    final newList = List<String>.from(setlist.hymnIds);
-    final targetIndex = index + direction;
-    final item = newList.removeAt(index);
-    newList.insert(targetIndex, item);
-
-    final updatedSetlist = Setlist(
-      id: setlist.id,
-      title: setlist.title,
-      date: setlist.date,
-      hymnIds: newList,
-    );
-
-    ref.read(setlistsProvider.notifier).updateSetlist(updatedSetlist);
-    ref.read(activeSetlistProvider.notifier).setSetlist(updatedSetlist);
-  }
 
   void _removeHymnFromSetlist(WidgetRef ref, Setlist setlist, int index) {
     final newList = List<String>.from(setlist.hymnIds);
@@ -577,11 +572,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           itemBuilder: (context, idx) {
                             final hymn = filteredList[idx];
                             return ListTile(
-                              title: Text(hymn.title, style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                              title: Text(hymn.collection == 'iump' ? '${hymn.id} - ${hymn.title}' : hymn.title, style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
                               subtitle: Text(
                                 hymn.collection == 'iump' 
-                                  ? 'Himno #${hymn.id}' 
-                                  : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro'),
+                                  ? 'Himnario IUMP' 
+                                  : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro de Avivamiento'),
                                 style: GoogleFonts.outfit(fontSize: 12),
                               ),
                               trailing: Icon(Icons.add_circle_outline_rounded, color: theme.colorScheme.primary),

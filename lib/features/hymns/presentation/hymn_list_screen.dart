@@ -1448,6 +1448,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
                       if (showFavorites && !_isMultiSelectMode && ref.watch(searchQueryProvider).isEmpty) {
                         return ReorderableListView.builder(
+                          buildDefaultDragHandles: false,
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 80.0),
                           itemCount: hymns.length,

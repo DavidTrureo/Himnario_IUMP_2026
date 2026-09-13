@@ -576,7 +576,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                                 'projector_hymn_${widget.hymn.collection}_${widget.hymn.id}', 
                                 jsonEncode(widget.hymn.toJson())
                               );
-                              WebWindowHelper.openProjectorWindow('/#/projector-view/${widget.hymn.collection}/${widget.hymn.id}');
+                              WebWindowHelper.openProjectorWindow('/projector-view/${widget.hymn.collection}/${widget.hymn.id}');
                             },
                           ),
                           const SizedBox(width: 8),

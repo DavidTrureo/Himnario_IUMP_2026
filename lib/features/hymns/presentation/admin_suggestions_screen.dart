@@ -1,4 +1,5 @@
 import 'package:himnario_iump/core/services/local_hymn_storage_service.dart';
+import 'package:himnario_iump/core/services/gemini_ai_service.dart';
 import 'dart:ui' as dart_ui;
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
 import 'package:flutter/material.dart';
@@ -221,10 +222,33 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                       ],
                     ),
                     const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Letra', style: TextStyle(fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
+                          tooltip: 'Mejorar Ortografía y Puntuación con IA',
+                          onPressed: () async {
+                            if (lyricsCtrl.text.trim().isEmpty) return;
+                            final result = await GeminiAiService.correctHymnGrammar(
+                              context: context,
+                              title: titleCtrl.text.trim(),
+                              lyrics: lyricsCtrl.text.trim(),
+                            );
+                            if (result != null) {
+                              titleCtrl.text = result['title']!;
+                              lyricsCtrl.text = result['lyrics']!;
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: lyricsCtrl,
                       maxLines: 8,
-                      decoration: const InputDecoration(labelText: 'Letra', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
                     ),
                   ],
                 ),

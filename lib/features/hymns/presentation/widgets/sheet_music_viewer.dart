@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../domain/hymn.dart';
@@ -157,6 +158,26 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
     }
   }
 
+
+  String _extractFileName(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final path = Uri.decodeComponent(uri.path);
+      final fileNameWithTimestamp = path.split('/').last;
+      final firstUnderscore = fileNameWithTimestamp.indexOf('_');
+      if (firstUnderscore != -1 && firstUnderscore < fileNameWithTimestamp.length - 1) {
+        return fileNameWithTimestamp.substring(firstUnderscore + 1);
+      }
+      return fileNameWithTimestamp;
+    } catch (e) {
+      return 'Partitura';
+    }
+  }
+
+  void _shareUrl(String url) {
+    Share.share(url, subject: 'Partitura de ${widget.hymn.title}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final urls = widget.hymn.sheetMusicUrls;
@@ -219,12 +240,23 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
                                         ElevatedButton.icon(
                                           onPressed: () => launchUrl(Uri.parse(url)),
                                           icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
-                                          label: Text('Abrir Partitura Oficial', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500)),
+                                          label: Text('Abrir ${_extractFileName(url)}', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.redAccent,
                                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                             elevation: 4,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        OutlinedButton.icon(
+                                          onPressed: () => _shareUrl(url),
+                                          icon: const Icon(Icons.share_rounded, color: Colors.redAccent),
+                                          label: Text('Compartir Enlace', style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.w500)),
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(color: Colors.redAccent),
+                                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                           ),
                                         ),
                                       ],

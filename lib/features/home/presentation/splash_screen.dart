@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'web_helper.dart' if (dart.library.html) 'web_helper_web.dart';
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -16,18 +19,33 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   AudioPlayer? _player;
+  bool _hasRedirected = false;
 
   @override
   void initState() {
     super.initState();
     // Iniciar audio asíncronamente respetando las políticas de Autoplay del navegador
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _playSplashSound();
+      // Manejar compatibilidad con enlaces antiguos (con #)
+      if (kIsWeb) {
+        final String hash = initialWebHash;
+        if (hash.startsWith('#/')) {
+          final path = hash.substring(1); // Quitamos el '#'
+          if (path.isNotEmpty && path != '/') {
+            _hasRedirected = true;
+            context.go(path);
+            return; // Detenemos la ejecución del splash y saltamos directo
+          }
+        }
+      }
+
+      // _playSplashSound();
     });
 
     // Auto-navegación automática después de 4.8s tanto en Web como en App Móvil
-    Timer(const Duration(milliseconds: 4800), () {
-      if (mounted) {
+    Timer(const Duration(milliseconds: 2500), () {
+      // Verificar de nuevo si se debe navegar al home o si ya redirigimos
+      if (mounted && !_hasRedirected) {
         context.go('/home');
       }
     });

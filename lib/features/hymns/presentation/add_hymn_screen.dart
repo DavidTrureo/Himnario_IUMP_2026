@@ -511,14 +511,39 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
                       tooltip: 'Buscar Letra en Internet (IA)',
                       onPressed: () => _searchLyricsWithAI(context),
                     )),
-                        IconButton(
-                          icon: const Icon(Icons.document_scanner),
-                          tooltip: 'Escanear con OCR',
-                          style: IconButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                            foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
-                          onPressed: _scanText,
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.auto_awesome_rounded, color: Colors.amber),
+                              tooltip: 'Mejorar Ortografía y Puntuación con IA',
+                              onPressed: () async {
+                                if (_lyricsController.text.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Ingresa la letra antes de pulir con IA')),
+                                  );
+                                  return;
+                                }
+                                final result = await GeminiAiService.correctHymnGrammar(
+                                  context: context,
+                                  title: _titleController.text.trim(),
+                                  lyrics: _lyricsController.text.trim(),
+                                );
+                                if (result != null) {
+                                  _titleController.text = result['title']!;
+                                  _lyricsController.text = result['lyrics']!;
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.document_scanner),
+                              tooltip: 'Escanear con OCR',
+                              style: IconButton.styleFrom(
+                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                              onPressed: _scanText,
+                            ),
+                          ],
                         ),
                       ],
                     ),

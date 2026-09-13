@@ -155,15 +155,16 @@ LETRA:
 $currentLyrics
 
 REGLAS ESTRICTAS OBLIGATORIAS:
-1. PUNTUACIÓN POÉTICA LÓGICA: DEBES ELIMINAR los puntos finales (.) y comas al final de los versos si la idea continúa en el siguiente verso (encabalgamiento poético). Solo deja o agrega puntos finales cuando termine verdaderamente la idea o la estrofa. BAJO NINGÚN MOTIVO dejes un punto final al final de cada línea de forma sistemática.
-2. ANÁLISIS DE CONTEXTO SEMÁNTICO (ACENTUACIÓN DIACRÍTICA Y TIEMPOS VERBALES):
-   - "amo" (presente, ej: "yo te amo") vs "amó" (pasado, ej: "Él me amó"). Revisa si la frase habla de la historia de Jesús en la cruz o del sentir actual del creyente.
-   - "Él" / "Tú" / "Mí" (pronombre referente a Dios) siempre con tilde y mayúscula frente a "el" / "tu" / "mi" (posesivos/artículos).
-   - "más" (cantidad) frente a "mas" (conjunción "pero").
-3. ESTRUCTURA INTACTA: Mantén la estructura de líneas y estrofas original. Si hay un "1.", "CORO:", etc., respétalo.
-4. MAYÚSCULAS: La primera letra de cada verso debe ir en Mayúscula obligatoriamente, al igual que los nombres divinos (Dios, Señor, Rey, Salvador).
-5. ACORDES INTACTOS: Mantén intactas las etiquetas de acordes como [DO]. NO elimines ni alteres ningún corchete.
-6. ORTOGRAFÍA Y SIGNOS INTERNOS: Corrige y agrega las tildes (´), signos de interrogación (¿?) y exclamación (¡!) correspondientes. Si dentro de un verso hace falta una coma (,), o si en lugar de un punto corresponde un punto y coma (;), cámbialo.
+1. LECTURA COMPLETA Y REGLAS RAE: Lee el canto COMPLETO primero para entender el contexto global. Luego, aplica estrictamente las normas ortográficas y de puntuación de la Real Academia Española (RAE) para corregir tildes, comas, puntos y signos de interrogación/exclamación (¿? ¡!) donde sea necesario.
+2. PUNTUACIÓN POÉTICA Y PUNTOS FINALES: PROHIBIDO poner un punto final (.) al final de cada línea de forma sistemática. Solo pon un punto final cuando la oración o estrofa realmente termine gramaticalmente. Si la idea continúa en la siguiente línea (encabalgamiento), NO pongas punto ni coma al final de esa línea.
+3. PRONOMBRES Y DIACRÍTICOS (¡CRÍTICO!):
+   - Referencia a DIOS: "Él", "Tú", "Mí" (Siempre con Tilde y Mayúscula).
+   - Referencia a un HUMANO: "él", "tú", "mí" (Con tilde, pero en minúscula, salvo que sea la primera palabra de la línea).
+   - Posesivos o Artículos: "el", "tu", "mi" (Sin tilde y en minúscula).
+   - Tiempos verbales: Diferencia bien el pasado ("Él me amó", "salvó") del presente ("yo le amo", "salvo").
+4. ESTRUCTURA INTACTA: Mantén la estructura de líneas y estrofas original. Si hay un "1.", "CORO:", etc., respétalo.
+5. MAYÚSCULAS: La primera letra de CADA verso/línea debe ir en Mayúscula obligatoriamente, sin importar si es pronombre o palabra común. También los nombres divinos (Dios, Señor, Rey, Salvador).
+6. ACORDES INTACTOS: Mantén intactas las etiquetas de acordes como [DO]. NO elimines ni alteres ningún corchete.
 7. FORMATO JSON: Retorna estrictamente un objeto JSON con los campos "title" y "lyrics". No agregues bloques markdown ni explicaciones.
 
 JSON esperado:
