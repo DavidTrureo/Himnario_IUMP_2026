@@ -1614,6 +1614,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         ..._getMergedBlocksCached(hymn.lyrics, _transposeOffset).map(
                           (block) => _buildLyricsBlock(context, hymn, block, fontSize, isDark, theme)
                         ),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          height: _showControlPanel ? (hasChords ? 240.0 : 140.0) : 0.0,
+                        ),
                       ],
                     ),
                   ),
@@ -1641,6 +1646,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                               child: SheetMusicViewer(hymn: hymn, isEmbedded: true),
                             ),
                           ),
+                        ),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          height: _showControlPanel ? 140.0 : 0.0,
                         ),
                         const SizedBox(height: 20),
                       ],
@@ -1833,13 +1843,19 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           firstLineRest = arabicMatch.group(2)?.trim() ?? '';
         } else {
           // 2. Intentar con número romano (I, II, III...)
-          final romanMatch = RegExp(r'^([IVXivx]+)(?:\s*\.\s*|\s*\-\s*|\s+|$)(.*)').firstMatch(lines.first);
+          final romanMatch = RegExp(r'^([IVXivx]+)(\s*\.\s*|\s*\-\s*|\s+|$)(.*)').firstMatch(lines.first);
           if (romanMatch != null) {
             final romanStr = romanMatch.group(1)!;
             final converted = _parseRomanNumeral(romanStr);
             if (converted != null) {
-              parsedNumber = converted.toString();
-              firstLineRest = romanMatch.group(2)?.trim() ?? '';
+              final separator = romanMatch.group(2) ?? '';
+              final restText = romanMatch.group(3) ?? '';
+              if (romanStr.toLowerCase() == 'vi' && !separator.contains('.') && !separator.contains('-') && restText.trim().isNotEmpty) {
+                // Falso positivo: es la palabra "Vi" (del verbo ver), no el número romano VI.
+              } else {
+                parsedNumber = converted.toString();
+                firstLineRest = restText.trim();
+              }
             }
           }
         }

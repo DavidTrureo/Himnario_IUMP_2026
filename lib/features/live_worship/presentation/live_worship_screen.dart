@@ -487,23 +487,29 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
             ),
           );
         } else {
-          final romanMatch = RegExp(r'^([IVXivx]+)(?:\s*\.\s*|\s*\-\s*|\s+|$)(.*)').firstMatch(firstLine);
+          final romanMatch = RegExp(r'^([IVXivx]+)(\s*\.\s*|\s*\-\s*|\s+|$)(.*)').firstMatch(firstLine);
           if (romanMatch != null) {
             final romanStr = romanMatch.group(1)!;
             final converted = _parseRomanNumeral(romanStr);
             if (converted != null) {
-              firstLineRest = romanMatch.group(2)?.trim() ?? '';
-              numberWidget = Padding(
-                padding: const EdgeInsets.only(bottom: 4, top: 4),
-                child: Text(
-                  '$converted.',
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
+              final separator = romanMatch.group(2) ?? '';
+              final restText = romanMatch.group(3) ?? '';
+              if (romanStr.toLowerCase() == 'vi' && !separator.contains('.') && !separator.contains('-') && restText.trim().isNotEmpty) {
+                // Falso positivo: es la palabra "Vi", no el número romano VI.
+              } else {
+                firstLineRest = restText.trim();
+                numberWidget = Padding(
+                  padding: const EdgeInsets.only(bottom: 4, top: 4),
+                  child: Text(
+                    '$converted.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
-                ),
-              );
+                );
+              } // <--- Added missing brace
             }
           }
         }

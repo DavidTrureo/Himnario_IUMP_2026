@@ -94,6 +94,7 @@ flutter:
     - assets/json/coros.json
     - assets/images/church_logo_v3.png
     - assets/images/mission_logo_v3.png
+    - assets/audio/
     - assets/images/church_logo_clean.png
     - assets/audio/splash_chime.mp3
 

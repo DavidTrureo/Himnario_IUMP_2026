@@ -108,6 +108,19 @@ class GeminiAiService {
 
     String apiKey = await getApiKey();
 
+    if (apiKey.isEmpty && context.mounted) {
+      final newKey = await showApiKeyInputDialog(
+        context, 
+        reason: 'Para aplicar puntuación inteligente de la RAE (comas, puntos) necesitas tu propia llave de API gratuita de Google AI Studio. De lo contrario, solo se aplicarán tildes básicas.'
+      );
+      if (newKey != null && newKey.isNotEmpty) {
+        apiKey = newKey;
+      } else {
+        // If they still don't have a key, just return the local result directly without showing the spinner
+        return {'title': currentTitle, 'lyrics': currentLyrics, 'corrections': totalCorrections.toString()};
+      }
+    }
+
     // Mostrar modal con indicador de progreso
     if (context.mounted) {
       showDialog(
@@ -145,32 +158,49 @@ class GeminiAiService {
     // Si hay clave API, consultar Gemini para perfeccionamiento contextual adicional
     if (apiKey.isNotEmpty) {
       try {
-        final promptText = '''Eres un corrector ortográfico y literario experto en poesía y métrica de himnos cristianos.
-DEBES ANALIZAR LA TOTALIDAD DE CADA ESTROFA para entender el contexto semántico completo ANTES de aplicar cualquier corrección. No trates cada línea de forma aislada.
+        final promptText = '''Actúa como un corrector de estilo y editor lingüístico experto, aplicando estrictamente las normas ortográficas, gramaticales y de puntuación de la Real Academia Española (RAE). 
 
-TÍTULO:
+Tu tarea es revisar, corregir y formatear la letra de un canto cristiano respetando las siguientes reglas de manera obligatoria:
+
+TÍTULO ORIGINAL:
 $currentTitle
 
-LETRA:
+LETRA ORIGINAL:
 $currentLyrics
 
-REGLAS ESTRICTAS OBLIGATORIAS:
-1. LECTURA COMPLETA Y REGLAS RAE: Lee el canto COMPLETO primero para entender el contexto global. Luego, aplica estrictamente las normas ortográficas y de puntuación de la Real Academia Española (RAE) para corregir tildes, comas, puntos y signos de interrogación/exclamación (¿? ¡!) donde sea necesario.
-2. PUNTUACIÓN POÉTICA Y PUNTOS FINALES: PROHIBIDO poner un punto final (.) al final de cada línea de forma sistemática. Solo pon un punto final cuando la oración o estrofa realmente termine gramaticalmente. Si la idea continúa en la siguiente línea (encabalgamiento), NO pongas punto ni coma al final de esa línea.
-3. PRONOMBRES Y DIACRÍTICOS (¡CRÍTICO!):
-   - Referencia a DIOS: "Él", "Tú", "Mí" (Siempre con Tilde y Mayúscula).
-   - Referencia a un HUMANO: "él", "tú", "mí" (Con tilde, pero en minúscula, salvo que sea la primera palabra de la línea).
-   - Posesivos o Artículos: "el", "tu", "mi" (Sin tilde y en minúscula).
-   - Tiempos verbales: Diferencia bien el pasado ("Él me amó", "salvó") del presente ("yo le amo", "salvo").
-4. ESTRUCTURA INTACTA: Mantén la estructura de líneas y estrofas original. Si hay un "1.", "CORO:", etc., respétalo.
-5. MAYÚSCULAS: La primera letra de CADA verso/línea debe ir en Mayúscula obligatoriamente, sin importar si es pronombre o palabra común. También los nombres divinos (Dios, Señor, Rey, Salvador).
-6. ACORDES INTACTOS: Mantén intactas las etiquetas de acordes como [DO]. NO elimines ni alteres ningún corchete.
-7. FORMATO JSON: Retorna estrictamente un objeto JSON con los campos "title" y "lyrics". No agregues bloques markdown ni explicaciones.
+REGLAS OBLIGATORIAS:
+1. Mayúscula al inicio de cada línea:
+   - Toda línea o verso DEBE iniciar siempre con letra mayúscula, sin importar el signo de puntuación de la línea anterior (estilo de versificación).
+   - El resto de las palabras de la línea deben ir en minúsculas, salvo las excepciones indicadas en la regla 2.
+
+2. Mayúsculas de respeto y nombres propios:
+   - Nombres propios: Nombres de personas, ciudades, países, montes o regiones geográficas siempre inician con mayúscula (ej.: Jonás, Nínive, Jerusalén, Sinaí).
+   - Nombres de la Deidad: Todas las personas de la Trinidad y sus nombres propios llevan mayúscula inicial (Dios, Jehová, Yahvé, Señor, Padre, Hijo, Jesús, Cristo, Redentor, Salvador, Espíritu Santo, Consolador).
+   - Mayúscula reverencial y pronombres referidos a la Deidad: Escribe con mayúscula los pronombres o adjetivos cuando aludan directamente a Dios o a Cristo (Él, Tú, Tuyo, Santo, Creador, Omnipotente). Excepción estricta: Los pronombres posesivos de tercera persona (su, suyo, suya, sus, suyos) DEBEN ir siempre en minúscula (ej: "su amor", no "Su amor").
+
+3. Acentuación y tildes según contexto (RAE):
+   - Analiza el contexto de cada verso para colocar las tildes diacríticas obligatorias (ej.: distinguir «él/el», «tú/tu», «mí/mi», «sí/si», «más/mas», «sé/se», «dé/de»).
+   - Elimina tildes innecesarias o desaconsejadas por la RAE (ej.: «solo» y los pronombres demostrativos «este, ese, aquel» van siempre sin tilde; «fe», «dio», «vio», «fue», «fui» no llevan tilde por ser monosílabos).
+   - Corrige tiempos verbales conjugados en pasado o futuro (ej.: olvidó, quemó, perdonó, destruyó, costó, cantaré). ESTO ES VITAL.
+
+4. Signos de puntuación (PUNTUACIÓN LIGERA, POÉTICA Y CONTEXTUAL):
+   - PRIMERO, lee el canto completo, analiza su contexto y entiende la fluidez de las ideas. Con esa información, gestiona cuidadosamente las puntuaciones (comas, puntos y comas, dos puntos, puntos seguidos).
+   - Añade signos de puntuación respetando estrictamente el estilo poético y el sentido de la letra.
+   - NO pongas punto final al terminar cada verso a menos que la idea u oración gramatical realmente termine ahí. Es vital dejar el verso sin puntuación al final si la idea continúa en el siguiente verso (encabalgamiento).
+   - Usa los puntos (seguidos o finales) PRINCIPALMENTE para separar ideas completas o al terminar una estrofa o coro.
+   - Usa comas, puntos y comas, o dos puntos para pausas lógicas breves que den verdadero sentido y fluidez a la lectura.
+   - Aplica los signos de interrogación o exclamación (¡!, ¿?) donde correspondan para dar expresividad.
+   - Corrige preposiciones incorrectas (ej: "inspirándose a Jehová" -> "inspirándose en Jehová").
+
+5. Formato de salida (¡MUY IMPORTANTE!):
+   - NO incluyas viñetas ni explicaciones.
+   - Devuelve ÚNICAMENTE y ESTRICTAMENTE un objeto JSON válido con dos campos: "title" y "lyrics". No agregues bloques markdown ni texto adicional.
 
 JSON esperado:
 {
-  "title": "$currentTitle",
-  "lyrics": "Letra corregida contextualmente"
+  "title": "El título corregido (mantenlo en mayúsculas)",
+  "lyrics": "La letra corregida aplicando todas las reglas anteriores. Conserva los saltos de línea (
+)."
 }
 ''';
 
@@ -181,12 +211,17 @@ JSON esperado:
                 {'text': promptText}
               ]
             }
-          ]
+          ],
+          'generationConfig': {
+            'response_mime_type': 'application/json',
+            'temperature': 0.3
+          }
         });
 
         http.Response? response;
-        final modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro-vision'];
+        final modelsToTry = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
 
+        List<String> modelErrors = [];
         for (final model in modelsToTry) {
           try {
             final url = Uri.parse(
@@ -195,13 +230,21 @@ JSON esperado:
               url,
               headers: {'Content-Type': 'application/json'},
               body: requestBody,
-            ).timeout(const Duration(seconds: 10));
+            ).timeout(const Duration(seconds: 30));
 
             if (res.statusCode == 200) {
               response = res;
               break;
+            } else {
+              modelErrors.add('$model failed with status ${res.statusCode}');
             }
-          } catch (_) {}
+          } catch (e) {
+            modelErrors.add('$model exception: $e');
+          }
+        }
+        
+        if (response == null) {
+          throw Exception('All models failed: ' + modelErrors.join(' | '));
         }
 
         if (response != null && response.statusCode == 200) {
@@ -225,6 +268,7 @@ JSON esperado:
         }
       } catch (e) {
         debugPrint('>>> Error en consulta remota Gemini: $e');
+        currentLyrics = "[ERROR GEMINI: $e]\n\n" + currentLyrics;
       }
     }
 
@@ -332,7 +376,7 @@ JSON esperado:
                 children: [
                   Text(
                     'Compara cómo estaba antes y cómo quedará después:',
-                    style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey[700]),
+                    style: GoogleFonts.nunito(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[300] : Colors.grey[700]),
                   ),
                   const SizedBox(height: 14),
 
@@ -386,7 +430,7 @@ JSON esperado:
                                 child: SingleChildScrollView(
                                   child: SelectableText(
                                     suggestedLyrics,
-                                    style: GoogleFonts.nunito(fontSize: 13, height: 1.4, color: Colors.black87),
+                                    style: GoogleFonts.nunito(fontSize: 13, height: 1.4, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
                                   ),
                                 ),
                               ),
@@ -401,7 +445,7 @@ JSON esperado:
                                 child: SingleChildScrollView(
                                   child: SelectableText(
                                     originalLyrics,
-                                    style: GoogleFonts.nunito(fontSize: 13, height: 1.4, color: Colors.grey[800]),
+                                    style: GoogleFonts.nunito(fontSize: 13, height: 1.4, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[300] : Colors.grey[800]),
                                   ),
                                 ),
                               ),
@@ -483,10 +527,11 @@ JSON esperado:
       ],
       'generationConfig': {
         'response_mime_type': 'application/json',
+          'temperature': 0.3,
       }
     });
 
-    final modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro-vision'];
+    final modelsToTry = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
     
     List<String> errors = [];
 
@@ -563,7 +608,7 @@ JSON esperado:
       });
 
       http.Response? response;
-      final modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+      final modelsToTry = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
 
       for (final model in modelsToTry) {
         if (response != null && response.statusCode == 200) break;
@@ -575,7 +620,7 @@ JSON esperado:
               url,
               headers: {'Content-Type': 'application/json'},
               body: requestBody,
-            ).timeout(const Duration(seconds: 15));
+            ).timeout(const Duration(seconds: 45));
             
             if (res.statusCode == 200) {
               response = res;

@@ -1,28 +1,22 @@
 PODS:
-  - audio_streamer (0.0.1):
-    - Flutter
   - Flutter (1.0.0)
   - printing (1.0.0):
     - Flutter
 
 DEPENDENCIES:
-  - audio_streamer (from `.symlinks/plugins/audio_streamer/ios`)
   - Flutter (from `Flutter`)
   - printing (from `.symlinks/plugins/printing/ios`)
 
 EXTERNAL SOURCES:
-  audio_streamer:
-    :path: ".symlinks/plugins/audio_streamer/ios"
   Flutter:
     :path: Flutter
   printing:
     :path: ".symlinks/plugins/printing/ios"
 
 SPEC CHECKSUMS:
-  audio_streamer: 2e472b9f81cec5e381c4cf7667afa3055dcb45a4
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   printing: 54ff03f28fe9ba3aa93358afb80a8595a071dd07
 
-PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
+PODFILE CHECKSUM: ff08d4cb261db145f5a2e4437bf075afb18bc83a
 
 COCOAPODS: 1.17.0

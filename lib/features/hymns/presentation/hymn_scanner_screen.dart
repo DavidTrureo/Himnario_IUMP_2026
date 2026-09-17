@@ -94,7 +94,7 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
           _isProcessing = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al procesar: $e')),
+          SnackBar(content: Text('Los servidores de IA están ocupados. Intenta de nuevo.')),
         );
       }
     }

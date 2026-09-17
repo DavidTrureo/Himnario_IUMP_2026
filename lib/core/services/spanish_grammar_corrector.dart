@@ -17,6 +17,55 @@ class GrammarCorrectionResult {
 class SpanishGrammarCorrector {
   // Diccionario de correcciones de palabras sin tilde -> con tilde y erratas comunes
   static final Map<Pattern, String> _wordReplacements = {
+    // Tiempos verbales pasados comunes (errores de tilde)
+    RegExp(r'\bquemo\b', caseSensitive: false): 'quemó', // Forzamos quemo -> quemó en el contexto de himnos
+    RegExp(r'\bperdónó\b', caseSensitive: false): 'perdonó', // Corrector de doble tilde accidental
+    RegExp(r'\bolvido\b', caseSensitive: false): 'olvidó', // Forzamos olvido -> olvidó
+    RegExp(r'\bdestruyo\b', caseSensitive: false): 'destruyó', // Forzamos destruyo -> destruyó
+    RegExp(r'\bcosto\b', caseSensitive: false): 'costó', // Forzamos costo -> costó
+    RegExp(r'\bse olvido\b', caseSensitive: false): 'se olvidó',
+    RegExp(r'\bme olvido\b', caseSensitive: false): 'me olvidó',
+    RegExp(r'\bte olvido\b', caseSensitive: false): 'te olvidó',
+    RegExp(r'\ble olvido\b', caseSensitive: false): 'le olvidó',
+    RegExp(r'\blo olvido\b', caseSensitive: false): 'lo olvidó',
+    RegExp(r'\bla olvido\b', caseSensitive: false): 'la olvidó',
+    
+    RegExp(r'\bse quemo\b', caseSensitive: false): 'se quemó',
+    RegExp(r'\blo quemo\b', caseSensitive: false): 'lo quemó',
+    RegExp(r'\bla quemo\b', caseSensitive: false): 'la quemó',
+    RegExp(r'\bte quemo\b', caseSensitive: false): 'te quemó',
+    
+    RegExp(r'\bse destruyo\b', caseSensitive: false): 'se destruyó',
+    RegExp(r'\blo destruyo\b', caseSensitive: false): 'lo destruyó',
+    RegExp(r'\bla destruyo\b', caseSensitive: false): 'la destruyó',
+    
+    RegExp(r'\bse salvo\b', caseSensitive: false): 'se salvó',
+    RegExp(r'\bme salvo\b', caseSensitive: false): 'me salvó',
+    RegExp(r'\bte salvo\b', caseSensitive: false): 'te salvó',
+    RegExp(r'\ble salvo\b', caseSensitive: false): 'le salvó',
+    RegExp(r'\blo salvo\b', caseSensitive: false): 'lo salvó',
+    RegExp(r'\bla salvo\b', caseSensitive: false): 'la salvó',
+    RegExp(r'\bnos salvo\b', caseSensitive: false): 'nos salvó',
+    
+    RegExp(r'\bme perdono\b', caseSensitive: false): 'me perdonó',
+    RegExp(r'\bte perdono\b', caseSensitive: false): 'te perdonó',
+    RegExp(r'\ble perdono\b', caseSensitive: false): 'le perdonó',
+    RegExp(r'\bnos perdono\b', caseSensitive: false): 'nos perdonó',
+    RegExp(r'\blo perdono\b', caseSensitive: false): 'lo perdonó',
+    RegExp(r'\bla perdono\b', caseSensitive: false): 'la perdonó',
+    RegExp(r'\bDios perdono\b', caseSensitive: false): 'Dios perdonó',
+    
+    RegExp(r'\bnada le costo\b', caseSensitive: false): 'nada le costó',
+    RegExp(r'\bcuanto le costo\b', caseSensitive: false): 'cuánto le costó',
+    RegExp(r'\bcuánto le costo\b', caseSensitive: false): 'cuánto le costó',
+    
+    RegExp(r'\bHecho sus\b', caseSensitive: true): 'Echó sus',
+    RegExp(r'\bhecho sus\b', caseSensitive: true): 'echó sus',
+    RegExp(r'\bHecho mis\b', caseSensitive: true): 'Echó mis',
+    RegExp(r'\bhecho mis\b', caseSensitive: true): 'echó mis',
+    RegExp(r'\bHecho tus\b', caseSensitive: true): 'Echó tus',
+    RegExp(r'\bhecho tus\b', caseSensitive: true): 'echó tus',
+
     // Errores tipográficos específicos y verbos esdrújulos de alabanza (-ame, -anos, -eme, -enos, -ime, -inos)
     RegExp(r'\bpentecostes\b', caseSensitive: false): 'Pentecostés',
     RegExp(r'\bbaitizame\b', caseSensitive: false): 'bautízame',
@@ -90,7 +139,7 @@ class SpanishGrammarCorrector {
     RegExp(r'\boracion\b', caseSensitive: false): 'oración',
     RegExp(r'\bbendicion\b', caseSensitive: false): 'bendición',
     RegExp(r'\bsalvacion\b', caseSensitive: false): 'salvación',
-    RegExp(r'\bperdon\b', caseSensitive: false): 'perdón',
+    RegExp(r'(?<![a-zA-ZáéíóúÁÉÍÓÚñÑ])perdon(?![a-zA-ZáéíóúÁÉÍÓÚñÑ])', caseSensitive: false): 'perdón',
     RegExp(r'\bcorazon\b', caseSensitive: false): 'corazón',
     RegExp(r'\bexaltacion\b', caseSensitive: false): 'exaltación',
     RegExp(r'\badoracion\b', caseSensitive: false): 'adoración',
@@ -286,21 +335,7 @@ class SpanishGrammarCorrector {
           count++;
         }
 
-        // Punto final de verso si la línea carece de signos de cierre, división o si no es parte de una frase multilínea con ¡...!
-        final bool isPartOfMultiLineExclamation = exclamationBalanced && !trimmed.contains('!');
-        if (!isSectionHeader(trimmed) &&
-            !isPartOfMultiLineExclamation &&
-            !trimmed.endsWith('.') &&
-            !trimmed.endsWith(',') &&
-            !trimmed.endsWith(';') &&
-            !trimmed.endsWith(':') &&
-            !trimmed.endsWith('!') &&
-            !trimmed.endsWith('?') &&
-            !trimmed.endsWith('/') &&
-            !trimmed.endsWith(']')) {
-          trimmed += '.';
-          count++;
-        }
+
 
         stanzaLines.add(trimmed);
       }

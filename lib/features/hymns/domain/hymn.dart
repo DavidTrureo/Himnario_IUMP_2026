@@ -266,6 +266,13 @@ class Hymn {
         final header = verseMatch.group(1)!.trim();
         final rest = verseMatch.group(2)!.trim();
         
+        // Falso positivo con la palabra "Vi" (verbo ver) en lugar del número romano VI.
+        if (header.toLowerCase() == 'vi') {
+          // Si es exactamente "vi" sin punto ni guion, lo tratamos como letra normal.
+          resultLines.add(trimmed);
+          continue;
+        }
+        
         final parsedNum = _parseVerseNumber(header);
         if (parsedNum != null) {
           resultLines.add('$parsedNum.');
@@ -281,7 +288,7 @@ class Hymn {
 
       // Además, si la línea ya es un header por sí sola, la normalizamos
       final standaloneMatch = RegExp(r'^((?:\d+|[IVXivx]+|Estrofa\s*\d+)\s*[\.\-:]?)$', caseSensitive: false).firstMatch(trimmed);
-      if (standaloneMatch != null && trimmed.length <= 15) {
+      if (standaloneMatch != null && trimmed.length <= 15 && trimmed.toLowerCase() != 'vi') {
         final header = standaloneMatch.group(1)!.trim();
         final parsedNum = _parseVerseNumber(header);
         if (parsedNum != null) {

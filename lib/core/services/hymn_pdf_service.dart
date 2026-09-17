@@ -297,7 +297,8 @@ class HymnPdfService {
         final firstLine = lines.first.trim().toLowerCase();
         final hasExplicitChorusHeader = firstLine.contains('coro') || 
                                         firstLine.contains('puente') || 
-                                        firstLine.contains('interludio');
+                                        firstLine.contains('interludio') || 
+                                        firstLine.contains('final');
         final isVerseHeader = RegExp(r'^(estrofa|\d+\.|\d+\b)', caseSensitive: false).hasMatch(firstLine);
 
         if (hasExplicitChorusHeader) {
@@ -365,7 +366,8 @@ class HymnPdfService {
     final firstLine = lines.first.trim();
     final hasExplicitChorusHeader = firstLine.toLowerCase().contains('coro') ||
                                     firstLine.toLowerCase().contains('puente') ||
-                                    firstLine.toLowerCase().contains('interludio');
+                                    firstLine.toLowerCase().contains('interludio') ||
+                                    firstLine.toLowerCase().contains('final');
 
     final isVerseHeader = RegExp(r'^(estrofa|\d+\.|\d+\b)', caseSensitive: false).hasMatch(firstLine);
 

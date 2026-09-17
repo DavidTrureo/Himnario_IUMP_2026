@@ -71,7 +71,7 @@ class SetlistExportService {
     // 1. PÁGINA DE RESUMEN (Siempre se incluye como portada)
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        pageFormat: PdfPageFormat.letter,
         margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {
           return [
@@ -118,7 +118,7 @@ class SetlistExportService {
                     borderRadius: pw.BorderRadius.circular(6),
                   ),
                   child: pw.Text(
-                    'PROGRAMA DE CULTO',
+                    'PROGRAMA DE CULTO - IUMP',
                     style: pw.TextStyle(
                       font: fontBold,
                       fontSize: 10,
@@ -259,7 +259,7 @@ class SetlistExportService {
               ],
             ),
 
-            pw.Spacer(),
+            pw.SizedBox(height: 24),
 
             // Footer
             pw.Divider(color: PdfColors.grey300, thickness: 0.5),
@@ -384,17 +384,19 @@ class SetlistExportService {
       for (var hymn in hymns) {
         doc.addPage(
           pw.Page(
-            pageFormat: PdfPageFormat.a4,
+            pageFormat: PdfPageFormat.letter,
             margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
             build: (pw.Context context) {
               return pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.start,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Expanded(
                     child: pw.FittedBox(
                       fit: pw.BoxFit.scaleDown,
                       alignment: pw.Alignment.topLeft,
                       child: pw.Container(
-                        width: PdfPageFormat.a4.width - 72,
+                        width: PdfPageFormat.letter.width - 72,
                         child: _buildSingleHymnWidget(hymn, compact: false),
                       ),
                     ),
@@ -420,7 +422,7 @@ class SetlistExportService {
 
         doc.addPage(
           pw.Page(
-            pageFormat: PdfPageFormat.a4,
+            pageFormat: PdfPageFormat.letter,
             margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
             build: (pw.Context context) {
               final contentWidget = pw.Row(
@@ -446,13 +448,18 @@ class SetlistExportService {
               );
 
               return pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.start,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(setlist.title, style: pw.TextStyle(font: fontBold, fontSize: 14, color: PdfColor.fromHex('#0F172A'))),
+                  pw.Container(
+                    height: 35,
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text(setlist.title, style: pw.TextStyle(font: fontBold, fontSize: 14, color: PdfColor.fromHex('#0F172A'))),
                       pw.Column(
+                        mainAxisSize: pw.MainAxisSize.min,
                         crossAxisAlignment: pw.CrossAxisAlignment.center,
                         children: [
                           pw.Text('IGLESIA UNIDA METODISTA PENTECOSTAL', style: pw.TextStyle(font: fontBold, fontSize: 12, color: PdfColor.fromHex('#1E1B4B'))),
@@ -461,7 +468,8 @@ class SetlistExportService {
                         ],
                       ),
                       pw.SizedBox(width: 44),
-                    ],
+                      ],
+                    ),
                   ),
                   pw.SizedBox(height: 8),
                   pw.Divider(color: PdfColor.fromHex('#CBD5E1'), thickness: 0.8),
@@ -471,7 +479,7 @@ class SetlistExportService {
                       fit: pw.BoxFit.scaleDown,
                       alignment: pw.Alignment.topLeft,
                       child: pw.Container(
-                        width: PdfPageFormat.a4.width - 72,
+                        width: PdfPageFormat.letter.width - 72,
                         child: contentWidget,
                       ),
                     ),

@@ -2331,7 +2331,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Error en el escaneo'),
-            content: Text('No pudimos procesar la imagen de manera exitosa: $e'),
+            content: Text('Los servidores de IA están temporalmente ocupados o hubo un error de conexión.\n\nPor favor, intenta nuevamente en un momento.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),

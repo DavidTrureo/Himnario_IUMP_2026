@@ -220,7 +220,7 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                           _buildLabel('Tonalidad (Armadura)'),
                           TextFormField(
                             controller: _keyCtrl,
-                            readOnly: true,
+                            
                             style: GoogleFonts.nunito(fontWeight: FontWeight.w600, color: Colors.grey),
                             decoration: _buildInputDecoration(theme, isDark).copyWith(
                               fillColor: isDark ? Colors.black26 : Colors.grey[200],
@@ -237,7 +237,7 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                           _buildLabel('Métrica'),
                           TextFormField(
                             controller: _timeSigCtrl,
-                            readOnly: true,
+                            
                             style: GoogleFonts.nunito(fontWeight: FontWeight.w600, color: Colors.grey),
                             decoration: _buildInputDecoration(theme, isDark).copyWith(
                               fillColor: isDark ? Colors.black26 : Colors.grey[200],

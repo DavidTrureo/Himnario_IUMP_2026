@@ -112,96 +112,26 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
       ),
     );
 
-    try {
+        try {
       final bytes = await pickedFile.readAsBytes();
       final base64Image = base64Encode(bytes);
+      
+      String mimeType = 'image/jpeg';
+      if (pickedFile.path.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+      else if (pickedFile.path.toLowerCase().endsWith('.webp')) mimeType = 'image/webp';
+      else if (pickedFile.path.toLowerCase().endsWith('.heic')) mimeType = 'image/heic';
 
-      final requestBody = jsonEncode({
-        'contents': [{
-          'parts': [
-            {
-              'text': '''Analiza esta imagen y extrae el texto del canto, himno o alabanza cristiana. 
-Identifica el título oficial del canto (si no está, infiérelo de la letra), 
-los acordes iniciales / tono (ej: RE / 2 TIEMPOS, SOLm / 3 TIEMPOS) si vienen escritos en alguna parte (si no vienen, deja el tono vacío), 
-y la letra completa del canto organizada de forma prolija en estrofas y coros claros, 
-eliminando cualquier acorde escrito entre medio de la letra (queremos solo el texto limpio de la letra). 
-Retorna el resultado estrictamente en este formato JSON, sin bloques de código markdown, sin explicaciones ni textos decorativos, solo el JSON:
-{
-  "title": "Título del canto",
-  "tone": "Acorde / N tiempos (dejar vacío si no hay indicación)",
-  "lyrics": "Letra completa limpia"
-}'''
-            },
-            {
-              'inlineData': {
-                'mimeType': 'image/jpeg',
-                'data': base64Image
-              }
-            }
-          ]
-        }]
-      });
-
-      http.Response? response;
-      final modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash'];
-
-      for (final model in modelsToTry) {
-        try {
-          final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey);
-          final res = await http.post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: requestBody,
-          ).timeout(const Duration(seconds: 15));
-          
-          if (res.statusCode == 200) {
-            response = res;
-            break;
-          }
-        } catch (_) {}
-
-        if (response == null) {
-          try {
-            final url = Uri.parse('https://generativelanguage.googleapis.com/v1/models/' + model + ':generateContent?key=' + apiKey);
-            final res = await http.post(
-              url,
-              headers: {'Content-Type': 'application/json'},
-              body: requestBody,
-            ).timeout(const Duration(seconds: 15));
-            
-            if (res.statusCode == 200) {
-              response = res;
-              break;
-            }
-          } catch (_) {}
-        }
-      }
-
+      final result = await GeminiAiService.transcribeSheetMusic(base64Image, mimeType: mimeType);
+      
       if (mounted) Navigator.pop(context); // Cierra cargando
 
-      if (response != null && response.statusCode == 200) {
-        final respData = jsonDecode(response.body);
-        String rawText = respData['candidates'][0]['content']['parts'][0]['text'] as String;
-        
-        rawText = rawText.trim();
-        if (rawText.startsWith('```json')) {
-          rawText = rawText.substring(7);
-        } else if (rawText.startsWith('```')) {
-          rawText = rawText.substring(3);
-        }
-        if (rawText.endsWith('```')) {
-          rawText = rawText.substring(0, rawText.length - 3);
-        }
-        rawText = rawText.trim();
+      if (result != null) {
+          final titleVal = result['title']?.toString() ?? '';
+          final toneVal = result['key']?.toString() ?? '';
+          final lyricsVal = result['lyrics']?.toString() ?? '';
 
-        final parsed = jsonDecode(rawText);
-        if (parsed is Map) {
-          final titleVal = parsed['title']?.toString() ?? '';
-          final toneVal = parsed['tone']?.toString() ?? '';
-          final lyricsVal = parsed['lyrics']?.toString() ?? '';
-
-          if (titleVal.isNotEmpty) _titleController.text = titleVal.toUpperCase();
-          if (toneVal.isNotEmpty) _keyController.text = toneVal.toUpperCase();
+          if (titleVal.isNotEmpty && titleVal.toLowerCase() != 'título desconocido') _titleController.text = titleVal.toUpperCase();
+          if (toneVal.isNotEmpty && toneVal.toLowerCase() != 'desconocida') _keyController.text = toneVal.toUpperCase();
           if (lyricsVal.isNotEmpty) _lyricsController.text = lyricsVal;
 
           if (mounted) {
@@ -212,9 +142,8 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
               ),
             );
           }
-        }
       } else {
-        throw Exception(response?.body ?? 'Error al llamar a Gemini');
+        throw Exception('No se pudo procesar la imagen (respuesta vacía)');
       }
 
     } catch (e) {
@@ -224,7 +153,7 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Error en el escaneo'),
-            content: Text('No pudimos procesar la imagen de manera exitosa: $e'),
+            content: Text('Los servidores de IA están temporalmente ocupados o hubo un error de conexión.\n\nPor favor, intenta nuevamente en un momento.'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))
             ],
@@ -333,7 +262,7 @@ Retorna el resultado estrictamente en este formato JSON, sin bloques de código 
       if (mounted) Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text('Error al guardar el canto. Intenta de nuevo.')),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
