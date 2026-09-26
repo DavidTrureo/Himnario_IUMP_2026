@@ -29,7 +29,7 @@ void main() async {
   );
 
   WidgetsFlutterBinding.ensureInitialized();
-  GoogleFonts.config.allowRuntimeFetching = false;
+  
 
   try {
     await Hymn.preloadAssets();

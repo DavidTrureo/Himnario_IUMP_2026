@@ -22,6 +22,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../favorites/domain/favorites_notifier.dart';
 import '../../setlists/presentation/setlists_provider.dart';
 import '../../../core/services/chord_transposer_service.dart';
@@ -681,9 +682,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
               // PageView Deslizable con las Alabanzas
               Positioned.fill(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: _sortedHymns.length,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: _sortedHymns.length,
                   onPageChanged: (index) {
                     setState(() {
                       _currentIndex = index;
@@ -698,16 +702,23 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     return _buildHymnPage(context, currentHymn, fontSize, isDark, theme);
                   },
                 ),
+                  ),
+                ),
               ),
               
               // Controlador flotante de tamaño de letra al fondo de la pantalla (Colapsable)
               if (_showControlPanel)
                 Positioned(
-                  left: 20,
-                  right: 20,
+                  left: 0,
+                  right: 0,
                   bottom: 20 + MediaQuery.of(context).padding.bottom,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 900),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                       child: Container(
@@ -948,6 +959,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       ),
                     ),
                   ),
+                        ),
+                      ),
+                    ),
                 ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.2),
 
               // Botón flotante para abrir los Ajustes de Lectura
@@ -976,16 +990,49 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 curve: Curves.easeOutCubic,
                 right: 20,
                 bottom: (_showControlPanel 
-                    ? 280.0 
-                    : (_showPlayerCard ? 150.0 : 20.0) + (_showControlPanel ? 0 : 60)) + MediaQuery.of(context).padding.bottom,
-                child: FloatingActionButton(
-                  heroTag: 'autoscroll-fab',
-                  backgroundColor: isDark ? const Color(0xFF6366F1) : theme.colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 4,
-                  onPressed: _toggleAutoScroll,
-                  tooltip: _isAutoScrolling ? 'Pausar autoscroll' : 'Iniciar autoscroll',
-                  child: Icon(_isAutoScrolling ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                    ? 360.0 
+                    : (_showPlayerCard ? 230.0 : 100.0) + (_showControlPanel ? 0 : 60)) + MediaQuery.of(context).padding.bottom,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isAutoScrolling) ...[
+                      FloatingActionButton.small(
+                        heroTag: 'autoscroll-faster',
+                        backgroundColor: isDark ? const Color(0xFF334155) : Colors.white,
+                        foregroundColor: isDark ? Colors.white : Colors.black87,
+                        onPressed: () {
+                          setState(() {
+                            _autoScrollSpeed = (_autoScrollSpeed + 10.0).clamp(10.0, 150.0);
+                          });
+                        },
+                        tooltip: 'Más rápido',
+                        child: const Icon(Icons.add),
+                      ),
+                      const SizedBox(height: 8),
+                      FloatingActionButton.small(
+                        heroTag: 'autoscroll-slower',
+                        backgroundColor: isDark ? const Color(0xFF334155) : Colors.white,
+                        foregroundColor: isDark ? Colors.white : Colors.black87,
+                        onPressed: () {
+                          setState(() {
+                            _autoScrollSpeed = (_autoScrollSpeed - 10.0).clamp(10.0, 150.0);
+                          });
+                        },
+                        tooltip: 'Más lento',
+                        child: const Icon(Icons.remove),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    FloatingActionButton(
+                      heroTag: 'autoscroll-fab',
+                      backgroundColor: isDark ? const Color(0xFF6366F1) : theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 4,
+                      onPressed: _toggleAutoScroll,
+                      tooltip: _isAutoScrolling ? 'Pausar autoscroll' : 'Iniciar autoscroll',
+                      child: Icon(_isAutoScrolling ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                    ),
+                  ],
                 ),
               ),
 
@@ -994,7 +1041,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 Positioned(
                   left: 20,
                   right: 20,
-                  bottom: (_showControlPanel ? 210 : 20) + MediaQuery.of(context).padding.bottom,
+                  bottom: (_showControlPanel ? 290 : 100) + MediaQuery.of(context).padding.bottom,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
@@ -1592,7 +1639,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       child: SafeArea(
         bottom: false,
         child: _viewMode == 'texto'
-            ? SingleChildScrollView(
+            ? Scrollbar(
+                controller: _scrollController,
+                interactive: true,
+                child: SingleChildScrollView(
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
@@ -1622,6 +1672,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       ],
                     ),
                   ),
+                ),
                 ),
               )
             : Padding(
@@ -1812,7 +1863,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                 Wrap(
                                   alignment: WrapAlignment.center,
                                   crossAxisAlignment: WrapCrossAlignment.end,
-                                  children: _buildLineWithChords(Hymn.formatLineCasing(line), fontSize, isDark, theme),
+                                  children: _buildLineWithChords(Hymn.formatLineCasing(line), fontSize, isDark, theme, isItalic: true),
                                 ),
                                 if (line != bodyLines.last)
                                   SizedBox(height: _showChords && line.contains('[') ? 10 : 4),
@@ -1934,7 +1985,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
   }
 
-  List<Widget> _buildLineWithChords(String line, double fontSize, bool isDark, ThemeData theme) {
+  List<Widget> _buildLineWithChords(String line, double fontSize, bool isDark, ThemeData theme, {bool isItalic = false}) {
     final RegExp regExp = RegExp(r'\[([^\]]+)\]');
 
     // IMPORTANTE: materializar el iterable en una lista para evitar
@@ -1951,6 +2002,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           style: GoogleFonts.nunito(
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
+            fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
             color: isDark ? Colors.white.withValues(alpha: 0.85) : theme.colorScheme.onSurface,
             height: 1.5,
           ),
@@ -1974,6 +2026,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               style: GoogleFonts.nunito(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,
+                fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
                 color: isDark ? Colors.white.withValues(alpha: 0.85) : theme.colorScheme.onSurface,
               ),
             ),
@@ -2022,6 +2075,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 style: GoogleFonts.nunito(
                   fontSize: fontSize,
                   fontWeight: FontWeight.w600,
+                  fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
                   color: isDark ? Colors.white.withValues(alpha: 0.85) : theme.colorScheme.onSurface,
                 ),
               ),
@@ -3732,8 +3786,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
   }
 
-  void _showConnectToTvDialog(BuildContext context, Hymn hymn) {
-    final codeController = TextEditingController();
+  Future<void> _showConnectToTvDialog(BuildContext context, Hymn hymn) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastCode = prefs.getString('last_tv_room');
+    final codeController = TextEditingController(text: lastCode);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -3762,8 +3818,23 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             onPressed: () {
               final code = codeController.text.trim();
               if (code.length == 4) {
-                Navigator.pop(ctx);
-                GoRouter.of(context).push('/remote', extra: {'hymn': hymn, 'roomId': code});
+                // Check if the room exists before saving it
+                FirebaseFirestore.instance.collection('tv_rooms').doc(code).get().then((doc) async {
+                  if (doc.exists) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('last_tv_room', code);
+                    if (context.mounted) {
+                      Navigator.pop(ctx);
+                      GoRouter.of(context).push('/remote', extra: {'hymn': hymn, 'roomId': code});
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('La sala no existe o está inactiva.')),
+                      );
+                    }
+                  }
+                });
               }
             },
             child: const Text('Conectar'),

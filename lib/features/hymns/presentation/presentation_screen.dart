@@ -214,8 +214,17 @@ class _PresentationScreenState extends State<PresentationScreen> {
       final blockLines = block.split('\n');
       if (blockLines.length > 8) {
         final mid = (blockLines.length / 2).ceil();
-        finalBlocks.add(blockLines.sublist(0, mid).join('\n'));
-        finalBlocks.add(blockLines.sublist(mid).join('\n'));
+        
+        final firstPart = blockLines.sublist(0, mid).join('\n');
+        String secondPart = blockLines.sublist(mid).join('\n');
+        
+        final headerMatch = RegExp(r'^(\d+\.|[Cc][Oo][Rr][Oo]:?|[Pp][Uu][Ee][Nn][Tt][Ee]:?|[Ff][Ii][Nn][Aa][Ll]:?)\s+').firstMatch(blockLines.first);
+        if (headerMatch != null) {
+          secondPart = '${headerMatch.group(1)} $secondPart';
+        }
+        
+        finalBlocks.add(firstPart);
+        finalBlocks.add(secondPart);
       } else {
         finalBlocks.add(block);
       }
@@ -224,7 +233,17 @@ class _PresentationScreenState extends State<PresentationScreen> {
     // 3. Agregar la diapositiva de Portada (Título) al principio
     finalBlocks.insert(0, '[TITLE]');
 
-    return finalBlocks;
+    return finalBlocks.map((b) {
+      if (b == '[TITLE]') return b;
+      final text = b.trim();
+      final match = RegExp(r'^(\d+\.|[Cc][Oo][Rr][Oo]:?)\s+').firstMatch(text);
+      if (match != null) {
+        final prefix = match.group(1)!;
+        final rest = text.substring(match.end);
+        return '$prefix\n$rest';
+      }
+      return text;
+    }).toList();
   }
 
   String _getBlockLabel(int index) {
@@ -253,26 +272,47 @@ class _PresentationScreenState extends State<PresentationScreen> {
         foundHeader = 'Final ';
         break;
       }
-      final match = RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).firstMatch(firstLine);
+      final match = RegExp(r'^(estrofa\s+\d+|\d+\.|([ivx]+))(\s*\.\s*|\s*\-\s*|\s+|$)(.*)', caseSensitive: false).firstMatch(firstLine);
       if (match != null) {
-        final text = match.group(0)!.trim().replaceAll('.', '');
-        final numMatch = RegExp(r'\d+').firstMatch(text);
-        if (numMatch != null) {
-          foundHeader = 'E${numMatch.group(0)}';
-        } else {
-          final cleanRoman = text.toUpperCase();
-          const map = {
-            'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 
-            'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10, 'XI': 11, 'XII': 12
-          };
-          final numRoman = map[cleanRoman];
-          if (numRoman != null) {
-            foundHeader = 'E$numRoman';
+        final group1 = match.group(1)!;
+        final romanStr = match.group(2);
+        final separator = match.group(3) ?? '';
+        final restText = match.group(4) ?? '';
+        
+        bool isRoman = false;
+        String textToParse = group1;
+        
+        if (romanStr != null) {
+          if (romanStr.toLowerCase() == 'vi' && !separator.contains('.') && !separator.contains('-') && restText.trim().isNotEmpty) {
+             // False positive for "vi "
           } else {
-            foundHeader = 'E?';
+             isRoman = true;
+             textToParse = romanStr;
           }
+        } else {
+          isRoman = true; // estrofa X or X.
         }
-        break;
+
+        if (isRoman) {
+          final text = textToParse.trim().replaceAll('.', '');
+          final numMatch = RegExp(r'\d+').firstMatch(text);
+          if (numMatch != null) {
+            foundHeader = 'E${numMatch.group(0)}';
+          } else {
+            final cleanRoman = text.toUpperCase();
+            const map = {
+              'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 
+              'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10, 'XI': 11, 'XII': 12
+            };
+            final numRoman = map[cleanRoman];
+            if (numRoman != null) {
+              foundHeader = 'E$numRoman';
+            } else {
+              foundHeader = 'E?';
+            }
+          }
+          break;
+        }
       }
       
       blocksSinceHeader++;
@@ -576,7 +616,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                                 'projector_hymn_${widget.hymn.collection}_${widget.hymn.id}', 
                                 jsonEncode(widget.hymn.toJson())
                               );
-                              WebWindowHelper.openProjectorWindow('/projector-view/${widget.hymn.collection}/${widget.hymn.id}');
+                              WebWindowHelper.openProjectorWindow('/#/projector-view/${widget.hymn.collection}/${widget.hymn.id}');
                             },
                           ),
                           const SizedBox(width: 8),
@@ -694,10 +734,13 @@ class _PresentationScreenState extends State<PresentationScreen> {
     final firstLine = lines.first.trim();
     
     final RegExp tagRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
       caseSensitive: false
     );
-    final isChorus = _getBlockLabel(index).toLowerCase().startsWith('coro');
+    final activeHeader = _getBlockLabel(index);
+    final isChorus = activeHeader.toLowerCase().startsWith('coro') || 
+                     activeHeader.toLowerCase().startsWith('puente') || 
+                     activeHeader.toLowerCase().startsWith('final');
     
     String displayText = blockText;
     if (tagRegExp.hasMatch(firstLine)) {
@@ -749,7 +792,6 @@ class _PresentationScreenState extends State<PresentationScreen> {
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 20.0),
-        constraints: const BoxConstraints(maxWidth: 1000),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -768,7 +810,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                         border: Border.all(color: textColor.withValues(alpha: 0.3), width: 1),
                       ),
                       child: Text(
-                        'CORO',
+                        activeHeader.split(' ').first.toUpperCase(),
                         style: TextStyle(fontFamily: 'Nunito', 
                           color: textColor,
                           fontSize: 13,
@@ -779,18 +821,15 @@ class _PresentationScreenState extends State<PresentationScreen> {
                     ),
                     const SizedBox(height: 14),
                   ],
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      displayText,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: 'Nunito', 
-                        fontSize: _fontSize,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: isChorus ? FontStyle.italic : FontStyle.normal,
-                        color: textColor,
-                        height: 1.45,
-                      ),
+                  Text(
+                    displayText,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontFamily: 'Nunito', 
+                      fontSize: _fontSize,
+                      fontWeight: FontWeight.bold,
+                      fontStyle: isChorus ? FontStyle.italic : FontStyle.normal,
+                      color: textColor,
+                      height: 1.45,
                     ),
                   ),
                 ],

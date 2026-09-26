@@ -311,7 +311,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+        padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 140.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -478,7 +478,9 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
                     ),
                     TextField(
                       controller: _lyricsController,
-                      maxLines: 12,
+                      minLines: 12,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
                       decoration: InputDecoration(
                         hintText: 'Pega la letra aquí o escanea una foto con el botón superior.',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

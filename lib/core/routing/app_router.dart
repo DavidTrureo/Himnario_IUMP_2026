@@ -26,6 +26,40 @@ final GlobalKey<NavigatorState> _shellNavigatorSetlistsKey = GlobalKey<Navigator
 final GlobalKey<NavigatorState> _shellNavigatorFavoritesKey = GlobalKey<NavigatorState>(debugLabel: 'shellFavorites');
 final GlobalKey<NavigatorState> _shellNavigatorToolsKey = GlobalKey<NavigatorState>(debugLabel: 'shellTools');
 
+
+// Reusable sub-routes para mantener el menú visible
+final hymnDetailRoute = GoRoute(
+  path: 'hymn/:id',
+  builder: (context, state) {
+    final hymnId = state.pathParameters['id']!;
+    return HymnDetailScreen(hymnId: hymnId);
+  },
+);
+
+final setlistDetailRoute = GoRoute(
+  path: 'setlist-detail',
+  builder: (context, state) => const SetlistDetailScreen(),
+  routes: [
+    GoRoute(
+      path: 'hymn/:id',
+      builder: (context, state) {
+        final hymnId = state.pathParameters['id']!;
+        return HymnDetailScreen(hymnId: hymnId);
+      },
+    ),
+  ],
+);
+
+final hymnsListRoute = GoRoute(
+  path: 'hymns',
+  builder: (context, state) {
+    final extra = state.extra as Map<String, dynamic>?;
+    final autoFocus = extra?['autoFocusSearch'] as bool? ?? false;
+    return HymnListScreen(autoFocusSearch: autoFocus);
+  },
+  routes: [hymnDetailRoute],
+);
+
 final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
@@ -46,6 +80,7 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/home',
               builder: (context, state) => const HomeScreen(),
+              routes: [hymnsListRoute, hymnDetailRoute],
             ),
           ],
         ),
@@ -56,6 +91,7 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/setlists',
               builder: (context, state) => const SetlistsListScreen(),
+              routes: [setlistDetailRoute, hymnDetailRoute],
             ),
           ],
         ),
@@ -66,6 +102,7 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/favorites',
               builder: (context, state) => const HymnListScreen(isFavoritesTab: true),
+              routes: [hymnDetailRoute],
             ),
           ],
         ),
@@ -84,30 +121,12 @@ final GoRouter appRouter = GoRouter(
     // Rutas fuera del BottomNavigationBar
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,
-      path: '/hymns',
-      builder: (context, state) => const HymnListScreen(),
-    ),
-    GoRoute(
-      parentNavigatorKey: _rootNavigatorKey,
-      path: '/hymn/:id',
-      builder: (context, state) {
-        final hymnId = state.pathParameters['id']!;
-        return HymnDetailScreen(hymnId: hymnId);
-      },
-    ),
-    GoRoute(
-      parentNavigatorKey: _rootNavigatorKey,
       path: '/projector-view/:collection/:id',
       builder: (context, state) {
         final collection = state.pathParameters['collection']!;
         final hymnId = state.pathParameters['id']!;
         return DetachedProjectorScreen(collection: collection, hymnId: hymnId);
       },
-    ),
-    GoRoute(
-      parentNavigatorKey: _rootNavigatorKey,
-      path: '/setlist-detail',
-      builder: (context, state) => const SetlistDetailScreen(),
     ),
 
     GoRoute(

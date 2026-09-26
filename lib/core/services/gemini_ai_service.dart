@@ -192,15 +192,18 @@ REGLAS OBLIGATORIAS:
    - Aplica los signos de interrogación o exclamación (¡!, ¿?) donde correspondan para dar expresividad.
    - Corrige preposiciones incorrectas (ej: "inspirándose a Jehová" -> "inspirándose en Jehová").
 
-5. Formato de salida (¡MUY IMPORTANTE!):
+5. Estructura y Etiquetas (¡INTOCABLES!):
+   - DEBES conservar EXACTAMENTE TODAS las etiquetas estructurales como "CORO:", "FINAL:", "PUENTE:", "1.", "2.", etc.
+   - NO las elimines, no las traduzcas, no las modifiques, ni las fusiones con el texto. Mantenlas en su propia línea, con sus saltos de línea originales.
+
+6. Formato de salida (¡MUY IMPORTANTE!):
    - NO incluyas viñetas ni explicaciones.
    - Devuelve ÚNICAMENTE y ESTRICTAMENTE un objeto JSON válido con dos campos: "title" y "lyrics". No agregues bloques markdown ni texto adicional.
 
 JSON esperado:
 {
   "title": "El título corregido (mantenlo en mayúsculas)",
-  "lyrics": "La letra corregida aplicando todas las reglas anteriores. Conserva los saltos de línea (
-)."
+  "lyrics": "La letra corregida aplicando todas las reglas anteriores. Conserva los saltos de línea (\n)."
 }
 ''';
 

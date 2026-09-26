@@ -106,7 +106,7 @@ class HymnPdfService {
                       ),
                       pw.SizedBox(height: 2),
                       pw.Text(
-                        'Primera de San Bernardo · Himnario Oficial 2026',
+                        'Iglesia Primera San Bernardo · Himnario Oficial 2026',
                         style: pw.TextStyle(
                           font: fontRegular,
                           fontSize: 9,
@@ -142,7 +142,7 @@ class HymnPdfService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(
-                    'Himnario IUMP · Primera en San Bernardo',
+                    'Himnario IUMP · Iglesia Primera San Bernardo',
                     style: pw.TextStyle(
                       font: fontRegular,
                       fontSize: 8,
@@ -443,12 +443,7 @@ class HymnPdfService {
         decoration: pw.BoxDecoration(
           color: PdfColor.fromHex('#F5F3FF'),
           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-          border: pw.Border(
-            left: pw.BorderSide(color: PdfColor.fromHex('#4F46E5'), width: 3),
-            top: pw.BorderSide(color: PdfColor.fromHex('#DDD6FE'), width: 0.5),
-            right: pw.BorderSide(color: PdfColor.fromHex('#DDD6FE'), width: 0.5),
-            bottom: pw.BorderSide(color: PdfColor.fromHex('#DDD6FE'), width: 0.5),
-          ),
+          border: pw.Border.all(color: PdfColor.fromHex('#C7D2FE'), width: 1),
         ),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -573,9 +568,10 @@ class HymnPdfService {
 
     final String filename = '${hymn.collection}_${hymn.id}_${_cleanFilename(hymn.title)}.pdf';
 
-    await Printing.sharePdf(
-      bytes: pdfBytes,
-      filename: filename,
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdfBytes,
+      name: filename,
+      format: PdfPageFormat.letter,
     );
   }
 

@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../hymns/domain/hymn.dart';
 import '../../hymns/presentation/hymn_list_screen.dart';
 import '../../hymns/presentation/notation_provider.dart';
+import '../../hymns/presentation/hymn_detail_screen.dart';
 import '../domain/live_session.dart';
 import 'live_session_provider.dart';
 
@@ -92,6 +93,8 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                 session.currentIndex < hymns.length
             ? hymns[session.currentIndex]
             : null;
+            
+        final fontSize = ref.watch(fontSizeProvider);
 
         return Scaffold(
           backgroundColor:
@@ -105,8 +108,11 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
               Expanded(
                 child: currentHymn == null
                     ? _buildEmptyState(isDark)
-                    : _buildHymnView(currentHymn, session, isDark, theme),
+                    : _buildHymnView(currentHymn, session, fontSize, isDark, theme),
               ),
+              
+              _buildFontSizeSlider(context, ref, fontSize, isDark, theme),
+
 
               // ─── Controles del Director ────────────────
               if (isDirector)
@@ -120,6 +126,47 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFontSizeSlider(BuildContext context, WidgetRef ref, double fontSize, bool isDark, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.text_fields_rounded, size: 20, color: isDark ? Colors.white60 : Colors.black45),
+          const SizedBox(width: 10),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3.5,
+                activeTrackColor: theme.colorScheme.primary,
+                inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
+                thumbColor: theme.colorScheme.primary,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+              ),
+              child: Slider(
+                min: 14.0,
+                max: 32.0,
+                value: fontSize,
+                onChanged: (val) {
+                  ref.read(fontSizeProvider.notifier).setFontSize(val);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            '${fontSize.toInt()}',
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -246,20 +293,17 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
 
   // ─── VISTA DEL HIMNO ───────────────────────────────────────
   Widget _buildHymnView(
-      Hymn hymn, LiveSession session, bool isDark, ThemeData theme) {
+      Hymn hymn, LiveSession session, double fontSize, bool isDark, ThemeData theme) {
     // Procesar letra ocultando acordes si showChords=false
     final rawLyrics = session.showChords
         ? hymn.lyrics
         : _stripChords(hymn.lyrics);
 
-    return InteractiveViewer(
-      minScale: 1.0,
-      maxScale: 3.5,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
           // Número e información básica
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -304,7 +348,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           Text(
             hymn.collection == 'iump' ? '${hymn.id} - ${hymn.title}' : hymn.title,
             style: GoogleFonts.outfit(
-              fontSize: 22,
+              fontSize: fontSize * 1.3,
               fontWeight: FontWeight.w900,
               color: isDark ? Colors.white : Colors.black87,
             ),
@@ -316,7 +360,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                 ? 'Himnario IUMP' 
                 : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro de Avivamiento'),
             style: GoogleFonts.outfit(
-              fontSize: 14,
+              fontSize: fontSize * 0.85,
               color: isDark ? Colors.white60 : Colors.black54,
               fontWeight: FontWeight.w500,
             ),
@@ -325,9 +369,8 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           const SizedBox(height: 20),
 
           // Letra sanitizada y formateada profesionalmente
-          _buildFormattedLyricsDisplay(rawLyrics, hymn.title, isDark, theme),
+          _buildFormattedLyricsDisplay(rawLyrics, hymn.title, fontSize, isDark, theme),
         ],
-      ),
       ),
     ).animate().fadeIn(duration: 300.ms);
   }
@@ -374,7 +417,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
     return merged;
   }
 
-  Widget _buildFormattedLyricsDisplay(String rawLyrics, String title, bool isDark, ThemeData theme) {
+  Widget _buildFormattedLyricsDisplay(String rawLyrics, String title, double fontSize, bool isDark, ThemeData theme) {
     final sanitized = Hymn.ensureHeadersOnOwnLine(rawLyrics);
     final blocks = _getMergedBlocks(sanitized);
 
@@ -442,7 +485,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                   child: Text(
                     headerText,
                     style: GoogleFonts.outfit(
-                      fontSize: 10,
+                      fontSize: fontSize * 0.6,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       letterSpacing: 1.0,
@@ -455,7 +498,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                     Hymn.formatLineCasing(line),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
-                      fontSize: 16,
+                      fontSize: fontSize,
                       height: 1.6,
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF1E293B),
@@ -480,7 +523,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
               '$numStr.',
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
-                fontSize: 14,
+                fontSize: fontSize * 0.85,
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.primary,
               ),
@@ -503,7 +546,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                   child: Text(
                     '$converted.',
                     style: GoogleFonts.outfit(
-                      fontSize: 14,
+                      fontSize: fontSize * 0.85,
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
                     ),
@@ -534,7 +577,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                     Hymn.formatLineCasing(line),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
-                      fontSize: 16,
+                      fontSize: fontSize,
                       height: 1.6,
                       color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF334155),
                     ),

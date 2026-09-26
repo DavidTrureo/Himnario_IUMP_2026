@@ -93,6 +93,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     final setlistHymns = _getHymnsInSetlist(setlist, allHymns);
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: theme.colorScheme.surface,
       body: Stack(
         children: [
@@ -226,7 +227,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     }
 
                     return SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 180),
                       sliver: SliverReorderableList(
                         itemCount: setlistHymns.length,
                         proxyDecorator: (Widget child, int index, Animation<double> animation) {
@@ -273,7 +274,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           if (setlistHymns.isEmpty) return const SizedBox.shrink();
 
           return Container(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+            margin: EdgeInsets.only(bottom: 96 + MediaQuery.of(context).padding.bottom),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : Colors.white,
               border: Border(

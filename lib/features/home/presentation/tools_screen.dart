@@ -23,19 +23,21 @@ class ToolsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
       appBar: AppBar(
+        titleSpacing: 24,
         title: Text(
           'Herramientas',
           style: GoogleFonts.outfit(
             fontWeight: FontWeight.bold,
+            fontSize: 26,
             color: isDark ? Colors.white : theme.colorScheme.primary,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
+        centerTitle: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 140.0),
         physics: const BouncingScrollPhysics(),
         children: [
           if (!kIsWeb || isAdmin) ...[
@@ -56,6 +58,27 @@ class ToolsScreen extends ConsumerWidget {
             icon: Icons.qr_code_scanner_rounded,
             iconColor: const Color(0xFFEAB308),
             onTap: () => context.push('/scan-qr'),
+          ),
+          const SizedBox(height: 16),
+          _ToolCard(
+            title: 'Pantalla de Proyección (Receptor)',
+            subtitle: 'Abre esta pantalla en tu TV/PC y contrólala desde el móvil',
+            icon: Icons.tv_rounded,
+            iconColor: const Color(0xFF0EA5E9),
+            onTap: () async {
+              if (kIsWeb) {
+                final currentUrl = Uri.base.toString();
+                final baseUrl = currentUrl.split('#')[0];
+                final url = Uri.parse('$baseUrl#/tv');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, webOnlyWindowName: '_blank');
+                } else {
+                  context.push('/tv');
+                }
+              } else {
+                context.push('/tv');
+              }
+            },
           ),
           const SizedBox(height: 16),
           if (isAdmin) ...[
@@ -561,7 +584,7 @@ class _PremiumAboutDialog extends ConsumerWidget {
                   maxScale: 4.0,
                   child: Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 120.0),
                       child: Image.asset(path, fit: BoxFit.contain),
                     ),
                   ),

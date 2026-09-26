@@ -209,7 +209,7 @@ class Hymn {
       'gomorra', 'tiberias', 'efrata', 'sicar', 'siloé', 'siloe', 'siquem', 'cedrón', 'cedron', 'silo',
       'galaad', 'basán', 'basan', 'moab', 'edom', 'amón', 'amon', 'fenicia', 'tiro', 'sidón', 'sidon',
       'nilo', 'éufrates', 'eufrates', 'samaritano', 'pentecostés', 'pentecostes',
-      'tú', 'ti', 'él', 'oh', 'amén', 'amen', 'aleluya'
+      'oh', 'amén', 'amen', 'aleluya'
     ];
     
     for (final word in wordsToCapitalize) {

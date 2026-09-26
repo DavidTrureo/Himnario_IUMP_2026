@@ -1,3 +1,4 @@
+import '../../../core/utils/formatters.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,21 +62,20 @@ class SetlistsListScreen extends ConsumerWidget {
               slivers: [
                 // AppBar Elegante
                 SliverAppBar(
-                  expandedHeight: 120.0,
+                  expandedHeight: 80.0,
                   floating: false,
                   pinned: true,
                   elevation: 0,
                   backgroundColor: Colors.transparent,
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: Text(
-                      'Repertorios de Culto',
-                      style: GoogleFonts.outfit(
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                        fontSize: 20,
-                      ),
+                  titleSpacing: 24,
+                  centerTitle: false,
+                  title: Text(
+                    'Repertorios de Culto',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: 26,
                     ),
-                    centerTitle: true,
                   ),
                   automaticallyImplyLeading: false,
                   actions: [
@@ -122,7 +122,7 @@ class SetlistsListScreen extends ConsumerWidget {
                                   'Aún no hay repertorios',
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.outfit(
-                                    fontSize: 22,
+                                    fontSize: 26,
                                     fontWeight: FontWeight.bold,
                                     color: isDark ? Colors.white : Colors.black87,
                                   ),
@@ -159,7 +159,7 @@ class SetlistsListScreen extends ConsumerWidget {
                     }
 
                     return SliverPadding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 200),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
@@ -290,7 +290,7 @@ class SetlistsListScreen extends ConsumerWidget {
               trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
               onTap: () {
                 ref.read(activeSetlistProvider.notifier).setSetlist(setlist);
-                context.push('/setlist-detail');
+                context.push('/setlists/setlist-detail');
               },
             ),
           ),
@@ -322,6 +322,7 @@ class SetlistsListScreen extends ConsumerWidget {
               children: [
                 TextFormField(
                   controller: titleController,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
                     labelText: 'Título del Culto/Repertorio',
                     hintText: 'ej: Culto Adoración Domingo',
@@ -349,7 +350,7 @@ class SetlistsListScreen extends ConsumerWidget {
               onPressed: () {
                 if (formKey.currentState!.validate()) {
                   ref.read(setlistsProvider.notifier).addSetlist(
-                    titleController.text.trim(),
+                    titleController.text.trim().toUpperCase(),
                     dateController.text.trim(),
                     [],
                   );

@@ -207,7 +207,7 @@ class HomeScreen extends ConsumerWidget {
                               ],
                             ),
                             Text(
-                              'Primera en San Bernardo',
+                              'Iglesia Primera San Bernardo',
                               style: GoogleFonts.nunito(
                                 fontSize: 14,
                                 color: isDark ? Colors.white60 : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
@@ -247,7 +247,7 @@ class HomeScreen extends ConsumerWidget {
                             ref.read(searchQueryProvider.notifier).updateQuery('');
                             ref.read(activeCollectionProvider.notifier).setCollection('all');
                             ref.read(activeCategoryProvider.notifier).setCategory('Todos');
-                            context.push('/hymns');
+                            context.push('/home/hymns', extra: {'autoFocusSearch': true});
                           },
                           decoration: InputDecoration(
                             hintText: 'Buscar por título, letra o número...',
@@ -306,6 +306,7 @@ class HomeScreen extends ConsumerWidget {
                         topRight: Radius.circular(36),
                       ),
                       child: ListView(
+                        padding: const EdgeInsets.only(bottom: 120),
                         physics: const BouncingScrollPhysics(),
                         children: [
                           _buildMenuItem(
@@ -436,7 +437,7 @@ class HomeScreen extends ConsumerWidget {
                       }
                       ref.read(searchQueryProvider.notifier).updateQuery('');
                       ref.read(activeCategoryProvider.notifier).setCategory('Todos');
-                      context.push('/hymns');
+                      context.push('/home/hymns');
                     },
               borderRadius: BorderRadius.circular(24),
               splashColor: iconColor.withValues(alpha: 0.1),
@@ -768,7 +769,7 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Iglesia Primera en San Bernardo',
+                'Iglesia Primera San Bernardo',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 17,

@@ -58,7 +58,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     try {
       prepareAudioContext();
       _player = AudioPlayer();
-      await _player!.setAsset('assets/audio/splash.wav');
+      await _player!.setAsset('assets/audio/ivan_luzan-beautiful-piano.mp3');
       await _player!.setVolume(1.0);
       await _player!.play();
     } catch (e) {
@@ -111,7 +111,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             ),
             
             // Contenido Central
-            Column(
+            SafeArea(
+              child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(flex: 3),
@@ -173,7 +174,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 .then(delay: 1200.ms)
                 .moveY(begin: 0, end: -10, duration: 800.ms, curve: Curves.easeInOut),
                 
-                const SizedBox(height: 32),
+                const SizedBox(height: 64),
                 
                 // Texto Principal
                 Text(
@@ -261,8 +262,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                 ).animate().fadeIn(delay: 2000.ms, duration: 600.ms),
                 
-                const SizedBox(height: 32),
+                const SizedBox(height: 64),
               ],
+              ),
             ),
           ],
         ),

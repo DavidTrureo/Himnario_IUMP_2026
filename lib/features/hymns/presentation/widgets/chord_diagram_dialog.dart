@@ -406,8 +406,8 @@ class ChordParser {
       // DO / C
       'C': const _GuitarPos([-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
       'DO': const _GuitarPos([-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
-      'CM': const _GuitarPos([-1, 3, 1, 0, 1, 3], [0, 3, 1, 0, 2, 4], baseFret: 3),
-      'DOM': const _GuitarPos([-1, 3, 1, 0, 1, 3], [0, 3, 1, 0, 2, 4], baseFret: 3),
+      'CM': const _GuitarPos([-1, 3, 5, 5, 4, 3], [0, 1, 3, 4, 2, 1], baseFret: 3),
+      'DOM': const _GuitarPos([-1, 3, 5, 5, 4, 3], [0, 1, 3, 4, 2, 1], baseFret: 3),
       'CADD9': const _GuitarPos([-1, 3, 2, 0, 3, 0], [0, 2, 1, 0, 3, 0]),
       'DOADD9': const _GuitarPos([-1, 3, 2, 0, 3, 0], [0, 2, 1, 0, 3, 0]),
       'CSUS4': const _GuitarPos([-1, 3, 3, 0, 1, 1], [0, 3, 4, 0, 1, 1]),
@@ -476,6 +476,8 @@ class ChordParser {
       'LAM': const _GuitarPos([-1, 0, 2, 2, 1, 0], [0, 0, 2, 3, 1, 0]),
       'A7': const _GuitarPos([-1, 0, 2, 0, 2, 0], [0, 0, 1, 0, 2, 0]),
       'LA7': const _GuitarPos([-1, 0, 2, 0, 2, 0], [0, 0, 1, 0, 2, 0]),
+      'AM7': const _GuitarPos([-1, 0, 2, 0, 1, 0], [0, 0, 2, 0, 1, 0]),
+      'LAM7': const _GuitarPos([-1, 0, 2, 0, 1, 0], [0, 0, 2, 0, 1, 0]),
       'AADD9': const _GuitarPos([-1, 0, 2, 2, 0, 0], [0, 0, 1, 2, 0, 0]),
       'LAADD9': const _GuitarPos([-1, 0, 2, 2, 0, 0], [0, 0, 1, 2, 0, 0]),
       'AM/G': const _GuitarPos([3, 0, 2, 2, 1, 0], [3, 0, 2, 4, 1, 0]),
@@ -535,8 +537,11 @@ class ChordParser {
 
     final int fretOffset = (rootIndex + 3) % 12;
     final int finalBaseFret = fretOffset == 0 ? 12 : fretOffset;
+    final int shift = finalBaseFret - 1;
 
-    return _GuitarPos(basePatternFrets, basePatternFingers, baseFret: finalBaseFret);
+    final absoluteFrets = basePatternFrets.map((f) => (f == -1 || f == 0) ? f : f + shift).toList();
+
+    return _GuitarPos(absoluteFrets, basePatternFingers, baseFret: finalBaseFret);
   }
 }
 

@@ -20,7 +20,7 @@ class SetlistExportService {
   static String formatSetlistText(Setlist setlist, List<Hymn> hymns) {
     final StringBuffer buffer = StringBuffer();
     buffer.writeln('📋 *PROGRAMA DE CULTO - IUMP*');
-    buffer.writeln('🏛️ *Iglesia Primera en San Bernardo*');
+    buffer.writeln('🏛️ *Iglesia Primera San Bernardo*');
     buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     buffer.writeln('🎵 *Lista:* ${setlist.title}');
     buffer.writeln('📅 *Fecha:* ${setlist.date}');
@@ -100,7 +100,7 @@ class SetlistExportService {
                           ),
                         ),
                         pw.Text(
-                          'Iglesia Primera en San Bernardo',
+                          'Iglesia Primera San Bernardo',
                           style: pw.TextStyle(
                             font: fontRegular,
                             fontSize: 10,
@@ -268,7 +268,7 @@ class SetlistExportService {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  'Himnario Oficial IUMP - Primera San Bernardo',
+                  'Himnario Oficial IUMP - Iglesia Primera San Bernardo',
                   style: pw.TextStyle(font: fontRegular, fontSize: 8, color: PdfColors.grey600),
                 ),
                 pw.Text(
@@ -405,7 +405,7 @@ class SetlistExportService {
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Himnario IUMP · Primera en San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 10, color: PdfColor.fromHex('#94A3B8'))),
+                      pw.Text('Himnario IUMP · Iglesia Primera San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 10, color: PdfColor.fromHex('#94A3B8'))),
                       pw.Text('Página ${context.pageNumber} de ${context.pagesCount}', style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColor.fromHex('#64748B'))),
                     ],
                   )
@@ -431,13 +431,10 @@ class SetlistExportService {
                   pw.Expanded(
                     child: _buildSingleHymnWidget(hymn1, compact: true),
                   ),
+                  pw.SizedBox(width: 16),
+                  pw.Container(width: 0.5, color: PdfColor.fromHex('#94A3B8')),
+                  pw.SizedBox(width: 16),
                   if (hymn2 != null) ...[
-                    pw.SizedBox(width: 24),
-                    pw.Container(
-                      width: 1,
-                      color: PdfColor.fromHex('#E2E8F0'),
-                    ),
-                    pw.SizedBox(width: 24),
                     pw.Expanded(
                       child: _buildSingleHymnWidget(hymn2, compact: true),
                     ),
@@ -464,7 +461,7 @@ class SetlistExportService {
                         children: [
                           pw.Text('IGLESIA UNIDA METODISTA PENTECOSTAL', style: pw.TextStyle(font: fontBold, fontSize: 12, color: PdfColor.fromHex('#1E1B4B'))),
                           pw.SizedBox(height: 2),
-                          pw.Text('Primera de San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 9, color: PdfColor.fromHex('#475569'))),
+                          pw.Text('Iglesia Primera San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 9, color: PdfColor.fromHex('#475569'))),
                         ],
                       ),
                       pw.SizedBox(width: 44),
@@ -475,12 +472,14 @@ class SetlistExportService {
                   pw.Divider(color: PdfColor.fromHex('#CBD5E1'), thickness: 0.8),
                   pw.SizedBox(height: 12),
                   pw.Expanded(
-                    child: pw.FittedBox(
-                      fit: pw.BoxFit.scaleDown,
-                      alignment: pw.Alignment.topLeft,
-                      child: pw.Container(
-                        width: PdfPageFormat.letter.width - 72,
-                        child: contentWidget,
+                    child: pw.Center(
+                      child: pw.FittedBox(
+                        fit: pw.BoxFit.scaleDown,
+                        alignment: pw.Alignment.topCenter,
+                        child: pw.Container(
+                          width: PdfPageFormat.letter.width - 72,
+                          child: contentWidget,
+                        ),
                       ),
                     ),
                   ),
@@ -488,7 +487,7 @@ class SetlistExportService {
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Himnario IUMP · Primera en San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 10, color: PdfColor.fromHex('#94A3B8'))),
+                      pw.Text('Himnario IUMP · Iglesia Primera San Bernardo', style: pw.TextStyle(font: fontRegular, fontSize: 10, color: PdfColor.fromHex('#94A3B8'))),
                       pw.Text('Página ${context.pageNumber} de ${context.pagesCount}', style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColor.fromHex('#64748B'))),
                     ],
                   )
@@ -499,7 +498,6 @@ class SetlistExportService {
         );
       }
     }
-
     return doc.save();
   }
 
@@ -510,9 +508,12 @@ class SetlistExportService {
     if (mode == ExportMode.fullHymns1PerPage) filenameMode = '_1xPagina';
     if (mode == ExportMode.fullHymns2PerPage) filenameMode = '_2xPagina';
     
+    final filename = 'Programa_Culto_${setlist.title.replaceAll(' ', '_')}$filenameMode.pdf';
+    
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdfBytes,
-      name: 'Programa_Culto_${setlist.title.replaceAll(' ', '_')}$filenameMode.pdf',
+      onLayout: (format) async => pdfBytes,
+      name: filename,
+      format: PdfPageFormat.letter,
     );
   }
 }

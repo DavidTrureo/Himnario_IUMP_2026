@@ -33,11 +33,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     // Listen to changes from the main window via BroadcastChannel
     WebWindowHelper.listenToProjectorState((newIndex, theme, fontSize, isBlank, newHymnId, newCollection) {
       if (mounted) {
-        if (newHymnId != null && newCollection != null && (newHymnId != widget.hymnId || newCollection != widget.collection)) {
-          // El himno ha cambiado, redirigimos la ruta para recargar la vista con el nuevo himno.
-          context.go('/projector-view/$newCollection/$newHymnId');
-          return;
-        }
+        bool needsRedirect = (newHymnId != null && newCollection != null && (newHymnId != widget.hymnId || newCollection != widget.collection));
 
         setState(() {
           if (newIndex >= 0 && newIndex < _blocks.length) {
@@ -47,6 +43,10 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
           _fontSize = fontSize;
           _isBlank = isBlank;
         });
+
+        if (needsRedirect) {
+          context.go('/projector-view/$newCollection/$newHymnId');
+        }
       }
     });
   }
@@ -228,7 +228,17 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     // 3. Agregar la diapositiva de Portada (Título) al principio
     finalBlocks.insert(0, '[TITLE]');
 
-    return finalBlocks;
+    return finalBlocks.map((b) {
+      if (b == '[TITLE]') return b;
+      final text = b.trim();
+      final match = RegExp(r'^(\d+\.|[Cc][Oo][Rr][Oo]:?)\s+').firstMatch(text);
+      if (match != null) {
+        final prefix = match.group(1)!;
+        final rest = text.substring(match.end);
+        return '$prefix\n$rest';
+      }
+      return text;
+    }).toList();
   }
 
   BoxDecoration _getThemeDecoration() {
@@ -286,20 +296,32 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     final firstLine = lines.first.trim();
     
     final RegExp tagRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
       caseSensitive: false
     );
 
     bool isChorus = false;
+    String? activeHeader;
     for (int i = index; i >= 0; i--) {
       final b = _blocks[i];
       if (b == '[TITLE]') continue;
       final fl = b.split('\n').first.trim().toLowerCase();
       if (fl.startsWith('coro')) {
         isChorus = true;
+        activeHeader = 'CORO';
         break;
       }
-      if (fl.startsWith('puente') || fl.startsWith('final') || RegExp(r'^(estrofa\s+\d+|\d+\.|[ivx]+\.)', caseSensitive: false).hasMatch(fl)) {
+      if (fl.startsWith('puente')) {
+        isChorus = true;
+        activeHeader = 'PUENTE';
+        break;
+      }
+      if (fl.startsWith('final')) {
+        isChorus = true;
+        activeHeader = 'FINAL';
+        break;
+      }
+      if (RegExp(r'^(estrofa\s+\d+|\d+\.|[ivx]+\.)', caseSensitive: false).hasMatch(fl)) {
         break;
       }
     }
@@ -354,7 +376,6 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 20.0),
-        constraints: const BoxConstraints(maxWidth: 1000),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -364,7 +385,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (isChorus) ...[
+                  if (activeHeader != null) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       decoration: BoxDecoration(
@@ -373,7 +394,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
                         border: Border.all(color: textColor.withValues(alpha: 0.3), width: 1),
                       ),
                       child: Text(
-                        'CORO',
+                        activeHeader,
                         style: TextStyle(fontFamily: 'Nunito', 
                           color: textColor,
                           fontSize: 13,
@@ -384,18 +405,15 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
                     ),
                     const SizedBox(height: 14),
                   ],
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      displayText,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: 'Nunito', 
-                        fontSize: _fontSize,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: isChorus ? FontStyle.italic : FontStyle.normal,
-                        color: textColor,
-                        height: 1.45,
-                      ),
+                  Text(
+                    displayText,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontFamily: 'Nunito', 
+                      fontSize: _fontSize,
+                      fontWeight: FontWeight.bold,
+                      fontStyle: isChorus ? FontStyle.italic : FontStyle.normal,
+                      color: textColor,
+                      height: 1.45,
                     ),
                   ),
                 ],

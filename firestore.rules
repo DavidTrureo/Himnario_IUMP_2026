@@ -45,6 +45,9 @@ service cloud.firestore {
     match /live_worship_rooms/{docId} {
       allow read, write: if true;
     }
+    match /tv_rooms/{docId} {
+      allow read, write: if true;
+    }
     
     // ── Sugerencias de Himnos ──────────────────────────────────────────────
     match /cantos_sugeridos/{docId} {

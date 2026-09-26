@@ -57,56 +57,187 @@ class _HymnTvReceiverScreenState extends State<HymnTvReceiverScreen> {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final currentBlock = data['currentBlock'] as String? ?? '';
           final isBlank = data['isBlank'] as bool? ?? false;
+          final isChorus = data['isChorus'] as bool? ?? false;
+          final activeHighlight = data['activeHighlight'] as String?;
+          final fontSize = (data['fontSize'] as num?)?.toDouble() ?? 64.0;
+          final themeStr = data['theme'] as String? ?? 'darkPremium';
           final hymnTitle = data['hymnTitle'] as String? ?? '';
 
-          if (currentBlock.isEmpty && hymnTitle.isNotEmpty) {
-            return _buildWaitingScreen(title: 'Conectado. Esperando letra...');
-          }
-
-          if (currentBlock.isEmpty) {
+          if (currentBlock.isEmpty && hymnTitle.isEmpty) {
             return _buildWaitingScreen();
           }
 
-          return AnimatedOpacity(
-            opacity: isBlank ? 0.0 : 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: Stack(
-              children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 60.0),
-                    child: Text(
-                      currentBlock,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.notoSans(
-                        color: Colors.white,
-                        fontSize: 64, // Texto gigante para TV
-                        fontWeight: FontWeight.bold,
-                        height: 1.3,
-                        shadows: [
-                          const Shadow(
-                            blurRadius: 10.0,
-                            color: Colors.black54,
-                            offset: Offset(2.0, 2.0),
+          final RegExp tagRegExp = RegExp(
+            r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
+            caseSensitive: false
+          );
+
+          String displayText = currentBlock;
+          String headerTag = '';
+
+          final lines = currentBlock.split('\n');
+          if (lines.isNotEmpty) {
+            final firstLine = lines.first.trim();
+            if (tagRegExp.hasMatch(firstLine)) {
+              final lineWithoutTag = firstLine.replaceFirst(tagRegExp, '').trim();
+              if (lineWithoutTag.isEmpty) {
+                displayText = lines.skip(1).join('\n').trim();
+              } else {
+                final rest = lines.skip(1).join('\n');
+                displayText = '$lineWithoutTag\n$rest'.trim();
+              }
+              headerTag = firstLine.replaceAll(lineWithoutTag, '').replaceAll(RegExp(r'[:.]'), '').trim().toUpperCase();
+            } else if (activeHighlight != null) {
+              headerTag = activeHighlight;
+            } else if (isChorus) {
+              headerTag = 'CORO';
+            }
+          }
+          
+          Color textColor = Colors.white;
+          BoxDecoration decoration = const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF0F172A), Color(0xFF020617)],
+            ),
+          );
+
+          switch (themeStr) {
+            case 'vitralChurch':
+              textColor = isChorus ? const Color(0xFFF472B6) : const Color(0xFFE2E8F0);
+              decoration = const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1E1B4B), Color(0xFF31103F), Color(0xFF0F172A)],
+                ),
+              );
+              break;
+            case 'highContrast':
+              textColor = isChorus ? Colors.yellowAccent : Colors.white;
+              decoration = const BoxDecoration(color: Colors.black);
+              break;
+            case 'whiteProjector':
+              textColor = isChorus ? const Color(0xFF1E3A8A) : Colors.black;
+              decoration = const BoxDecoration(color: Colors.white);
+              break;
+            case 'darkPremium':
+            default:
+              textColor = isChorus ? const Color(0xFFFDE047) : Colors.white;
+              decoration = const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF0F172A), Color(0xFF020617)],
+                ),
+              );
+              break;
+          }
+
+          return Container(
+            decoration: decoration,
+            child: AnimatedOpacity(
+              opacity: isBlank ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 20.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Spacer(),
+                          SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (currentBlock.isEmpty)
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                                        child: Text(
+                                          hymnTitle.replaceFirst(RegExp(r'^\d+\.\s*'), ''),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(fontFamily: 'Nunito', 
+                                            fontSize: 90,
+                                            fontWeight: FontWeight.bold,
+                                            color: textColor,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      if (RegExp(r'^\d+\.').hasMatch(hymnTitle))
+                                        Text(
+                                          'Himno ${hymnTitle.split('.').first}',
+                                          style: TextStyle(fontFamily: 'Nunito', 
+                                            fontSize: 40,
+                                            color: textColor.withValues(alpha: 0.6),
+                                            letterSpacing: 3.0,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                    ],
+                                  )
+                                else ...[
+                                  if (headerTag.isNotEmpty) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: textColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: textColor.withValues(alpha: 0.3), width: 1),
+                                      ),
+                                      child: Text(
+                                        headerTag,
+                                        style: TextStyle(fontFamily: 'Nunito', 
+                                          color: textColor,
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 2.0,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                  ],
+                                  Text(
+                                    displayText,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontFamily: 'Nunito', 
+                                      fontSize: fontSize,
+                                      fontWeight: FontWeight.bold,
+                                      fontStyle: isChorus ? FontStyle.italic : FontStyle.normal,
+                                      color: textColor,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
+                          const Spacer(),
+                          if (currentBlock.isNotEmpty && hymnTitle.isNotEmpty)
+                            Text(
+                              hymnTitle,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontFamily: 'Nunito', 
+                                fontSize: 24,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white.withValues(alpha: 0.25),
+                                letterSpacing: 1.0,
+                              ),
+                            ),
                         ],
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 40,
-                  left: 40,
-                  child: Text(
-                    hymnTitle,
-                    style: GoogleFonts.notoSans(
-                      color: Colors.white54,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
