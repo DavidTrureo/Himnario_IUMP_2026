@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -32,6 +33,7 @@ import 'widgets/visual_metronome_widget.dart';
 import '../../../core/widgets/app_music_icons.dart';
 import '../../../core/services/hymn_pdf_service.dart';
 import 'widgets/sheet_music_viewer.dart';
+import 'spinning_vinyl.dart';
 
 // Notifier para controlar el tamaño de la letra
 class FontSizeNotifier extends Notifier<double> {
@@ -97,45 +99,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   YoutubePlayerController? _youtubeController;
   final ScrollController _scrollController = ScrollController();
-  bool _isAutoScrolling = false;
-  double _autoScrollSpeed = 30.0;
 
-  void _toggleAutoScroll() {
-    setState(() {
-      _isAutoScrolling = !_isAutoScrolling;
-    });
-    if (_isAutoScrolling) {
-      _startAutoScroll();
-    }
-  }
-
-  void _startAutoScroll() async {
-    while (_isAutoScrolling) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (_scrollController.hasClients && _isAutoScrolling) {
-        final double maxScroll = _scrollController.position.maxScrollExtent;
-        final double currentScroll = _scrollController.offset;
-        final double delta = _autoScrollSpeed / 10.0; // Píxeles por iteración
-
-        if (currentScroll + delta >= maxScroll) {
-          // Llegamos al final
-          _scrollController.jumpTo(maxScroll);
-          setState(() {
-            _isAutoScrolling = false;
-          });
-          break;
-        } else {
-          _scrollController.animateTo(
-            currentScroll + delta,
-            duration: const Duration(milliseconds: 100),
-            curve: Curves.linear,
-          );
-        }
-      } else {
-        break;
-      }
-    }
-  }
 
 
   void _updateYoutubePlayer(Hymn hymn) {
@@ -223,6 +187,30 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     _audioPlayer?.dispose();
     _youtubeController?.close();
     super.dispose();
+  }
+
+  void _scrollDownByHalfPage() {
+    if (_scrollController.hasClients) {
+      final viewportHeight = _scrollController.position.viewportDimension;
+      final offset = _scrollController.offset + (viewportHeight * 0.85); // 85% de la pantalla
+      _scrollController.animateTo(
+        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _scrollUpByHalfPage() {
+    if (_scrollController.hasClients) {
+      final viewportHeight = _scrollController.position.viewportDimension;
+      final offset = _scrollController.offset - (viewportHeight * 0.85);
+      _scrollController.animateTo(
+        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _initializeHymns(List<Hymn> hymns) {
@@ -392,13 +380,44 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     return PopScope(
       canPop: true,
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent) {
+            final key = event.logicalKey;
+            // Pedales que envían Space, Enter, PageDown o ArrowDown -> Bajar media página
+            if (key == LogicalKeyboardKey.space || 
+                key == LogicalKeyboardKey.enter || 
+                key == LogicalKeyboardKey.pageDown || 
+                key == LogicalKeyboardKey.arrowDown) {
+              _scrollDownByHalfPage();
+              return KeyEventResult.handled;
+            }
+            // Pedales que envían PageUp o ArrowUp -> Subir media página
+            if (key == LogicalKeyboardKey.pageUp || 
+                key == LogicalKeyboardKey.arrowUp) {
+              _scrollUpByHalfPage();
+              return KeyEventResult.handled;
+            }
+            // Pedales que envían Izquierda/Derecha -> Cambiar himno (usando PageController)
+            if (key == LogicalKeyboardKey.arrowLeft && _pageController != null) {
+              _pageController!.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.arrowRight && _pageController != null) {
+              _pageController!.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Scaffold(
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () {
               context.pop();
             },
@@ -461,6 +480,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       });
                     } else {
                       if (_audioPlayer != null && _currentAudioUrl == hymn.audioUrl) {
+                        setState(() {
+                          _showPlayerCard = true;
+                        });
                         if (_isPlaying) {
                           _audioPlayer!.pause();
                         } else {
@@ -984,64 +1006,14 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ),
                 ).animate().fadeIn(delay: 200.ms).scale(),
 
-              // Botón flotante para Autoscroll
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                right: 20,
-                bottom: (_showControlPanel 
-                    ? 360.0 
-                    : (_showPlayerCard ? 230.0 : 100.0) + (_showControlPanel ? 0 : 60)) + MediaQuery.of(context).padding.bottom,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_isAutoScrolling) ...[
-                      FloatingActionButton.small(
-                        heroTag: 'autoscroll-faster',
-                        backgroundColor: isDark ? const Color(0xFF334155) : Colors.white,
-                        foregroundColor: isDark ? Colors.white : Colors.black87,
-                        onPressed: () {
-                          setState(() {
-                            _autoScrollSpeed = (_autoScrollSpeed + 10.0).clamp(10.0, 150.0);
-                          });
-                        },
-                        tooltip: 'Más rápido',
-                        child: const Icon(Icons.add),
-                      ),
-                      const SizedBox(height: 8),
-                      FloatingActionButton.small(
-                        heroTag: 'autoscroll-slower',
-                        backgroundColor: isDark ? const Color(0xFF334155) : Colors.white,
-                        foregroundColor: isDark ? Colors.white : Colors.black87,
-                        onPressed: () {
-                          setState(() {
-                            _autoScrollSpeed = (_autoScrollSpeed - 10.0).clamp(10.0, 150.0);
-                          });
-                        },
-                        tooltip: 'Más lento',
-                        child: const Icon(Icons.remove),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    FloatingActionButton(
-                      heroTag: 'autoscroll-fab',
-                      backgroundColor: isDark ? const Color(0xFF6366F1) : theme.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 4,
-                      onPressed: _toggleAutoScroll,
-                      tooltip: _isAutoScrolling ? 'Pausar autoscroll' : 'Iniciar autoscroll',
-                      child: Icon(_isAutoScrolling ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                    ),
-                  ],
-                ),
-              ),
+
 
               // Reproductor de Audio Flotante (Glassmorphic)
               if (_showPlayerCard && _audioPlayer != null)
                 Positioned(
                   left: 20,
                   right: 20,
-                  bottom: (_showControlPanel ? 290 : 100) + MediaQuery.of(context).padding.bottom,
+                  bottom: (_showControlPanel ? (hymn.lyrics.contains('[') ? 250 : 150) : 20) + MediaQuery.of(context).padding.bottom,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
@@ -1070,10 +1042,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           children: [
                             Row(
                               children: [
-                                Icon(
-                                  Icons.audiotrack_rounded,
-                                  size: 18,
+                                SpinningVinyl(
+                                  isPlaying: _isPlaying,
                                   color: theme.colorScheme.primary,
+                                  size: 18,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
@@ -1115,11 +1087,26 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                             Row(
                               children: [
                                 IconButton(
+                                  icon: const Icon(Icons.replay_10_rounded, size: 24),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                  color: isDark ? Colors.white70 : Colors.black54,
+                                  tooltip: 'Retroceder 10s',
+                                  onPressed: () {
+                                    if (_audioPlayer != null) {
+                                      final newPos = _position - const Duration(seconds: 10);
+                                      _audioPlayer!.seek(newPos < Duration.zero ? Duration.zero : newPos);
+                                    }
+                                  },
+                                ),
+                                IconButton(
                                   icon: Icon(
                                     _isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
-                                    size: 32,
+                                    size: 38,
                                     color: theme.colorScheme.primary,
                                   ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                                   onPressed: () {
                                     if (_isPlaying) {
                                       _audioPlayer?.pause();
@@ -1128,6 +1115,20 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                     }
                                   },
                                 ),
+                                IconButton(
+                                  icon: const Icon(Icons.forward_10_rounded, size: 24),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                  color: isDark ? Colors.white70 : Colors.black54,
+                                  tooltip: 'Avanzar 10s',
+                                  onPressed: () {
+                                    if (_audioPlayer != null) {
+                                      final newPos = _position + const Duration(seconds: 10);
+                                      _audioPlayer!.seek(newPos > _duration ? _duration : newPos);
+                                    }
+                                  },
+                                ),
+                                const SizedBox(width: 4),
                                 Expanded(
                                   child: SliderTheme(
                                     data: SliderTheme.of(context).copyWith(
@@ -1181,6 +1182,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   left: _metronomeVertical ? (MediaQuery.of(context).size.width - 82) : 4,
                   right: _metronomeVertical ? 6 : 4,
                   child: VisualMetronomeWidget(
+                    hymnId: hymn.id,
                     initialBpm: 80,
                     isTopPosition: _metronomeTop,
                     isVerticalLayout: _metronomeVertical,
@@ -1204,13 +1206,27 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             ],
           ),
         ),
-      );
+      ),
+    );
   }
 
   Future<String> _getLocalAudioPath(String url) async {
     final dir = await getApplicationDocumentsDirectory();
     final hash = url.hashCode.toString();
-    return '${dir.path}/hymn_audio_$hash.mp3';
+    
+    String ext = 'mp3';
+    try {
+      final uri = Uri.parse(url);
+      final decodedPath = Uri.decodeComponent(uri.path);
+      if (decodedPath.contains('.')) {
+        final possibleExt = decodedPath.split('.').last.toLowerCase();
+        if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'].contains(possibleExt)) {
+          ext = possibleExt;
+        }
+      }
+    } catch (_) {}
+    
+    return '${dir.path}/hymn_audio_$hash.$ext';
   }
 
   Future<void> _downloadAudio(Hymn hymn) async {
@@ -1299,6 +1315,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             _isPlaying = state.playing;
             _isLoadingAudio = state.processingState == ProcessingState.loading ||
                 state.processingState == ProcessingState.buffering;
+
+            if (state.processingState == ProcessingState.completed) {
+              // Cuando termine, pausamos y volvemos a cero
+              _isPlaying = false;
+              player.pause();
+              player.seek(Duration.zero);
+            }
           });
         }
       });
@@ -1649,7 +1672,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   20.0, 
                   16.0, 
                   20.0, 
-                  (hasChords ? 165.0 : 110.0) + MediaQuery.of(context).padding.bottom
+                  100.0 + MediaQuery.of(context).padding.bottom
                 ),
                 child: Center(
                   child: Container(
@@ -1667,7 +1690,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           curve: Curves.easeOutCubic,
-                          height: _showControlPanel ? (hasChords ? 240.0 : 140.0) : 0.0,
+                          height: (_showControlPanel && _showPlayerCard)
+                              ? 320.0
+                              : (_showControlPanel
+                                  ? 220.0
+                                  : (_showPlayerCard ? 160.0 : 0.0)),
                         ),
                       ],
                     ),
@@ -2176,13 +2203,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         final file = result.files.first;
         final fileSizeMB = file.size / (1024 * 1024);
 
-        if (fileSizeMB > 10.0) {
+        if (fileSizeMB > 20.0) {
           final proceed = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Archivo pesado'),
               content: Text(
-                'El archivo seleccionado mide ${fileSizeMB.toStringAsFixed(1)} MB, lo cual supera el límite recomendado de 10 MB.\n\n¿Deseas subirlo de todas formas?',
+                'El archivo seleccionado mide ${fileSizeMB.toStringAsFixed(1)} MB, lo cual supera el límite recomendado de 20 MB.\n\n¿Deseas subirlo de todas formas?',
               ),
               actions: [
                 TextButton(
@@ -2205,7 +2232,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           uploadStatusText = 'Preparando subida...';
         });
 
-        File fileToUpload = File(file.path!);
         String ext = file.extension ?? 'mp3';
 
         dialogSetState(() {
@@ -2229,6 +2255,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           if (file.path == null) {
             throw Exception('Ruta de archivo no válida.');
           }
+          File fileToUpload = File(file.path!);
           uploadTask = storageRef.putFile(
             fileToUpload,
             SettableMetadata(contentType: ext == 'm4a' ? 'audio/mp4' : 'audio/mpeg'),
@@ -2985,7 +3012,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
                       Navigator.pop(context); // Cerrar diálogo de inmediato
                       if (isMoving) {
-                        Navigator.pop(context); // Salir de la pantalla de detalle ya que se trasladó
+                        if (this.context.mounted) {
+                          if (this.context.canPop()) {
+                            this.context.pop();
+                          } else {
+                            this.context.go('/hymns');
+                          }
+                        }
                       }
 
                       // Ejecutar la actualización en Riverpod después de que la navegación se complete
@@ -3223,6 +3256,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         {'label': 'Suspendido (sus4)', 'val': 'sus4'},
                         {'label': 'Novena (9)', 'val': '9'},
                         {'label': 'Add9', 'val': 'add9'},
+                        {'label': 'Treceava (13)', 'val': '13'},
+                        {'label': '13 Suspendido (13sus)', 'val': '13sus'},
                         {'label': 'm7(b5)', 'val': 'm7(b5)'},
                         {'label': 'Menor 6 (m6)', 'val': 'm6'},
                       ].map((qual) {
@@ -3334,7 +3369,14 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 await ref.read(hymnsProvider(hymn.collection).notifier).deleteHymn(hymn.id);
                 if (!context.mounted) return;
                 Navigator.pop(context); // Cerrar diálogo
-                Navigator.pop(context); // Volver a la lista
+                
+                if (this.context.mounted) {
+                  if (this.context.canPop()) {
+                    this.context.pop();
+                  } else {
+                    this.context.go('/hymns');
+                  }
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Himno eliminado con éxito', style: GoogleFonts.nunito()),
@@ -3771,7 +3813,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         final currentId = int.tryParse(idString) ?? 0;
         
         if (delete.collection == currentCollection && delete.id == currentId) {
-          Navigator.of(context).pop();
+          if (this.context.mounted) {
+            if (this.context.canPop()) {
+              this.context.pop();
+            } else {
+              this.context.go('/hymns');
+            }
+          }
         }
       }
     } catch (e) {
@@ -3847,6 +3895,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   void _showExportPdfModal(BuildContext context, Hymn hymn) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
@@ -3905,7 +3954,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () async {
-                  ctx.pop();
+                  if (ctx.mounted) ctx.pop();
                   await HymnPdfService.shareHymnPdf(
                     hymn,
                     transposeOffset: _transposeOffset,
@@ -3924,7 +3973,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 subtitle: Text('Ideal para la congregación o imprimir folletos', style: GoogleFonts.outfit(fontSize: 12)),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () async {
-                  ctx.pop();
+                  if (ctx.mounted) ctx.pop();
                   await HymnPdfService.shareHymnPdf(
                     hymn,
                     transposeOffset: _transposeOffset,

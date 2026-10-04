@@ -44,6 +44,9 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
           _isBlank = isBlank;
         });
 
+        // Always reload hymn from SharedPreferences in case lyrics were edited/updated
+        _loadHymn();
+
         if (needsRedirect) {
           context.go('/projector-view/$newCollection/$newHymnId');
         }
@@ -94,6 +97,21 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     super.dispose();
   }
 
+  bool _isHeaderLine(String line) {
+    final text = line.trim().toLowerCase();
+    
+    // Explicitly exclude "vi" verb (e.g. "Vi tus lágrimas") if not followed by . or -
+    if (text.startsWith('vi') && !text.contains('.') && !text.contains('-') && text.length > 2 && text[2] == ' ') {
+      return false;
+    }
+
+    final RegExp tagRegExp = RegExp(
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
+      caseSensitive: false
+    );
+    return tagRegExp.hasMatch(text);
+  }
+
   List<String> _getMergedBlocksWithoutChords(String lyrics) {
     final RegExp chordRegex = RegExp(r'\[[^\]]+\]');
     
@@ -108,7 +126,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     List<String> currentBlock = [];
     
     final headerRegex = RegExp(
-      r'^(coro\s*[ivx]*|coro\s*\d*|puente|final|solista|estrofa\s+\d+|\d+\.|[ivx]+\.)\s*:?\s*', 
+      r'^(coro\s*[ivx]*|coro\s*\d*|puente|final|solista|estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
       caseSensitive: false
     );
 
@@ -122,8 +140,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
         continue;
       }
 
-      final match = headerRegex.firstMatch(line);
-      if (match != null) {
+      if (_isHeaderLine(line)) {
         if (currentBlock.isNotEmpty) {
           rawBlocks.add(currentBlock.join('\n'));
           currentBlock = [];
@@ -158,7 +175,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
       if (chorusStartIndex != -1) {
         for (int i = chorusStartIndex; i < rawBlocks.length; i++) {
           final fl = rawBlocks[i].split('\n').first.trim().toLowerCase();
-          if (i != chorusStartIndex && (fl.startsWith('coro') || fl.startsWith('puente') || fl.startsWith('final') || RegExp(r'^(estrofa\s+\d+|\d+\.|[ivx]+\.)', caseSensitive: false).hasMatch(fl))) {
+          if (i != chorusStartIndex && _isHeaderLine(fl)) {
             break;
           }
           chorusFragments.add(rawBlocks[i]);
@@ -176,7 +193,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
           if (fl.startsWith('coro')) { currentHeader = 'coro'; break; }
           if (fl.startsWith('puente')) { currentHeader = 'puente'; break; }
           if (fl.startsWith('final')) { currentHeader = 'final'; break; }
-          if (RegExp(r'^(estrofa\s+\d+|\d+\.|[ivx]+\.)', caseSensitive: false).hasMatch(fl)) {
+          if (_isHeaderLine(fl)) {
             currentHeader = 'estrofa'; break;
           }
         }
@@ -185,10 +202,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
           bool isLastFragment = true;
           if (i < rawBlocks.length - 1) {
             final nextBlockFirstLine = rawBlocks[i + 1].split('\n').first.trim().toLowerCase();
-            final hasHeader = nextBlockFirstLine.startsWith('coro') || 
-                              nextBlockFirstLine.startsWith('puente') || 
-                              nextBlockFirstLine.startsWith('final') || 
-                              RegExp(r'^(estrofa\s+\d+|\d+\.|[ivx]+\.)', caseSensitive: false).hasMatch(nextBlockFirstLine);
+            final hasHeader = _isHeaderLine(nextBlockFirstLine);
             if (!hasHeader) {
               isLastFragment = false;
             }
@@ -216,15 +230,33 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     final List<String> finalBlocks = [];
     for (var block in sequencedBlocks) {
       final blockLines = block.split('\n');
-      if (blockLines.length > 8) {
-        final mid = (blockLines.length / 2).ceil();
-        finalBlocks.add(blockLines.sublist(0, mid).join('\n'));
-        finalBlocks.add(blockLines.sublist(mid).join('\n'));
+      
+      final nonEmptyLines = blockLines.where((l) => l.trim().isNotEmpty).toList();
+      int lyricsCount = nonEmptyLines.length;
+      bool hasHeader = nonEmptyLines.isNotEmpty && _isHeaderLine(nonEmptyLines.first);
+      if (hasHeader) {
+        lyricsCount--;
+      }
+
+      if (lyricsCount > 8) {
+        final lyricsMid = (lyricsCount / 2).ceil();
+        final mid = hasHeader ? lyricsMid + 1 : lyricsMid;
+        
+        final firstPart = blockLines.sublist(0, mid).join('\n');
+        String secondPart = blockLines.sublist(mid).join('\n');
+        
+        final headerMatch = RegExp(r'^(\d+\.|[Cc][Oo][Rr][Oo]:?|[Pp][Uu][Ee][Nn][Tt][Ee]:?|[Ff][Ii][Nn][Aa][Ll]:?)\s+').firstMatch(blockLines.first);
+        if (headerMatch != null) {
+          secondPart = '${headerMatch.group(1)} $secondPart';
+        }
+        
+        finalBlocks.add(firstPart);
+        finalBlocks.add(secondPart);
       } else {
         finalBlocks.add(block);
       }
     }
-    
+
     // 3. Agregar la diapositiva de Portada (Título) al principio
     finalBlocks.insert(0, '[TITLE]');
 

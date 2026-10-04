@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class ChordDiagramDialog extends StatelessWidget {
+class ChordDiagramDialog extends StatefulWidget {
   final String chordName;
 
   const ChordDiagramDialog({super.key, required this.chordName});
@@ -14,11 +14,23 @@ class ChordDiagramDialog extends StatelessWidget {
   }
 
   @override
+  State<ChordDiagramDialog> createState() => _ChordDiagramDialogState();
+}
+
+class _ChordDiagramDialogState extends State<ChordDiagramDialog> {
+  int _guitarPosIndex = 0;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final chordData = ChordParser.parse(chordName);
+    final chordData = ChordParser.parse(widget.chordName);
+    final posCount = chordData.guitarPositions.length;
+    if (_guitarPosIndex >= posCount) {
+      _guitarPosIndex = 0;
+    }
+    final currentPos = chordData.guitarPositions[_guitarPosIndex];
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -72,7 +84,7 @@ class ChordDiagramDialog extends StatelessWidget {
                           ],
                         ),
                         child: Text(
-                          chordName,
+                          widget.chordName,
                           style: GoogleFonts.outfit(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
@@ -160,15 +172,40 @@ class ChordDiagramDialog extends StatelessWidget {
                       children: [
                         // Vista Mástil Guitarra
                         Center(
-                          child: CustomPaint(
-                            size: const Size(200, 210),
-                            painter: GuitarFretboardPainter(
-                              frets: chordData.guitarFrets,
-                              fingers: chordData.guitarFingers,
-                              baseFret: chordData.baseFret,
-                              isDark: isDark,
-                              accentColor: Colors.amber[500]!,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (posCount > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_left_rounded),
+                                  color: isDark ? Colors.white60 : Colors.black54,
+                                  onPressed: () {
+                                    setState(() {
+                                      _guitarPosIndex = (_guitarPosIndex - 1 + posCount) % posCount;
+                                    });
+                                  },
+                                ),
+                              CustomPaint(
+                                size: const Size(200, 210),
+                                painter: GuitarFretboardPainter(
+                                  frets: currentPos.frets,
+                                  fingers: currentPos.fingers,
+                                  baseFret: currentPos.baseFret,
+                                  isDark: isDark,
+                                  accentColor: Colors.amber[500]!,
+                                ),
+                              ),
+                              if (posCount > 1)
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded),
+                                  color: isDark ? Colors.white60 : Colors.black54,
+                                  onPressed: () {
+                                    setState(() {
+                                      _guitarPosIndex = (_guitarPosIndex + 1) % posCount;
+                                    });
+                                  },
+                                ),
+                            ],
                           ),
                         ),
 
@@ -218,22 +255,26 @@ class ChordDiagramDialog extends StatelessWidget {
   }
 }
 
+class GuitarPosition {
+  final List<int> frets;
+  final List<int> fingers;
+  final int baseFret;
+
+  const GuitarPosition(this.frets, this.fingers, {this.baseFret = 1});
+}
+
 class ChordInfoData {
   final String fullName;
   final List<String> notes;
-  final List<int> guitarFrets; // -1 mutada, 0 al aire, 1+ traste
-  final List<int> guitarFingers;
-  final List<int> pianoKeys; // Índices de 0 a 11 en octava
-  final int baseFret;
+  final List<GuitarPosition> guitarPositions;
+  final List<int> pianoKeys;
 
   const ChordInfoData(
     this.fullName,
     this.notes,
-    this.guitarFrets,
-    this.guitarFingers,
-    this.pianoKeys, {
-    this.baseFret = 1,
-  });
+    this.guitarPositions,
+    this.pianoKeys,
+  );
 }
 
 class ChordParser {
@@ -277,7 +318,7 @@ class ChordParser {
   static ChordInfoData parse(String rawChord) {
     final clean = rawChord.trim().replaceAll(RegExp(r'\[|\]'), '');
     if (clean.isEmpty) {
-      return const ChordInfoData('Do Mayor', ['DO', 'MI', 'SOL'], [-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0], [0, 4, 7]);
+      return const ChordInfoData('Do Mayor', ['DO', 'MI', 'SOL'], [GuitarPosition([-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0])], [0, 4, 7]);
     }
 
     String mainChord = clean;
@@ -309,10 +350,12 @@ class ChordParser {
     bool isMinor = lowerSuffix.startsWith('m') && !lowerSuffix.startsWith('maj');
     bool isDim = lowerSuffix.contains('dim') || lowerSuffix.contains('m7(b5)') || lowerSuffix.contains('m7b5');
     bool isAug = lowerSuffix.contains('aug');
-    bool isSus4 = lowerSuffix.contains('sus4');
+    bool isSus4 = lowerSuffix.contains('sus4') || (lowerSuffix.contains('sus') && !lowerSuffix.contains('sus2'));
     bool isSus2 = lowerSuffix.contains('sus2');
-    bool hasAdd9 = lowerSuffix.contains('add9') || lowerSuffix.contains('9');
-    bool has7 = lowerSuffix.contains('7') && !lowerSuffix.contains('maj7');
+    bool has13 = lowerSuffix.contains('13');
+    bool hasAdd9 = lowerSuffix.contains('add9') || lowerSuffix.contains('9') || has13;
+    bool has9 = lowerSuffix.contains('9') && !lowerSuffix.contains('add9');
+    bool has7 = (lowerSuffix.contains('7') && !lowerSuffix.contains('maj7')) || has13 || has9;
     bool hasMaj7 = lowerSuffix.contains('maj7');
     bool is5 = lowerSuffix == '5';
 
@@ -320,27 +363,38 @@ class ChordParser {
 
     if (is5) {
       intervals.add(7);
-    } else if (isSus4) {
-      intervals.addAll([5, 7]);
-    } else if (isSus2) {
-      intervals.addAll([2, 7]);
     } else if (isDim) {
       intervals.addAll([3, 6]);
       if (has7 || lowerSuffix.contains('b5')) intervals.add(10);
+      if (lowerSuffix.contains('dim7')) intervals.add(9); // bb7 = M6 = 9 semitones
     } else if (isAug) {
       intervals.addAll([4, 8]);
-    } else if (isMinor) {
-      intervals.addAll([3, 7]);
       if (has7) intervals.add(10);
-      if (hasMaj7) intervals.add(11);
     } else {
-      intervals.addAll([4, 7]);
+      // Determinar la tercera (o falta de ella)
+      if (isSus4) {
+        intervals.add(5);
+      } else if (isSus2) {
+        intervals.add(2);
+      } else if (isMinor) {
+        intervals.add(3);
+      } else {
+        intervals.add(4); // Mayor por defecto
+      }
+      
+      // Quinta justa
+      intervals.add(7);
+
+      // Séptimas
       if (has7) intervals.add(10);
       if (hasMaj7) intervals.add(11);
     }
 
-    if (hasAdd9) {
-      intervals.add(2);
+    if (hasAdd9 || has9) {
+      if (!intervals.contains(2)) intervals.add(2); // 9th is same as 2nd (2 semitones)
+    }
+    if (has13) {
+      intervals.add(9); // 13th is same as 6th (9 semitones)
     }
 
     final List<int> pianoKeys = intervals.map((i) => (rootIndex + i) % 12).toSet().toList();
@@ -351,15 +405,13 @@ class ChordParser {
     final List<String> notes = pianoKeys.map((idx) => _getSpanishNoteName(idx)).toList();
     final String fullName = _buildFullName(rootStr, suffix, bassNote);
 
-    final guitarData = _getGuitarPosition(clean, rootStr, suffix, bassNote, rootIndex);
+    final guitarPositions = _getGuitarPositions(clean, rootStr, suffix, bassNote, rootIndex);
 
     return ChordInfoData(
       fullName,
       notes,
-      guitarData.frets,
-      guitarData.fingers,
+      guitarPositions,
       pianoKeys,
-      baseFret: guitarData.baseFret,
     );
   }
 
@@ -380,7 +432,11 @@ class ChordParser {
       quality = 'Dominante 7ª';
     } else if (lower.contains('add9')) {
       quality = 'con Novena (Add9)';
-    } else if (lower.contains('sus4')) {
+    } else if (lower.contains('13sus')) {
+      quality = '13 Suspendido (13sus)';
+    } else if (lower.contains('13')) {
+      quality = 'Treceava (13)';
+    } else if (lower.contains('sus4') || (lower.contains('sus') && !lower.contains('sus2'))) {
       quality = 'Suspendido 4ª (Sus4)';
     } else if (lower.contains('sus2')) {
       quality = 'Suspendido 2ª (Sus2)';
@@ -398,160 +454,240 @@ class ChordParser {
     return '$rootSpan $quality';
   }
 
-  static _GuitarPos _getGuitarPosition(String fullChord, String root, String suffix, String bass, int rootIndex) {
+  static List<GuitarPosition> _getGuitarPositions(String fullChord, String root, String suffix, String bass, int rootIndex) {
     final clean = fullChord.trim().toUpperCase();
 
     // Diccionario de acordes comunes y compuestos específicos
-    final Map<String, _GuitarPos> dictionary = {
+    final Map<String, GuitarPosition> dictionary = {
       // DO / C
-      'C': const _GuitarPos([-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
-      'DO': const _GuitarPos([-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
-      'CM': const _GuitarPos([-1, 3, 5, 5, 4, 3], [0, 1, 3, 4, 2, 1], baseFret: 3),
-      'DOM': const _GuitarPos([-1, 3, 5, 5, 4, 3], [0, 1, 3, 4, 2, 1], baseFret: 3),
-      'CADD9': const _GuitarPos([-1, 3, 2, 0, 3, 0], [0, 2, 1, 0, 3, 0]),
-      'DOADD9': const _GuitarPos([-1, 3, 2, 0, 3, 0], [0, 2, 1, 0, 3, 0]),
-      'CSUS4': const _GuitarPos([-1, 3, 3, 0, 1, 1], [0, 3, 4, 0, 1, 1]),
-      'DOSUS4': const _GuitarPos([-1, 3, 3, 0, 1, 1], [0, 3, 4, 0, 1, 1]),
-      'CSUS2': const _GuitarPos([-1, 3, 0, 0, 1, 0], [0, 3, 0, 0, 1, 0]),
-      'DOSUS2': const _GuitarPos([-1, 3, 0, 0, 1, 0], [0, 3, 0, 0, 1, 0]),
-      'C7': const _GuitarPos([-1, 3, 2, 3, 1, 0], [0, 3, 2, 4, 1, 0]),
-      'DO7': const _GuitarPos([-1, 3, 2, 3, 1, 0], [0, 3, 2, 4, 1, 0]),
-      'CMAJ7': const _GuitarPos([-1, 3, 2, 0, 0, 0], [0, 3, 2, 0, 0, 0]),
-      'DOMAJ7': const _GuitarPos([-1, 3, 2, 0, 0, 0], [0, 3, 2, 0, 0, 0]),
-      'C/E': const _GuitarPos([0, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
-      'DO/MI': const _GuitarPos([0, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
-      'C/G': const _GuitarPos([3, 3, 2, 0, 1, 0], [3, 4, 2, 0, 1, 0]),
-      'DO/SOL': const _GuitarPos([3, 3, 2, 0, 1, 0], [3, 4, 2, 0, 1, 0]),
+      'C': const GuitarPosition([-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
+      'DO': const GuitarPosition([-1, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
+      'CM': const GuitarPosition([-1, 3, 5, 5, 4, 3], [0, 1, 3, 4, 2, 1], baseFret: 3),
+      'DOM': const GuitarPosition([-1, 3, 5, 5, 4, 3], [0, 1, 3, 4, 2, 1], baseFret: 3),
+      'CADD9': const GuitarPosition([-1, 3, 2, 0, 3, 0], [0, 2, 1, 0, 3, 0]),
+      'DOADD9': const GuitarPosition([-1, 3, 2, 0, 3, 0], [0, 2, 1, 0, 3, 0]),
+      'CSUS4': const GuitarPosition([-1, 3, 3, 0, 1, 1], [0, 3, 4, 0, 1, 1]),
+      'DOSUS4': const GuitarPosition([-1, 3, 3, 0, 1, 1], [0, 3, 4, 0, 1, 1]),
+      'CSUS2': const GuitarPosition([-1, 3, 0, 0, 1, 0], [0, 3, 0, 0, 1, 0]),
+      'DOSUS2': const GuitarPosition([-1, 3, 0, 0, 1, 0], [0, 3, 0, 0, 1, 0]),
+      'C7': const GuitarPosition([-1, 3, 2, 3, 1, 0], [0, 3, 2, 4, 1, 0]),
+      'DO7': const GuitarPosition([-1, 3, 2, 3, 1, 0], [0, 3, 2, 4, 1, 0]),
+      'CMAJ7': const GuitarPosition([-1, 3, 2, 0, 0, 0], [0, 3, 2, 0, 0, 0]),
+      'DOMAJ7': const GuitarPosition([-1, 3, 2, 0, 0, 0], [0, 3, 2, 0, 0, 0]),
+      'C/E': const GuitarPosition([0, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
+      'DO/MI': const GuitarPosition([0, 3, 2, 0, 1, 0], [0, 3, 2, 0, 1, 0]),
+      'C/G': const GuitarPosition([3, 3, 2, 0, 1, 0], [3, 4, 2, 0, 1, 0]),
+      'DO/SOL': const GuitarPosition([3, 3, 2, 0, 1, 0], [3, 4, 2, 0, 1, 0]),
 
       // RE / D
-      'D': const _GuitarPos([-1, -1, 0, 2, 3, 2], [0, 0, 0, 1, 3, 2]),
-      'RE': const _GuitarPos([-1, -1, 0, 2, 3, 2], [0, 0, 0, 1, 3, 2]),
-      'DM': const _GuitarPos([-1, -1, 0, 2, 3, 1], [0, 0, 0, 2, 3, 1]),
-      'REM': const _GuitarPos([-1, -1, 0, 2, 3, 1], [0, 0, 0, 2, 3, 1]),
-      'DADD9': const _GuitarPos([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
-      'READD9': const _GuitarPos([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
-      'DSUS4': const _GuitarPos([-1, -1, 0, 2, 3, 3], [0, 0, 0, 1, 2, 3]),
-      'RESUS4': const _GuitarPos([-1, -1, 0, 2, 3, 3], [0, 0, 0, 1, 2, 3]),
-      'DSUS2': const _GuitarPos([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
-      'RESUS2': const _GuitarPos([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
-      'D7': const _GuitarPos([-1, -1, 0, 2, 1, 2], [0, 0, 0, 2, 1, 3]),
-      'RE7': const _GuitarPos([-1, -1, 0, 2, 1, 2], [0, 0, 0, 2, 1, 3]),
-      'D/F#': const _GuitarPos([2, 0, 0, 2, 3, 2], [1, 0, 0, 2, 4, 3]),
-      'RE/FA#': const _GuitarPos([2, 0, 0, 2, 3, 2], [1, 0, 0, 2, 4, 3]),
+      'D': const GuitarPosition([-1, -1, 0, 2, 3, 2], [0, 0, 0, 1, 3, 2]),
+      'RE': const GuitarPosition([-1, -1, 0, 2, 3, 2], [0, 0, 0, 1, 3, 2]),
+      'DM': const GuitarPosition([-1, -1, 0, 2, 3, 1], [0, 0, 0, 2, 3, 1]),
+      'REM': const GuitarPosition([-1, -1, 0, 2, 3, 1], [0, 0, 0, 2, 3, 1]),
+      'DADD9': const GuitarPosition([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
+      'READD9': const GuitarPosition([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
+      'DSUS4': const GuitarPosition([-1, -1, 0, 2, 3, 3], [0, 0, 0, 1, 2, 3]),
+      'RESUS4': const GuitarPosition([-1, -1, 0, 2, 3, 3], [0, 0, 0, 1, 2, 3]),
+      'DSUS2': const GuitarPosition([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
+      'RESUS2': const GuitarPosition([-1, -1, 0, 2, 3, 0], [0, 0, 0, 1, 2, 0]),
+      'D7': const GuitarPosition([-1, -1, 0, 2, 1, 2], [0, 0, 0, 2, 1, 3]),
+      'RE7': const GuitarPosition([-1, -1, 0, 2, 1, 2], [0, 0, 0, 2, 1, 3]),
+      'D/F#': const GuitarPosition([2, 0, 0, 2, 3, 2], [1, 0, 0, 2, 4, 3]),
+      'RE/FA#': const GuitarPosition([2, 0, 0, 2, 3, 2], [1, 0, 0, 2, 4, 3]),
 
       // MI / E
-      'E': const _GuitarPos([0, 2, 2, 1, 0, 0], [0, 2, 3, 1, 0, 0]),
-      'MI': const _GuitarPos([0, 2, 2, 1, 0, 0], [0, 2, 3, 1, 0, 0]),
-      'EM': const _GuitarPos([0, 2, 2, 0, 0, 0], [0, 2, 3, 0, 0, 0]),
-      'MIM': const _GuitarPos([0, 2, 2, 0, 0, 0], [0, 2, 3, 0, 0, 0]),
-      'E7': const _GuitarPos([0, 2, 0, 1, 0, 0], [0, 2, 0, 1, 0, 0]),
-      'MI7': const _GuitarPos([0, 2, 0, 1, 0, 0], [0, 2, 0, 1, 0, 0]),
-      'ESUS4': const _GuitarPos([0, 2, 2, 2, 0, 0], [0, 1, 2, 3, 0, 0]),
-      'MISUS4': const _GuitarPos([0, 2, 2, 2, 0, 0], [0, 1, 2, 3, 0, 0]),
+      'E': const GuitarPosition([0, 2, 2, 1, 0, 0], [0, 2, 3, 1, 0, 0]),
+      'MI': const GuitarPosition([0, 2, 2, 1, 0, 0], [0, 2, 3, 1, 0, 0]),
+      'EM': const GuitarPosition([0, 2, 2, 0, 0, 0], [0, 2, 3, 0, 0, 0]),
+      'MIM': const GuitarPosition([0, 2, 2, 0, 0, 0], [0, 2, 3, 0, 0, 0]),
+      'E7': const GuitarPosition([0, 2, 0, 1, 0, 0], [0, 2, 0, 1, 0, 0]),
+      'MI7': const GuitarPosition([0, 2, 0, 1, 0, 0], [0, 2, 0, 1, 0, 0]),
+      'ESUS4': const GuitarPosition([0, 2, 2, 2, 0, 0], [0, 1, 2, 3, 0, 0]),
+      'MISUS4': const GuitarPosition([0, 2, 2, 2, 0, 0], [0, 1, 2, 3, 0, 0]),
 
       // FA / F
-      'F': const _GuitarPos([1, 3, 3, 2, 1, 1], [1, 3, 4, 2, 1, 1]),
-      'FA': const _GuitarPos([1, 3, 3, 2, 1, 1], [1, 3, 4, 2, 1, 1]),
-      'FM': const _GuitarPos([1, 3, 3, 1, 1, 1], [1, 3, 4, 1, 1, 1]),
-      'FAM': const _GuitarPos([1, 3, 3, 1, 1, 1], [1, 3, 4, 1, 1, 1]),
-      'F#M': const _GuitarPos([2, 4, 4, 2, 2, 2], [1, 3, 4, 1, 1, 1]),
-      'FA#M': const _GuitarPos([2, 4, 4, 2, 2, 2], [1, 3, 4, 1, 1, 1]),
+      'F': const GuitarPosition([1, 3, 3, 2, 1, 1], [1, 3, 4, 2, 1, 1]),
+      'FA': const GuitarPosition([1, 3, 3, 2, 1, 1], [1, 3, 4, 2, 1, 1]),
+      'FM': const GuitarPosition([1, 3, 3, 1, 1, 1], [1, 3, 4, 1, 1, 1]),
+      'FAM': const GuitarPosition([1, 3, 3, 1, 1, 1], [1, 3, 4, 1, 1, 1]),
+      'F#M': const GuitarPosition([2, 4, 4, 2, 2, 2], [1, 3, 4, 1, 1, 1]),
+      'FA#M': const GuitarPosition([2, 4, 4, 2, 2, 2], [1, 3, 4, 1, 1, 1]),
 
       // SOL / G
-      'G': const _GuitarPos([3, 2, 0, 0, 0, 3], [2, 1, 0, 0, 0, 3]),
-      'SOL': const _GuitarPos([3, 2, 0, 0, 0, 3], [2, 1, 0, 0, 0, 3]),
-      'GM': const _GuitarPos([3, 5, 5, 3, 3, 3], [1, 3, 4, 1, 1, 1], baseFret: 3),
-      'SOLM': const _GuitarPos([3, 5, 5, 3, 3, 3], [1, 3, 4, 1, 1, 1], baseFret: 3),
-      'G7': const _GuitarPos([3, 2, 0, 0, 0, 1], [3, 2, 0, 0, 0, 1]),
-      'SOL7': const _GuitarPos([3, 2, 0, 0, 0, 1], [3, 2, 0, 0, 0, 1]),
-      'GSUS4': const _GuitarPos([3, 3, 0, 0, 1, 3], [2, 3, 0, 0, 1, 4]),
-      'SOLSUS4': const _GuitarPos([3, 3, 0, 0, 1, 3], [2, 3, 0, 0, 1, 4]),
-      'G/B': const _GuitarPos([-1, 2, 0, 0, 0, 3], [0, 1, 0, 0, 0, 2]),
-      'SOL/SI': const _GuitarPos([-1, 2, 0, 0, 0, 3], [0, 1, 0, 0, 0, 2]),
+      'G': const GuitarPosition([3, 2, 0, 0, 0, 3], [2, 1, 0, 0, 0, 3]),
+      'SOL': const GuitarPosition([3, 2, 0, 0, 0, 3], [2, 1, 0, 0, 0, 3]),
+      'GM': const GuitarPosition([3, 5, 5, 3, 3, 3], [1, 3, 4, 1, 1, 1], baseFret: 3),
+      'SOLM': const GuitarPosition([3, 5, 5, 3, 3, 3], [1, 3, 4, 1, 1, 1], baseFret: 3),
+      'G7': const GuitarPosition([3, 2, 0, 0, 0, 1], [3, 2, 0, 0, 0, 1]),
+      'SOL7': const GuitarPosition([3, 2, 0, 0, 0, 1], [3, 2, 0, 0, 0, 1]),
+      'GSUS4': const GuitarPosition([3, 3, 0, 0, 1, 3], [2, 3, 0, 0, 1, 4]),
+      'SOLSUS4': const GuitarPosition([3, 3, 0, 0, 1, 3], [2, 3, 0, 0, 1, 4]),
+      'G/B': const GuitarPosition([-1, 2, 0, 0, 0, 3], [0, 1, 0, 0, 0, 2]),
+      'SOL/SI': const GuitarPosition([-1, 2, 0, 0, 0, 3], [0, 1, 0, 0, 0, 2]),
 
       // LA / A
-      'A': const _GuitarPos([-1, 0, 2, 2, 2, 0], [0, 0, 1, 2, 3, 0]),
-      'LA': const _GuitarPos([-1, 0, 2, 2, 2, 0], [0, 0, 1, 2, 3, 0]),
-      'AM': const _GuitarPos([-1, 0, 2, 2, 1, 0], [0, 0, 2, 3, 1, 0]),
-      'LAM': const _GuitarPos([-1, 0, 2, 2, 1, 0], [0, 0, 2, 3, 1, 0]),
-      'A7': const _GuitarPos([-1, 0, 2, 0, 2, 0], [0, 0, 1, 0, 2, 0]),
-      'LA7': const _GuitarPos([-1, 0, 2, 0, 2, 0], [0, 0, 1, 0, 2, 0]),
-      'AM7': const _GuitarPos([-1, 0, 2, 0, 1, 0], [0, 0, 2, 0, 1, 0]),
-      'LAM7': const _GuitarPos([-1, 0, 2, 0, 1, 0], [0, 0, 2, 0, 1, 0]),
-      'AADD9': const _GuitarPos([-1, 0, 2, 2, 0, 0], [0, 0, 1, 2, 0, 0]),
-      'LAADD9': const _GuitarPos([-1, 0, 2, 2, 0, 0], [0, 0, 1, 2, 0, 0]),
-      'AM/G': const _GuitarPos([3, 0, 2, 2, 1, 0], [3, 0, 2, 4, 1, 0]),
-      'LAM/SOL': const _GuitarPos([3, 0, 2, 2, 1, 0], [3, 0, 2, 4, 1, 0]),
+      'A': const GuitarPosition([-1, 0, 2, 2, 2, 0], [0, 0, 1, 2, 3, 0]),
+      'LA': const GuitarPosition([-1, 0, 2, 2, 2, 0], [0, 0, 1, 2, 3, 0]),
+      'AM': const GuitarPosition([-1, 0, 2, 2, 1, 0], [0, 0, 2, 3, 1, 0]),
+      'LAM': const GuitarPosition([-1, 0, 2, 2, 1, 0], [0, 0, 2, 3, 1, 0]),
+      'A7': const GuitarPosition([-1, 0, 2, 0, 2, 0], [0, 0, 1, 0, 2, 0]),
+      'LA7': const GuitarPosition([-1, 0, 2, 0, 2, 0], [0, 0, 1, 0, 2, 0]),
+      'AM7': const GuitarPosition([-1, 0, 2, 0, 1, 0], [0, 0, 2, 0, 1, 0]),
+      'LAM7': const GuitarPosition([-1, 0, 2, 0, 1, 0], [0, 0, 2, 0, 1, 0]),
+      'AADD9': const GuitarPosition([-1, 0, 2, 2, 0, 0], [0, 0, 1, 2, 0, 0]),
+      'LAADD9': const GuitarPosition([-1, 0, 2, 2, 0, 0], [0, 0, 1, 2, 0, 0]),
+      'AM/G': const GuitarPosition([3, 0, 2, 2, 1, 0], [3, 0, 2, 4, 1, 0]),
+      'LAM/SOL': const GuitarPosition([3, 0, 2, 2, 1, 0], [3, 0, 2, 4, 1, 0]),
 
       // SI / B
-      'B': const _GuitarPos([-1, 2, 4, 4, 4, 2], [0, 1, 2, 3, 4, 1], baseFret: 2),
-      'SI': const _GuitarPos([-1, 2, 4, 4, 4, 2], [0, 1, 2, 3, 4, 1], baseFret: 2),
-      'BM': const _GuitarPos([-1, 2, 4, 4, 3, 2], [0, 1, 3, 4, 2, 1], baseFret: 2),
-      'SIM': const _GuitarPos([-1, 2, 4, 4, 3, 2], [0, 1, 3, 4, 2, 1], baseFret: 2),
-      'B7': const _GuitarPos([-1, 2, 1, 2, 0, 2], [0, 2, 1, 3, 0, 4]),
-      'SI7': const _GuitarPos([-1, 2, 1, 2, 0, 2], [0, 2, 1, 3, 0, 4]),
+      'B': const GuitarPosition([-1, 2, 4, 4, 4, 2], [0, 1, 2, 3, 4, 1], baseFret: 2),
+      'SI': const GuitarPosition([-1, 2, 4, 4, 4, 2], [0, 1, 2, 3, 4, 1], baseFret: 2),
+      'BM': const GuitarPosition([-1, 2, 4, 4, 3, 2], [0, 1, 3, 4, 2, 1], baseFret: 2),
+      'SIM': const GuitarPosition([-1, 2, 4, 4, 3, 2], [0, 1, 3, 4, 2, 1], baseFret: 2),
+      'B7': const GuitarPosition([-1, 2, 1, 2, 0, 2], [0, 2, 1, 3, 0, 4]),
+      'SI7': const GuitarPosition([-1, 2, 1, 2, 0, 2], [0, 2, 1, 3, 0, 4]),
       // Acordes Semidisminuidos (m7b5) y Disminuidos (dim)
-      'CM7(B5)': const _GuitarPos([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
-      'DOM7(B5)': const _GuitarPos([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
-      'CM7B5': const _GuitarPos([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
-      'DOM7B5': const _GuitarPos([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
-      'CDIM': const _GuitarPos([-1, 3, 4, 2, 4, -1], [0, 2, 3, 1, 4, 0]),
-      'DODIM': const _GuitarPos([-1, 3, 4, 2, 4, -1], [0, 2, 3, 1, 4, 0]),
+      'CM7(B5)': const GuitarPosition([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
+      'DOM7(B5)': const GuitarPosition([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
+      'CM7B5': const GuitarPosition([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
+      'DOM7B5': const GuitarPosition([-1, 3, 4, 3, 4, -1], [0, 1, 3, 2, 4, 0]),
+      'CDIM': const GuitarPosition([-1, 3, 4, 2, 4, -1], [0, 2, 3, 1, 4, 0]),
+      'DODIM': const GuitarPosition([-1, 3, 4, 2, 4, -1], [0, 2, 3, 1, 4, 0]),
 
-      'C#M7(B5)': const _GuitarPos([-1, 4, 5, 4, 5, -1], [0, 1, 3, 2, 4, 0]),
-      'DO#M7(B5)': const _GuitarPos([-1, 4, 5, 4, 5, -1], [0, 1, 3, 2, 4, 0]),
+      'C#M7(B5)': const GuitarPosition([-1, 4, 5, 4, 5, -1], [0, 1, 3, 2, 4, 0]),
+      'DO#M7(B5)': const GuitarPosition([-1, 4, 5, 4, 5, -1], [0, 1, 3, 2, 4, 0]),
 
-      'DM7(B5)': const _GuitarPos([-1, 5, 6, 5, 6, -1], [0, 1, 3, 2, 4, 0]),
-      'REM7(B5)': const _GuitarPos([-1, 5, 6, 5, 6, -1], [0, 1, 3, 2, 4, 0]),
+      'DM7(B5)': const GuitarPosition([-1, 5, 6, 5, 6, -1], [0, 1, 3, 2, 4, 0]),
+      'REM7(B5)': const GuitarPosition([-1, 5, 6, 5, 6, -1], [0, 1, 3, 2, 4, 0]),
 
-      'EM7(B5)': const _GuitarPos([0, 1, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]),
-      'MIM7(B5)': const _GuitarPos([0, 1, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]),
+      'EM7(B5)': const GuitarPosition([0, 1, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]),
+      'MIM7(B5)': const GuitarPosition([0, 1, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]),
 
-      'F#M7(B5)': const _GuitarPos([2, -1, 2, 2, 1, -1], [2, 0, 3, 4, 1, 0]),
-      'FA#M7(B5)': const _GuitarPos([2, -1, 2, 2, 1, -1], [2, 0, 3, 4, 1, 0]),
+      'F#M7(B5)': const GuitarPosition([2, -1, 2, 2, 1, -1], [2, 0, 3, 4, 1, 0]),
+      'FA#M7(B5)': const GuitarPosition([2, -1, 2, 2, 1, -1], [2, 0, 3, 4, 1, 0]),
 
-      'GM7(B5)': const _GuitarPos([3, -1, 3, 3, 2, -1], [2, 0, 3, 4, 1, 0]),
-      'SOLM7(B5)': const _GuitarPos([3, -1, 3, 3, 2, -1], [2, 0, 3, 4, 1, 0]),
+      'GM7(B5)': const GuitarPosition([3, -1, 3, 3, 2, -1], [2, 0, 3, 4, 1, 0]),
+      'SOLM7(B5)': const GuitarPosition([3, -1, 3, 3, 2, -1], [2, 0, 3, 4, 1, 0]),
 
-      'AM7(B5)': const _GuitarPos([-1, 0, 1, 0, 1, 0], [0, 0, 1, 0, 2, 0]),
-      'LAM7(B5)': const _GuitarPos([-1, 0, 1, 0, 1, 0], [0, 0, 1, 0, 2, 0]),
+      'AM7(B5)': const GuitarPosition([-1, 0, 1, 0, 1, 0], [0, 0, 1, 0, 2, 0]),
+      'LAM7(B5)': const GuitarPosition([-1, 0, 1, 0, 1, 0], [0, 0, 1, 0, 2, 0]),
 
-      'BM7(B5)': const _GuitarPos([-1, 2, 3, 2, 3, -1], [0, 1, 3, 2, 4, 0]),
-      'SIM7(B5)': const _GuitarPos([-1, 2, 3, 2, 3, -1], [0, 1, 3, 2, 4, 0]),
+      'BM7(B5)': const GuitarPosition([-1, 2, 3, 2, 3, -1], [0, 1, 3, 2, 4, 0]),
+      'SIM7(B5)': const GuitarPosition([-1, 2, 3, 2, 3, -1], [0, 1, 3, 2, 4, 0]),
     };
 
     if (dictionary.containsKey(clean)) {
-      return dictionary[clean]!;
+      final exact = dictionary[clean]!;
+      // For exact dictionary matches, we only provide 1 position for now.
+      return [exact];
     }
 
-    // Si no está exacto en el diccionario, usar transposición algorítmica por cejuela inteligente
-    final bool isHalfDim = suffix.toLowerCase().contains('m7(b5)') || suffix.toLowerCase().contains('m7b5');
-    final bool isMinor = suffix.toLowerCase().startsWith('m');
+    // Si no está exacto en el diccionario, generar 2 posiciones (Cejuela en 5ta y 6ta cuerda)
+    final lower = suffix.toLowerCase();
     
-    List<int> basePatternFrets = isMinor ? [-1, 1, 3, 3, 2, 1] : [-1, 1, 3, 3, 3, 1];
-    List<int> basePatternFingers = isMinor ? [0, 1, 3, 4, 2, 1] : [0, 1, 2, 3, 4, 1];
+    final bool isHalfDim = lower.contains('m7(b5)') || lower.contains('m7b5');
+    final bool isDim = lower.contains('dim') && !isHalfDim;
+    final bool is13Sus = lower.contains('13sus');
+    final bool is13 = lower.contains('13') && !is13Sus;
+    final bool isSus4 = (lower.contains('sus4') || (lower.contains('sus') && !lower.contains('sus2'))) && !is13Sus;
+    
+    final bool hasAdd9 = lower.contains('add9');
+    final bool has9 = lower.contains('9') && !hasAdd9;
+    final bool hasMaj7 = lower.contains('maj7');
+    final bool has7 = (lower.contains('7') && !hasMaj7) || is13 || has9;
+    final bool isMinor = lower.startsWith('m') && !isHalfDim && !isDim;
+
+    // Configuración Base - Cuerda 5 (A shape)
+    List<int> aFrets = [-1, 1, 3, 3, 3, 1]; // Mayor
+    List<int> aFingers = [0, 1, 2, 3, 4, 1];
+    
+    // Configuración Base - Cuerda 6 (E shape)
+    List<int> eFrets = [1, 3, 3, 2, 1, 1]; // Mayor
+    List<int> eFingers = [1, 3, 4, 2, 1, 1];
+
     if (isHalfDim) {
-      basePatternFrets = [-1, 1, 2, 1, 2, -1];
-      basePatternFingers = [0, 1, 3, 2, 4, 0];
+      aFrets = [-1, 1, 2, 1, 2, -1];
+      aFingers = [0, 1, 3, 1, 4, 0];
+      eFrets = [1, -1, 1, 1, 0, -1]; // Forma de 6ta cuerda con traste "al aire" local
+      eFingers = [1, 0, 2, 3, 0, 0]; // (Nota: será recalculado sin embargo es complejo de transponer. Lo omitiremos de momento al filtrar)
+    } else if (isDim) {
+      aFrets = [-1, 1, 2, 3, 2, -1];
+      aFingers = [0, 1, 2, 4, 3, 0];
+      eFrets = [1, -1, 1, 1, -1, -1];
+      eFingers = [1, 0, 2, 3, 0, 0];
+    } else if (hasAdd9) {
+      aFrets = [-1, 1, 3, 3, 1, 3];
+      aFingers = [0, 1, 3, 4, 1, 2];
+      eFrets = [1, 3, 5, 2, 1, 1];
+      eFingers = [1, 2, 4, 3, 1, 1];
+    } else if (has9) {
+      aFrets = [-1, 1, 3, 1, 3, 1]; // Fallback to 7
+      aFingers = [0, 1, 3, 1, 4, 1];
+      eFrets = [1, 3, 1, 2, 1, 3];
+      eFingers = [1, 3, 1, 2, 1, 4];
+    } else if (is13Sus) {
+      aFrets = [-1, 1, 1, 1, 1, 3];
+      aFingers = [0, 1, 1, 1, 1, 4];
+      eFrets = [1, -1, 1, 3, 3, 3];
+      eFingers = [1, 0, 1, 2, 3, 4];
+    } else if (is13) {
+      aFrets = [-1, 1, 3, 1, 3, 1]; // Fallback 7
+      aFingers = [0, 1, 3, 1, 4, 1];
+      eFrets = [1, -1, 1, 2, 3, -1];
+      eFingers = [1, 0, 1, 2, 4, 0];
+    } else if (isSus4) {
+      aFrets = [-1, 1, 3, 3, 4, 1];
+      aFingers = [0, 1, 2, 3, 4, 1];
+      eFrets = [1, 3, 3, 3, 1, 1];
+      eFingers = [1, 2, 3, 4, 1, 1];
+    } else if (hasMaj7) {
+      aFrets = [-1, 1, 3, 2, 3, 1];
+      aFingers = [0, 1, 3, 2, 4, 1];
+      eFrets = [1, -1, 2, 2, 1, -1];
+      eFingers = [1, 0, 3, 4, 2, 0];
+    } else if (isMinor && has7) { // m7
+      aFrets = [-1, 1, 3, 1, 2, 1];
+      aFingers = [0, 1, 3, 1, 2, 1];
+      eFrets = [1, 3, 1, 1, 1, 1];
+      eFingers = [1, 3, 1, 1, 1, 1];
+    } else if (has7) { // Dominant 7
+      aFrets = [-1, 1, 3, 1, 3, 1];
+      aFingers = [0, 1, 3, 1, 4, 1];
+      eFrets = [1, 3, 1, 2, 1, 1];
+      eFingers = [1, 3, 1, 2, 1, 1];
+    } else if (isMinor) { // Minor triad
+      aFrets = [-1, 1, 3, 3, 2, 1];
+      aFingers = [0, 1, 3, 4, 2, 1];
+      eFrets = [1, 3, 3, 1, 1, 1];
+      eFingers = [1, 3, 4, 1, 1, 1];
     }
 
-    final int fretOffset = (rootIndex + 3) % 12;
-    final int finalBaseFret = fretOffset == 0 ? 12 : fretOffset;
-    final int shift = finalBaseFret - 1;
+    GuitarPosition generatePos(List<int> patternFrets, List<int> patternFingers, int offset) {
+      final int fretOffset = (rootIndex + offset) % 12;
+      final int finalBaseFret = fretOffset == 0 ? 12 : fretOffset;
+      final int shift = finalBaseFret - 1;
+      final absoluteFrets = patternFrets.map((f) => (f == -1 || f == 0) ? f : f + shift).toList();
+      return GuitarPosition(absoluteFrets, patternFingers, baseFret: finalBaseFret);
+    }
 
-    final absoluteFrets = basePatternFrets.map((f) => (f == -1 || f == 0) ? f : f + shift).toList();
+    final posA = generatePos(aFrets, aFingers, 3); // A string (Offset 3)
+    final posE = generatePos(eFrets, eFingers, 8); // E string (Offset 8)
 
-    return _GuitarPos(absoluteFrets, basePatternFingers, baseFret: finalBaseFret);
+    // Si es un acorde muy raro y no hemos definido la forma de E, la ignoramos.
+    if (isHalfDim || isDim) {
+      return [posA];
+    }
+
+    // Ordenar de forma inteligente: el que está más cerca del clavijero se muestra primero
+    if (posE.baseFret < posA.baseFret) {
+      return [posE, posA];
+    } else {
+      return [posA, posE];
+    }
   }
 }
 
-class _GuitarPos {
-  final List<int> frets;
-  final List<int> fingers;
-  final int baseFret;
 
-  const _GuitarPos(this.frets, this.fingers, {this.baseFret = 1});
-}
 
 class GuitarFretboardPainter extends CustomPainter {
   final List<int> frets;

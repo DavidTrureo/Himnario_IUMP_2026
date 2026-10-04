@@ -90,6 +90,26 @@ class _PresentationScreenState extends State<PresentationScreen> {
     super.dispose();
   }
 
+  bool _isHeaderLine(String line) {
+    final fl = line.trim().toLowerCase();
+    if (fl.startsWith('coro') || fl.startsWith('puente') || fl.startsWith('final') || fl.startsWith('solista')) {
+      return true;
+    }
+    final match = RegExp(r'^(estrofa\s+\d+|\d+\.|([ivx]+))(\s*\.\s*|\s*\-\s*|\s+|$)(.*)', caseSensitive: false).firstMatch(fl);
+    if (match != null) {
+      final romanStr = match.group(2);
+      final separator = match.group(3) ?? '';
+      final restText = match.group(4) ?? '';
+      if (romanStr != null) {
+        if (romanStr.toLowerCase() == 'vi' && !separator.contains('.') && !separator.contains('-') && restText.trim().isNotEmpty) {
+          return false; // False positive for "vi " as a verb
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
   List<String> _getMergedBlocksWithoutChords(String lyrics) {
     final RegExp chordRegex = RegExp(r'\[[^\]]+\]');
     
@@ -118,8 +138,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
         continue;
       }
 
-      final match = headerRegex.firstMatch(line);
-      if (match != null) {
+      if (_isHeaderLine(line)) {
         if (currentBlock.isNotEmpty) {
           rawBlocks.add(currentBlock.join('\n'));
           currentBlock = [];
@@ -154,7 +173,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
       if (chorusStartIndex != -1) {
         for (int i = chorusStartIndex; i < rawBlocks.length; i++) {
           final fl = rawBlocks[i].split('\n').first.trim().toLowerCase();
-          if (i != chorusStartIndex && (fl.startsWith('coro') || fl.startsWith('puente') || fl.startsWith('final') || RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(fl))) {
+          if (i != chorusStartIndex && _isHeaderLine(fl)) {
             break;
           }
           chorusFragments.add(rawBlocks[i]);
@@ -172,7 +191,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
           if (fl.startsWith('coro')) { currentHeader = 'coro'; break; }
           if (fl.startsWith('puente')) { currentHeader = 'puente'; break; }
           if (fl.startsWith('final')) { currentHeader = 'final'; break; }
-          if (RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(fl)) {
+          if (_isHeaderLine(fl)) {
             currentHeader = 'estrofa'; break;
           }
         }
@@ -181,10 +200,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
           bool isLastFragment = true;
           if (i < rawBlocks.length - 1) {
             final nextBlockFirstLine = rawBlocks[i + 1].split('\n').first.trim().toLowerCase();
-            final hasHeader = nextBlockFirstLine.startsWith('coro') || 
-                              nextBlockFirstLine.startsWith('puente') || 
-                              nextBlockFirstLine.startsWith('final') || 
-                              RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(nextBlockFirstLine);
+            final hasHeader = _isHeaderLine(nextBlockFirstLine);
             if (!hasHeader) {
               isLastFragment = false;
             }
@@ -212,8 +228,17 @@ class _PresentationScreenState extends State<PresentationScreen> {
     final List<String> finalBlocks = [];
     for (var block in sequencedBlocks) {
       final blockLines = block.split('\n');
-      if (blockLines.length > 8) {
-        final mid = (blockLines.length / 2).ceil();
+      
+      final nonEmptyLines = blockLines.where((l) => l.trim().isNotEmpty).toList();
+      int lyricsCount = nonEmptyLines.length;
+      bool hasHeader = nonEmptyLines.isNotEmpty && _isHeaderLine(nonEmptyLines.first);
+      if (hasHeader) {
+        lyricsCount--;
+      }
+
+      if (lyricsCount > 8) {
+        final lyricsMid = (lyricsCount / 2).ceil();
+        final mid = hasHeader ? lyricsMid + 1 : lyricsMid;
         
         final firstPart = blockLines.sublist(0, mid).join('\n');
         String secondPart = blockLines.sublist(mid).join('\n');
@@ -329,7 +354,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
         final block = _blocks[i];
         if (block == '[TITLE]') continue;
         final firstLine = block.split('\n').first.trim().toLowerCase();
-        if (i != groupStart && (firstLine.startsWith('coro') || firstLine.startsWith('puente') || firstLine.startsWith('final') || RegExp(r'^(estrofa\s+\d+|\d+\.|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))', caseSensitive: false).hasMatch(firstLine))) {
+        if (i != groupStart && _isHeaderLine(firstLine)) {
             break;
         }
         totalFragments++;
@@ -743,13 +768,19 @@ class _PresentationScreenState extends State<PresentationScreen> {
                      activeHeader.toLowerCase().startsWith('final');
     
     String displayText = blockText;
-    if (tagRegExp.hasMatch(firstLine)) {
-      final lineWithoutTag = firstLine.replaceFirst(tagRegExp, '').trim();
-      if (lineWithoutTag.isEmpty) {
-        displayText = lines.skip(1).join('\n').trim();
+    final match = tagRegExp.firstMatch(firstLine);
+    if (match != null) {
+      final matchText = firstLine.substring(match.start, match.end).trim().toLowerCase();
+      if (matchText.startsWith('vi') && !matchText.contains('.') && !matchText.contains('-') && firstLine.substring(match.end).trim().isNotEmpty) {
+        // Falso positivo: no es "VI" romano, es "Vi" (verbo). No borrar.
       } else {
-        final rest = lines.skip(1).join('\n');
-        displayText = '$lineWithoutTag\n$rest'.trim();
+        final lineWithoutTag = firstLine.substring(match.end).trim();
+        if (lineWithoutTag.isEmpty) {
+          displayText = lines.skip(1).join('\n').trim();
+        } else {
+          final rest = lines.skip(1).join('\n');
+          displayText = '$lineWithoutTag\n$rest'.trim();
+        }
       }
     }
     

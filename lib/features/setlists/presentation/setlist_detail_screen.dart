@@ -128,8 +128,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                   expandedHeight: 140.0,
                   floating: false,
                   pinned: true,
-                  elevation: 0,
-                  backgroundColor: Colors.transparent,
+                  elevation: 2, // Slight elevation to give a shadow when scrolled
+                  backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  surfaceTintColor: Colors.transparent, // Prevents Material 3 tinting over the background
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.people_outline_rounded),
@@ -274,8 +275,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           if (setlistHymns.isEmpty) return const SizedBox.shrink();
 
           return Container(
-            margin: EdgeInsets.only(bottom: 96 + MediaQuery.of(context).padding.bottom),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A) : Colors.white,
               border: Border(
@@ -456,7 +456,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ],
         ),
         onTap: () {
-          context.push('/hymn/${hymn.collection}-${hymn.id}');
+          final location = GoRouterState.of(context).uri.path;
+          final target = location.endsWith('/')
+              ? '${location}hymn/${hymn.collection}-${hymn.id}'
+              : '$location/hymn/${hymn.collection}-${hymn.id}';
+          context.push(target);
         },
       ),
     );

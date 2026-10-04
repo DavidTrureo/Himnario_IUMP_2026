@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/widgets/app_music_icons.dart';
 import 'metronome_audio_synth.dart';
 
 class VisualMetronomeWidget extends StatefulWidget {
+  final int hymnId;
   final int initialBpm;
   final bool isTopPosition;
   final bool isVerticalLayout;
@@ -14,6 +16,7 @@ class VisualMetronomeWidget extends StatefulWidget {
 
   const VisualMetronomeWidget({
     super.key,
+    required this.hymnId,
     this.initialBpm = 80,
     this.isTopPosition = true,
     this.isVerticalLayout = false,
@@ -31,7 +34,9 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
   bool _isPlaying = false;
   bool _soundEnabled = true;
   int _beatsPerMeasure = 4; // Métrica por defecto 4/4
+  int _subdivision = 1; // 1=Negras, 2=Corcheas, 3=Tresillos, 4=Semicorcheas
   int _beatCount = 0;
+  int _subTick = 0;
   Timer? _timer;
   late AnimationController _pulseController;
   final List<DateTime> _tapTimes = [];
@@ -44,6 +49,22 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
       vsync: this,
       duration: const Duration(milliseconds: 90),
     );
+    _loadSavedBpm();
+  }
+  
+  Future<void> _loadSavedBpm() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedBpm = prefs.getInt('metronome_bpm_${widget.hymnId}');
+    if (savedBpm != null && mounted) {
+      setState(() {
+        _bpm = savedBpm;
+      });
+    }
+  }
+
+  Future<void> _saveBpm(int bpmToSave) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('metronome_bpm_${widget.hymnId}', bpmToSave);
   }
 
   @override
@@ -59,10 +80,12 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
       _isPlaying = !_isPlaying;
       if (_isPlaying) {
         _beatCount = 0;
-        _playClickSound();
+        _subTick = 0;
+        _playClickSound(isMainBeat: true);
         _pulseController.forward(from: 0.0).then((_) {
           if (mounted) _pulseController.reverse();
         });
+        _subTick++;
         _startTimer();
       } else {
         _timer?.cancel();
@@ -70,23 +93,37 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
     });
   }
 
-  void _playClickSound() {
-    final isAccent = _beatsPerMeasure > 1 && (_beatCount % _beatsPerMeasure) == 0;
-    playAudioTick(soundEnabled: _soundEnabled, accent: isAccent);
+  void _playClickSound({required bool isMainBeat}) {
+    if (isMainBeat) {
+      final isAccent = _beatsPerMeasure > 1 && (_beatCount % _beatsPerMeasure) == 0;
+      playAudioTick(soundEnabled: _soundEnabled, accent: isAccent, subdivision: false);
+    } else {
+      playAudioTick(soundEnabled: _soundEnabled, accent: false, subdivision: true);
+    }
   }
 
   void _startTimer() {
     _timer?.cancel();
-    final intervalMs = (60000 / _bpm).round();
+    final intervalMs = (60000 / _bpm / _subdivision).round();
     _timer = Timer.periodic(Duration(milliseconds: intervalMs), (timer) {
       if (mounted && _isPlaying) {
+        bool isMainBeat = (_subTick % _subdivision) == 0;
+        
         setState(() {
-          _beatCount++;
+          if (isMainBeat) {
+            _beatCount++;
+          }
         });
-        _playClickSound();
-        _pulseController.forward(from: 0.0).then((_) {
-          if (mounted) _pulseController.reverse();
-        });
+        
+        _playClickSound(isMainBeat: isMainBeat);
+        
+        if (isMainBeat) {
+          _pulseController.forward(from: 0.0).then((_) {
+            if (mounted) _pulseController.reverse();
+          });
+        }
+        
+        _subTick++;
       }
     });
   }
@@ -94,6 +131,7 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
   void _setBpm(int newBpm) {
     setState(() {
       _bpm = newBpm.clamp(40, 240);
+      _saveBpm(_bpm);
       if (_isPlaying) {
         _startTimer();
       }
@@ -121,7 +159,7 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
     });
 
     // 3. Emitir el golpe de audio en el momento exacto del toque de TAP
-    _playClickSound();
+    _playClickSound(isMainBeat: true);
 
     if (_tapTimes.length >= 2) {
       final differences = <int>[];
@@ -133,6 +171,7 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
         final calculatedBpm = (60000 / avgDifference).round().clamp(40, 240);
         setState(() {
           _bpm = calculatedBpm;
+          _saveBpm(_bpm);
           if (_isPlaying) {
             // Cancelar el temporizador anterior y reiniciar desde cero para evitar mezclas o solapamientos
             _timer?.cancel();
@@ -195,20 +234,28 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
                   ),
                   const SizedBox(height: 4),
 
-                  Text(
-                    '$_bpm',
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    'BPM',
-                    style: GoogleFonts.outfit(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.primary,
+                  GestureDetector(
+                    onTap: _handleTapTempo,
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      children: [
+                        Text(
+                          '$_bpm',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          'BPM',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -242,19 +289,32 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
                       }
                     },
                   ),
-
-                  // Botón TAP Tempo en Modo Vertical
-                  OutlinedButton(
-                    onPressed: _handleTapTempo,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  
+                  // Selector de Subdivisión en Modo Vertical
+                  DropdownButton<int>(
+                    value: _subdivision,
+                    underline: const SizedBox(),
+                    icon: const Icon(Icons.arrow_drop_down_rounded, size: 14),
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                      color: theme.colorScheme.primary,
                     ),
-                    child: Text(
-                      'TAP',
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 10),
-                    ),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('1/4')),
+                      DropdownMenuItem(value: 2, child: Text('1/8')),
+                      DropdownMenuItem(value: 3, child: Text('3/8')),
+                      DropdownMenuItem(value: 4, child: Text('1/16')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _subdivision = val;
+                          _subTick = 0;
+                          if (_isPlaying) _startTimer();
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(height: 6),
 
@@ -342,21 +402,30 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '$_bpm',
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          'BPM',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: theme.colorScheme.primary,
+                        GestureDetector(
+                          onTap: _handleTapTempo,
+                          behavior: HitTestBehavior.opaque,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$_bpm',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'BPM',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -392,6 +461,34 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
                         ),
                         const SizedBox(width: 2),
 
+                        // Selector de Subdivisión en Modo Horizontal
+                        DropdownButton<int>(
+                          value: _subdivision,
+                          underline: const SizedBox(),
+                          icon: const Icon(Icons.arrow_drop_down_rounded, size: 16),
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: theme.colorScheme.primary,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 1, child: Text('1/4')),
+                            DropdownMenuItem(value: 2, child: Text('1/8')),
+                            DropdownMenuItem(value: 3, child: Text('3/8')),
+                            DropdownMenuItem(value: 4, child: Text('1/16')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _subdivision = val;
+                                _subTick = 0;
+                                if (_isPlaying) _startTimer();
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 2),
+
                         // Botones Ajuste - / +
                         IconButton(
                           icon: const Icon(Icons.remove_circle_outline_rounded, size: 18),
@@ -404,21 +501,6 @@ class _VisualMetronomeWidgetState extends State<VisualMetronomeWidget> with Sing
                           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                           padding: EdgeInsets.zero,
                           onPressed: () => _setBpm(_bpm + 2),
-                        ),
-                        const SizedBox(width: 4),
-
-                        // Botón TAP Tempo
-                        OutlinedButton(
-                          onPressed: _handleTapTempo,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            'TAP',
-                            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 11),
-                          ),
                         ),
                         const SizedBox(width: 4),
 

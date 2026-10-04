@@ -1203,6 +1203,21 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
       'sheetMusicUrls': hymn.sheetMusicUrls,
     };
     
+    // Actualización optimista de la colección destino (previene sobreescrituras en movimientos rápidos)
+    final targetNotifier = ref.read(hymnsProvider(targetCollection).notifier);
+    if (targetNotifier.state.hasValue) {
+      final currentTargetList = targetNotifier.state.value!.toList();
+      currentTargetList.add(Hymn.fromJson(data, targetCollection));
+      targetNotifier.state = AsyncValue.data(currentTargetList);
+    }
+    
+    // Actualización optimista de la colección origen
+    if (state.hasValue) {
+      final currentSourceList = state.value!.toList();
+      currentSourceList.removeWhere((h) => h.id == hymn.id);
+      state = AsyncValue.data(currentSourceList);
+    }
+
     try {
       // Escribir en la colección destino
       await firestore.collection(targetCollection).doc(nextId.toString()).set(data);

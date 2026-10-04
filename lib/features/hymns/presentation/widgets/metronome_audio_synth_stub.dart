@@ -79,11 +79,14 @@ Uint8List _generateAcousticToneWavBytes({required double frequency, required dou
   return bytes.buffer.asUint8List();
 }
 
-void playMetronomeTick({required bool soundEnabled, bool accent = false}) async {
+void playMetronomeTick({required bool soundEnabled, bool accent = false, bool subdivision = false}) async {
   if (!soundEnabled) return;
   try {
     _nativePlayer ??= AudioPlayer();
-    final freq = accent ? 2600.0 : 2200.0;
+    double freq = 2200.0;
+    if (accent) freq = 2600.0;
+    if (subdivision) freq = 1200.0;
+    
     final wavBytes = _generateClaveWavBytes(frequency: freq, durationSeconds: 0.04);
     final base64Wav = base64Encode(wavBytes);
     final dataUrl = 'data:audio/wav;base64,$base64Wav';

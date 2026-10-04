@@ -20,10 +20,13 @@ void unlockAudioContext() {
   } catch (_) {}
 }
 
-void playMetronomeTick({required bool soundEnabled, bool accent = false}) {
+void playMetronomeTick({required bool soundEnabled, bool accent = false, bool subdivision = false}) {
   if (!soundEnabled) return;
   try {
-    final freq = accent ? 2600 : 2200;
+    int freq = 2200;
+    if (accent) freq = 2600;
+    if (subdivision) freq = 1200;
+
     js.context.callMethod('eval', [
       '''
       (function() {

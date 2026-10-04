@@ -1,3 +1,4 @@
+import 'dart:io';
 
 import 'package:himnario_iump/core/services/chord_transposer_service.dart';
 import 'package:flutter/services.dart';
@@ -9,31 +10,44 @@ import '../../features/hymns/domain/hymn.dart';
 import 'chord_transposer_service.dart';
 
 class HymnPdfService {
+  static pw.MemoryImage? _missionLogo;
+  static pw.MemoryImage? _churchLogo;
+  static pw.Font? _fontRegular;
+  static pw.Font? _fontBold;
+
   /// Genera un documento PDF profesional y hermoso para un canto individual.
   static Future<Uint8List> generateHymnPdf(
     Hymn hymn, {
     int transposeOffset = 0,
     bool includeChords = true,
     String notation = 'spanish',
+    PdfPageFormat pageFormat = PdfPageFormat.letter,
   }) async {
     final doc = pw.Document();
 
-    // Cargar logotipos oficial e iglesia local
-    pw.MemoryImage? missionLogo;
-    pw.MemoryImage? churchLogo;
-    try {
-      final missionBytes = await rootBundle.load('assets/images/mission_logo_v3.png');
-      missionLogo = pw.MemoryImage(missionBytes.buffer.asUint8List());
-    } catch (_) {}
+    // Cargar logotipos oficial e iglesia local (cacheados)
+    if (_missionLogo == null) {
+      try {
+        final missionBytes = await rootBundle.load('assets/images/mission_logo_v3.png');
+        _missionLogo = pw.MemoryImage(missionBytes.buffer.asUint8List());
+      } catch (_) {}
+    }
 
-    try {
-      final churchBytes = await rootBundle.load('assets/images/church_logo_clean.png');
-      churchLogo = pw.MemoryImage(churchBytes.buffer.asUint8List());
-    } catch (_) {}
+    if (_churchLogo == null) {
+      try {
+        final churchBytes = await rootBundle.load('assets/images/church_logo_clean.png');
+        _churchLogo = pw.MemoryImage(churchBytes.buffer.asUint8List());
+      } catch (_) {}
+    }
 
-    // Cargar fuentes estilizadas desde Google Fonts PDF
-    final fontRegular = await PdfGoogleFonts.nunitoRegular();
-    final fontBold = await PdfGoogleFonts.outfitBold();
+    // Cargar fuentes estilizadas desde Google Fonts PDF (cacheadas)
+    _fontRegular ??= await PdfGoogleFonts.nunitoRegular();
+    _fontBold ??= await PdfGoogleFonts.outfitBold();
+
+    final missionLogo = _missionLogo;
+    final churchLogo = _churchLogo;
+    final fontRegular = _fontRegular!;
+    final fontBold = _fontBold!;
 
     // Procesar letra y transposición (asegurando cabeceras en su propia línea)
     String lyricsToRender = Hymn.ensureHeadersOnOwnLine(hymn.lyrics);
@@ -41,7 +55,12 @@ class HymnPdfService {
       lyricsToRender = ChordTransposerService.transposeLyrics(lyricsToRender, transposeOffset);
     }
     if (!includeChords) {
-      lyricsToRender = lyricsToRender.replaceAll(RegExp(r'\[[^\]]*\]'), '').trim();
+      // Removemos los acordes, pero si la línea queda completamente vacía (y no lo estaba antes), la eliminamos
+      // para no crear bloques vacíos que rompan el diseño en columnas.
+      lyricsToRender = lyricsToRender.split('\n').where((line) {
+        final noChords = line.replaceAll(RegExp(r'\[[^\]]*\]'), '').trim();
+        return noChords.isNotEmpty || line.trim().isEmpty;
+      }).map((line) => line.replaceAll(RegExp(r'\[[^\]]*\]'), '')).join('\n');
     }
 
     // Extraer solo la nota de tonalidad limpia
@@ -72,7 +91,7 @@ class HymnPdfService {
 
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        pageFormat: pageFormat,
         margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
         header: (pw.Context context) {
           return pw.Column(
@@ -230,7 +249,7 @@ class HymnPdfService {
             pw.SizedBox(height: 18),
 
             // Cuerpo de la Letra
-            buildLyricsPdfWidget(lyricsToRender, fontRegular, fontBold, transposeOffset, notation),
+            buildLyricsPdfWidget(lyricsToRender, fontRegular, fontBold, transposeOffset, notation, forceSingleColumn: includeChords),
           ];
         },
       ),
@@ -310,8 +329,10 @@ class HymnPdfService {
       isChorusList.add(currentIsChorus);
     }
 
-    // Si la letra es extensa (18 líneas o más de 3 bloques), organizamos en 2 columnas para caber en 1 sola hoja
-    if (!forceSingleColumn && (totalLines >= 18 || blocks.length > 3)) {
+    // Si NO se fuerzan a 1 sola columna (ej. "Solo Letra", sin acordes)
+    // Usamos 2 columnas para que quepa bonito y ahorre papel.
+    // Solo lo hacemos si hay hasta 14 bloques, para evitar overflow de pw.Row en una sola página.
+    if (!forceSingleColumn && blocks.length > 2 && blocks.length <= 14) {
       final int halfIndex = (blocks.length / 2).ceil();
       final leftBlocks = blocks.sublist(0, halfIndex);
       final rightBlocks = blocks.sublist(halfIndex);
@@ -345,10 +366,21 @@ class HymnPdfService {
       );
     }
 
-    // Si es corto, se muestra en 1 sola columna
+    // Siempre usamos 1 sola columna para "Completo" para que MultiPage 
+    // pueda paginar correctamente sin separar el título ni colapsar.
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: List.generate(blocks.length, (i) => buildBlockWidget(blocks[i], fontRegular, fontBold, isChorusList[i], transposeOffset, notation)),
+      children: List.generate(
+        blocks.length,
+        (i) => buildBlockWidget(
+          blocks[i],
+          fontRegular,
+          fontBold,
+          isChorusList[i],
+          transposeOffset,
+          notation,
+        ),
+      ),
     );
   }
 
@@ -559,20 +591,37 @@ class HymnPdfService {
     bool includeChords = true,
     String notation = 'spanish',
   }) async {
-    final pdfBytes = await generateHymnPdf(
-      hymn,
-      transposeOffset: transposeOffset,
-      includeChords: includeChords,
-      notation: notation,
-    );
+    try {
+      final String variant = includeChords ? 'completo' : 'letra';
+      final int timestamp = DateTime.now().millisecondsSinceEpoch;
+      final String filename = '${hymn.collection}_${hymn.id}_${_cleanFilename(hymn.title)}_${variant}_$timestamp.pdf';
 
-    final String filename = '${hymn.collection}_${hymn.id}_${_cleanFilename(hymn.title)}.pdf';
+      final pdfBytes = await generateHymnPdf(
+        hymn,
+        transposeOffset: transposeOffset,
+        includeChords: includeChords,
+        notation: notation,
+        pageFormat: PdfPageFormat.letter,
+      );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdfBytes,
-      name: filename,
-      format: PdfPageFormat.letter,
-    );
+      // En Android usamos layoutPdf para forzar el formato Carta por defecto en la impresora
+      // En iOS usamos sharePdf para evitar el congelamiento nativo al usar los botones +/- de escala
+      if (Platform.isAndroid) {
+        await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => pdfBytes,
+          name: filename,
+          format: PdfPageFormat.letter,
+        );
+      } else {
+        await Printing.sharePdf(
+          bytes: pdfBytes,
+          filename: filename,
+        );
+      }
+    } catch (e, stacktrace) {
+      print('ERROR in shareHymnPdf: $e');
+      print(stacktrace);
+    }
   }
 
   static String _cleanFilename(String text) {
