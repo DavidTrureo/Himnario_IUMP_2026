@@ -222,35 +222,41 @@ JSON esperado:
         });
 
         http.Response? response;
-        final modelsToTry = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
+        final modelsToTry = [
+          {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+          {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
+          {'model': 'gemini-1.5-flash', 'api': 'v1'},
+        ];
 
         List<String> modelErrors = [];
-        for (final model in modelsToTry) {
+        for (final item in modelsToTry) {
+          final model = item['model']!;
+          final api = item['api']!;
           try {
             final url = Uri.parse(
-                'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey');
+                'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$apiKey');
             final res = await http.post(
               url,
               headers: {'Content-Type': 'application/json'},
               body: requestBody,
-            ).timeout(const Duration(seconds: 30));
+            ).timeout(const Duration(seconds: 20));
 
             if (res.statusCode == 200) {
               response = res;
               break;
             } else {
-              modelErrors.add('$model failed with status ${res.statusCode}');
+              modelErrors.add('$model ($api) failed with status ${res.statusCode}');
             }
           } catch (e) {
-            modelErrors.add('$model exception: $e');
+            modelErrors.add('$model ($api) exception: $e');
           }
         }
         
         if (response == null) {
-          throw Exception('All models failed: ' + modelErrors.join(' | '));
+          throw Exception('All models failed: ${modelErrors.join(' | ')}');
         }
 
-        if (response != null && response.statusCode == 200) {
+        if (response.statusCode == 200) {
           final jsonRes = jsonDecode(response.body);
           final candidates = jsonRes['candidates'] as List?;
           if (candidates != null && candidates.isNotEmpty) {
@@ -271,7 +277,7 @@ JSON esperado:
         }
       } catch (e) {
         debugPrint('>>> Error en consulta remota Gemini: $e');
-        currentLyrics = "[ERROR GEMINI: $e]\n\n" + currentLyrics;
+        currentLyrics = "[ERROR GEMINI: $e]\n\n$currentLyrics";
       }
     }
 
@@ -494,17 +500,17 @@ JSON esperado:
     );
   }
 
-  /// Analiza una imagen (fotografía de partitura o guía de acordes) y extrae la información musical
+  /// Analiza una imagen (fotografía de cancionero o letra escrita) y extrae el texto limpio del canto
   static Future<Map<String, dynamic>?> transcribeSheetMusic(String base64Image, {String mimeType = 'image/jpeg'}) async {
     String apiKey = await getApiKey();
     if (apiKey.isEmpty) return null;
 
-    final promptText = '''Eres un experto transcriptor. Analiza la imagen adjunta, que contiene la letra de un canto, probablemente con acordes escritos arriba de las palabras.
+    final promptText = '''Eres un experto transcriptor de cantos e himnos cristianos. Analiza la imagen adjunta, que contiene la letra de un canto (puede tener acordes escritos arriba o entremedio).
 Extrae la información y devuélvela ESTRICTAMENTE en formato JSON:
 1. "title": Título de la canción (o "Título Desconocido").
-2. "key": Tonalidad (ej: "G Mayor", "Am", "Desconocida").
-3. "timeSignature": Métrica (ej: "4/4", "Desconocida").
-4. "lyrics": Extrae ÚNICAMENTE LA LETRA del canto. IGNORA COMPLETAMENTE TODOS LOS ACORDES que aparezcan arriba de las palabras (por ejemplo, ignora letras sueltas como C, D, Em, LAm, DO, RE, SOL, etc. que estén solas en una línea superior). Tu objetivo es devolver un texto limpio, ordenado en estrofas, que contenga solo el texto cantable. No incluyas ningún corchete ni acorde en el resultado.
+2. "key": Tonalidad si está indicada (ej: "Sol Mayor", "La menor", "D", "Desconocida").
+3. "timeSignature": Métrica si está indicada (ej: "4/4", "3/4", "Desconocida").
+4. "lyrics": Extrae ÚNICAMENTE LA LETRA LIMPIA del canto. IGNORA COMPLETAMENTE TODOS LOS ACORDES que aparezcan arriba o entre las palabras (por ejemplo C, D, Em, LAm, DO, RE, SOL, etc.). Devuelve un texto limpio, ordenado prolijamente en estrofas y coros cantables.
 
 JSON esperado:
 {
@@ -520,8 +526,8 @@ JSON esperado:
           'parts': [
             {'text': promptText},
             {
-              'inline_data': {
-                'mime_type': mimeType,
+              'inlineData': {
+                'mimeType': mimeType,
                 'data': base64Image
               }
             }
@@ -530,23 +536,30 @@ JSON esperado:
       ],
       'generationConfig': {
         'response_mime_type': 'application/json',
-          'temperature': 0.3,
+        'temperature': 0.2,
       }
     });
 
-    final modelsToTry = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
+    final modelsToTry = [
+      {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+      {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
+      {'model': 'gemini-1.5-flash', 'api': 'v1'},
+      {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
+    ];
     
     List<String> errors = [];
 
-    for (final model in modelsToTry) {
-      final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey');
+    for (final item in modelsToTry) {
+      final model = item['model']!;
+      final api = item['api']!;
+      final url = Uri.parse('https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$apiKey');
 
       try {
         final response = await http.post(
           url,
           headers: {'Content-Type': 'application/json'},
           body: requestBody,
-        );
+        ).timeout(const Duration(seconds: 22));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -570,29 +583,14 @@ JSON esperado:
             'lyrics': parsed['lyrics']?.toString() ?? '',
           };
         } else {
-          errors.add('$model failed: ${response.body}');
+          errors.add('$model ($api) status ${response.statusCode}');
         }
       } catch (e) {
-        errors.add('$model exception: $e');
+        errors.add('$model ($api) exc: $e');
       }
     }
     
-    String availableModels = "No se pudieron obtener";
-    try {
-      final modelsUrl = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$apiKey');
-      final modelsRes = await http.get(modelsUrl);
-      if (modelsRes.statusCode == 200) {
-        final data = jsonDecode(modelsRes.body);
-        final models = data['models'] as List?;
-        if (models != null) {
-          availableModels = models.map((m) => m['name']).join(', ');
-        }
-      } else {
-        availableModels = "Error ${modelsRes.statusCode}: ${modelsRes.body}";
-      }
-    } catch (_) {}
-    
-    throw Exception('Fallaron todos los modelos. \nModelos disponibles para tu Clave API: $availableModels\n\nErrores:\n' + errors.join('\n'));
+    throw Exception('No se pudo transcribir la imagen. Errores: ${errors.join(', ')}');
   }
 
   static Future<String?> generateText(String prompt) async {
@@ -611,26 +609,29 @@ JSON esperado:
       });
 
       http.Response? response;
-      final modelsToTry = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
+      final modelsToTry = [
+        {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+        {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
+        {'model': 'gemini-1.5-flash', 'api': 'v1'},
+      ];
 
-      for (final model in modelsToTry) {
+      for (final item in modelsToTry) {
         if (response != null && response.statusCode == 200) break;
-        final endpoints = ['v1beta', 'v1'];
-        for (final endpoint in endpoints) {
-          try {
-            final url = Uri.parse('https://generativelanguage.googleapis.com/$endpoint/models/$model:generateContent?key=$apiKey');
-            final res = await http.post(
-              url,
-              headers: {'Content-Type': 'application/json'},
-              body: requestBody,
-            ).timeout(const Duration(seconds: 45));
-            
-            if (res.statusCode == 200) {
-              response = res;
-              break;
-            }
-          } catch (_) {}
-        }
+        final model = item['model']!;
+        final endpoint = item['api']!;
+        try {
+          final url = Uri.parse('https://generativelanguage.googleapis.com/$endpoint/models/$model:generateContent?key=$apiKey');
+          final res = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: requestBody,
+          ).timeout(const Duration(seconds: 25));
+          
+          if (res.statusCode == 200) {
+            response = res;
+            break;
+          }
+        } catch (_) {}
       }
 
       if (response != null && response.statusCode == 200) {
@@ -645,7 +646,7 @@ JSON esperado:
       }
       return null;
     } catch (e) {
-      print('Error en generateText: $e');
+      debugPrint('Error en generateText: $e');
       return null;
     }
   }

@@ -60,7 +60,7 @@ class LiveSessionService {
       currentIndex: 0,
       directorDeviceId: directorDeviceId,
       participantCount: 0,
-      showChords: true,
+      showChords: false,
       status: 'active',
       createdAt: DateTime.now(),
     );

@@ -11,9 +11,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../hymns/domain/hymn.dart';
+import '../../hymns/presentation/hymn_detail_screen.dart';
 import '../../hymns/presentation/hymn_list_screen.dart';
 import '../../hymns/presentation/notation_provider.dart';
-import '../../hymns/presentation/hymn_detail_screen.dart';
+import '../../../core/services/chord_transposer_service.dart';
 import '../domain/live_session.dart';
 import 'live_session_provider.dart';
 
@@ -202,7 +203,13 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           // Botón volver
           IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/');
+              }
+            },
           ),
           const SizedBox(width: 4),
 
@@ -280,10 +287,16 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
               onPressed: () => _showQrDialog(context, liveUrl, session, isDark),
             ),
             // Compartir
-            IconButton(
-              icon: const Icon(Icons.share_rounded),
-              tooltip: 'Compartir enlace',
-              onPressed: () => _shareSessionLink(liveUrl, session),
+            Builder(
+              builder: (btnContext) => IconButton(
+                icon: const Icon(Icons.share_rounded),
+                tooltip: 'Compartir enlace',
+                onPressed: () {
+                  final box = btnContext.findRenderObject() as RenderBox?;
+                  final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+                  _shareSessionLink(liveUrl, session, sharePositionOrigin: rect);
+                },
+              ),
             ),
           ],
         ],
@@ -369,7 +382,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           const SizedBox(height: 20),
 
           // Letra sanitizada y formateada profesionalmente
-          _buildFormattedLyricsDisplay(rawLyrics, hymn.title, fontSize, isDark, theme),
+          _buildFormattedLyricsDisplay(rawLyrics, hymn.title, fontSize, isDark, theme, session.showChords),
         ],
       ),
     ).animate().fadeIn(duration: 300.ms);
@@ -417,7 +430,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
     return merged;
   }
 
-  Widget _buildFormattedLyricsDisplay(String rawLyrics, String title, double fontSize, bool isDark, ThemeData theme) {
+  Widget _buildFormattedLyricsDisplay(String rawLyrics, String title, double fontSize, bool isDark, ThemeData theme, bool showChords) {
     final sanitized = Hymn.ensureHeadersOnOwnLine(rawLyrics);
     final blocks = _getMergedBlocks(sanitized);
 
@@ -573,14 +586,10 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
               ...bodyLines.map((line) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text(
-                    Hymn.formatLineCasing(line),
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.nunito(
-                      fontSize: fontSize,
-                      height: 1.6,
-                      color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF334155),
-                    ),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.end,
+                    children: _buildLineWithChords(Hymn.formatLineCasing(line), fontSize, isDark, theme, showChords),
                   ),
                 );
               }),
@@ -589,6 +598,97 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
         );
       }).toList(),
     );
+  }
+
+  List<Widget> _buildLineWithChords(String line, double fontSize, bool isDark, ThemeData theme, bool showChords) {
+    final RegExp regExp = RegExp(r'\[([^\]]+)\]');
+    final matchesList = regExp.allMatches(line).toList();
+
+    if (matchesList.isEmpty || !showChords) {
+      final cleanLine = line.replaceAll(RegExp(r'\[[^\]]+\]'), '');
+      return [
+        Text(
+          cleanLine,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.nunito(
+            fontSize: fontSize,
+            height: 1.6,
+            color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF334155),
+          ),
+        )
+      ];
+    }
+
+    final List<Widget> inlineWidgets = [];
+    int lastMatchEnd = 0;
+
+    for (int i = 0; i < matchesList.length; i++) {
+      final match = matchesList[i];
+
+      // 1. Texto plano antes del acorde
+      if (match.start > lastMatchEnd) {
+        final textBefore = line.substring(lastMatchEnd, match.start);
+        if (textBefore.isNotEmpty) {
+          inlineWidgets.add(
+            Text(
+              textBefore,
+              style: GoogleFonts.nunito(
+                fontSize: fontSize,
+                color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF334155),
+              ),
+            ),
+          );
+        }
+      }
+
+      // 2. Acorde + texto que va directamente debajo de él
+      final rawChord = match.group(1)!;
+      final transposedChord = ChordTransposerService.transposeSingleChord(rawChord, 0); // No transpose in Live mode yet
+      final displayedChord = Hymn.convertChordNotation(transposedChord, ref.watch(notationProvider));
+
+      final nextMatchStart = (i == matchesList.length - 1)
+          ? line.length
+          : matchesList[i + 1].start;
+
+      final textUnder = line.substring(match.end, nextMatchStart);
+      final chordFontSize = fontSize * 0.65;
+      final minChordWidth = displayedChord.length * (chordFontSize * 0.58);
+
+      inlineWidgets.add(
+        ConstrainedBox(
+          constraints: BoxConstraints(minWidth: minChordWidth),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                child: Text(
+                  displayedChord,
+                  style: GoogleFonts.outfit(
+                    fontSize: chordFontSize,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.amber[600],
+                  ),
+                ),
+              ),
+              if (textUnder.isNotEmpty)
+                Text(
+                  textUnder,
+                  style: GoogleFonts.nunito(
+                    fontSize: fontSize,
+                    color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF334155),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+
+      lastMatchEnd = nextMatchStart;
+    }
+
+    return inlineWidgets;
   }
 
   // ─── CONTROLES DEL DIRECTOR ────────────────────────────────
@@ -839,6 +939,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                 );
               },
               child: Container(
+                width: 240,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
@@ -853,7 +954,8 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(
+                    SizedBox(
+                      width: 180,
                       child: Text(
                         url,
                         style: GoogleFonts.outfit(fontSize: 11),
@@ -874,13 +976,17 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
             onPressed: () => ctx.pop(),
             child: const Text('Cerrar'),
           ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.share_rounded, size: 18),
-            label: const Text('Compartir'),
-            onPressed: () {
-              ctx.pop();
-              _shareSessionLink(url, session);
-            },
+          Builder(
+            builder: (btnContext) => ElevatedButton.icon(
+              icon: const Icon(Icons.share_rounded, size: 18),
+              label: const Text('Compartir'),
+              onPressed: () {
+                final box = btnContext.findRenderObject() as RenderBox?;
+                final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+                ctx.pop();
+                _shareSessionLink(url, session, sharePositionOrigin: rect);
+              },
+            ),
           ),
         ],
       ),
@@ -888,7 +994,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
   }
 
   // ─── COMPARTIR ENLACE ──────────────────────────────────────
-  Future<void> _shareSessionLink(String url, LiveSession session) async {
+  Future<void> _shareSessionLink(String url, LiveSession session, {Rect? sharePositionOrigin}) async {
     final text =
         '🎵 *${session.title}*\n📅 ${session.date}\n\nÚnete al Modo Culto en Vivo:\n$url';
 
@@ -901,8 +1007,12 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
       // ignore: deprecated_member_use
       if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
-      await SharePlus.instance.share(
-          ShareParams(text: text, subject: session.title));
+      // ignore: deprecated_member_use
+      await Share.share(
+        text,
+        subject: session.title,
+        sharePositionOrigin: sharePositionOrigin,
+      );
     }
   }
 

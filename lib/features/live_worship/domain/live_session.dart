@@ -36,7 +36,7 @@ class LiveSession {
       currentIndex: json['currentIndex'] as int? ?? 0,
       directorDeviceId: json['directorDeviceId'] as String? ?? '',
       participantCount: json['participantCount'] as int? ?? 0,
-      showChords: json['showChords'] as bool? ?? true,
+      showChords: json['showChords'] as bool? ?? false,
       status: json['status'] as String? ?? 'active',
       createdAt: json['createdAt'] is Timestamp
           ? (json['createdAt'] as Timestamp).toDate()

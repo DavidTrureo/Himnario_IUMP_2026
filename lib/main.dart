@@ -19,7 +19,11 @@ import 'core/routing/app_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'features/hymns/domain/hymn.dart';
 
+import 'package:flutter_web_plugins/url_strategy.dart';
+
 void main() async {
+  usePathUrlStrategy();
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,

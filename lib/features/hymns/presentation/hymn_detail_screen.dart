@@ -34,7 +34,7 @@ import '../../../core/widgets/app_music_icons.dart';
 import '../../../core/services/hymn_pdf_service.dart';
 import 'widgets/sheet_music_viewer.dart';
 import 'spinning_vinyl.dart';
-
+import 'obs_remote_screen.dart';
 // Notifier para controlar el tamaño de la letra
 class FontSizeNotifier extends Notifier<double> {
   @override
@@ -517,7 +517,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) {
-                  switch (value) {
+                  switch (value) {                    case 'obs_remote':
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => ObsRemoteScreen(hymn: hymn),
+                      ));
+                      break;
                     case 'metronome':
                       setState(() {
                         _showMetronome = !_showMetronome;
@@ -554,6 +558,17 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   }
                 },
                 itemBuilder: (context) => [
+                  if (!kIsWeb)
+                    PopupMenuItem(
+                      value: 'obs_remote',
+                      child: Row(
+                        children: [
+                          Icon(Icons.live_tv_rounded, color: theme.colorScheme.primary),
+                          const SizedBox(width: 10),
+                          Text('Transmitir a OBS', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
                   PopupMenuItem(
                     value: 'metronome',
                     child: Row(

@@ -59,3 +59,31 @@ __pycache__/
 .DS_Store
 
 *.apk
+*.aab
+.firebase/
+*.zip
+*.wav
+diff.txt
+google_fonts/
+google_fonts_readme.md
+
+# Scripts temporales de parche y prueba en raíz
+fix_*.py
+patch*.py
+update_*.py
+generate_*_audios.py
+restore_hymns.py
+get_history.py
+plan_routes.py
+download_fonts.py
+test_*.dart
+test_*.js
+fix_test.dart
+lib/test_*.dart
+scripts/temp_*
+scripts/test_*
+scripts/patch_*
+scripts/check_*
+scripts/add_scrollbar_*
+scripts/query_rest.dart
+test/test_pdf.dart

@@ -21,14 +21,19 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final pickedFile = await _picker.pickImage(source: source, imageQuality: 80);
+      final pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
       if (pickedFile != null) {
         setState(() {
           _imageFile = pickedFile;
         });
       }
     } catch (e) {
-      debugPrint("Error picking image: \$e");
+      debugPrint("Error picking image: $e");
     }
   }
 
@@ -37,6 +42,7 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
 
     String apiKey = await GeminiAiService.getApiKey();
     if (apiKey.isEmpty) {
+      if (!mounted) return;
       final newKey = await GeminiAiService.showApiKeyInputDialog(context);
       if (newKey != null && newKey.isNotEmpty) {
         await GeminiAiService.saveApiKey(newKey);
@@ -59,14 +65,16 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
       final bytes = await _imageFile!.readAsBytes();
       final base64Image = base64Encode(bytes);
 
-      
       String mimeType = 'image/jpeg';
-      if (_imageFile!.path.toLowerCase().endsWith('.png')) mimeType = 'image/png';
-      else if (_imageFile!.path.toLowerCase().endsWith('.webp')) mimeType = 'image/webp';
-      else if (_imageFile!.path.toLowerCase().endsWith('.heic')) mimeType = 'image/heic';
+      if (_imageFile!.path.toLowerCase().endsWith('.png')) {
+        mimeType = 'image/png';
+      } else if (_imageFile!.path.toLowerCase().endsWith('.webp')) {
+        mimeType = 'image/webp';
+      } else if (_imageFile!.path.toLowerCase().endsWith('.heic')) {
+        mimeType = 'image/heic';
+      }
       
       final result = await GeminiAiService.transcribeSheetMusic(base64Image, mimeType: mimeType);
-
 
       if (mounted) {
         setState(() {
@@ -84,7 +92,10 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo procesar la imagen. Verifica tu conexión o clave API de Gemini.')),
+            const SnackBar(
+              content: Text('No se pudo procesar la imagen. Verifica tu conexión o clave API de Gemini.'),
+              backgroundColor: Colors.redAccent,
+            ),
           );
         }
       }
@@ -93,8 +104,17 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
         setState(() {
           _isProcessing = false;
         });
+        final errorMsg = e.toString().contains('API_KEY_INVALID') || e.toString().contains('403')
+            ? 'Clave API no válida o sin permisos. Toca la llave arriba para actualizarla.'
+            : (e.toString().contains('TimeoutException') || e.toString().contains('timed out')
+                ? 'Tiempo de espera agotado. Revisa tu conexión a internet e inténtalo de nuevo.'
+                : 'Error al procesar la imagen. Intenta con una foto más clara o recortada.');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Los servidores de IA están ocupados. Intenta de nuevo.')),
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     }
@@ -103,7 +123,6 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -190,7 +209,7 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
                                           const CircularProgressIndicator(color: Colors.white),
                                           const SizedBox(height: 16),
                                           Text(
-                                            'Analizando partitura...',
+                                            'Transcribiendo letra con IA...',
                                             style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                                           )
                                         ],
@@ -210,7 +229,7 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
                                     Column(
                                       children: [
                                         Text(
-                                          'Sube una foto de una letra o partitura con acordes',
+                                          'Toma o sube una foto de la letra del canto',
                                           textAlign: TextAlign.center,
                                           style: GoogleFonts.nunito(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                                         ),
@@ -245,8 +264,22 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
                                                   const SizedBox(width: 8),
                                                   Expanded(
                                                     child: Text(
-                                                      'La IA extraerá automáticamente el texto limpio de la letra desde la foto de tu cancionero (ignorando los acordes para evitar errores de alineación) para ahorrarte la escritura manual.',
+                                                      'La IA extraerá automáticamente la letra limpia del canto (ignorando acordes que puedan estar escritos) para ahorrarte la transcripción manual.',
                                                       style: GoogleFonts.nunito(color: Colors.amber[100], fontSize: 13),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Icon(Icons.menu_book_rounded, color: Color(0xFF38BDF8), size: 20),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Solo escanea letra y texto: No lee notas musicales en pentagramas ni partituras melódicas.',
+                                                      style: GoogleFonts.nunito(color: const Color(0xFFBAE6FD), fontSize: 13, fontWeight: FontWeight.w600),
                                                     ),
                                                   ),
                                                 ],

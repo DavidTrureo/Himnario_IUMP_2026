@@ -605,12 +605,20 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     }
   }
 
-  void _showBiblicalAssistantDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+  Future<void> _showBiblicalAssistantDialog(BuildContext context, WidgetRef ref) async {
+    final selectedKey = await showDialog<String>(
       context: context,
       barrierDismissible: true,
       builder: (context) => const BiblicalAssistantDialog(),
     );
+
+    if (selectedKey != null && context.mounted) {
+      final location = GoRouterState.of(context).uri.path;
+      final target = location.endsWith('/')
+          ? '${location}hymn/$selectedKey'
+          : '$location/hymn/$selectedKey';
+      context.push(target);
+    }
   }
 
   Future<void> _deleteSelectedHymns(BuildContext context) async {
@@ -4160,7 +4168,61 @@ class _BiblicalAssistantDialogState
   List<Map<String, dynamic>> recommendations = [];
   bool hasSearched = false;
   bool showKeySetup = false;
+  bool isAiPowered = false;
+  int totalAnalyzed = 0;
   final Set<String> _selectedCollections = {'iump', 'especiales', 'coros'};
+
+  static const Set<String> _stopWords = {
+    'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'lo', 'al', 'del',
+    'de', 'a', 'en', 'con', 'por', 'para', 'sin', 'sobre', 'tras', 'entre',
+    'hacia', 'hasta', 'desde', 'durante', 'mediante', 'segun', 'contra',
+    'que', 'se', 'su', 'sus', 'mi', 'mis', 'tu', 'tus', 'nos', 'les', 'le',
+    'como', 'cuando', 'donde', 'quien', 'cual', 'cuales', 'cuyo',
+    'este', 'esta', 'estos', 'estas', 'esto', 'ese', 'esa', 'esos', 'esas', 'eso',
+    'aquel', 'aquella', 'aquellos', 'aquellas', 'aquello',
+    'y', 'o', 'u', 'e', 'ni', 'pero', 'mas', 'sino', 'porque', 'pues', 'ya',
+    'si', 'no', 'muy', 'tan', 'tanto', 'tambien', 'tampoco', 'solo', 'solamente',
+    'todo', 'toda', 'todos', 'todas', 'cada', 'otro', 'otra', 'otros', 'otras',
+    'fue', 'era', 'ha', 'han', 'hay', 'habia', 'ser', 'es', 'son', 'somos',
+    'hablamos', 'hablo', 'habla', 'trato', 'trata', 'predicacion', 'tema',
+    'mensaje', 'palabra', 'hermano', 'pastores', 'culto', 'iglesia', 'hoy',
+    'ayer', 'domingo', 'tenian', 'tenia', 'estan', 'estaba', 'dice', 'dijo'
+  };
+
+  static const Set<String> _ubiquitousWords = {
+    'dios', 'senor', 'jesus', 'cristo'
+  };
+
+  static const Map<String, List<String>> _thematicSynonyms = {
+    'pastor': ['oveja', 'ovejas', 'valle', 'rebano', 'pastos', 'delicados', 'aguas', 'guiara', 'falta', 'guia'],
+    'salmo': ['jehova', 'senor', 'cantad', 'alabad', 'fortaleza', 'refugio'],
+    'tempestad': ['tormenta', 'mar', 'barca', 'olas', 'viento', 'bonanza', 'calma', 'galilea', 'naufragio', 'naufragar'],
+    'tormenta': ['tempestad', 'mar', 'barca', 'olas', 'viento', 'calma', 'refugio'],
+    'barca': ['mar', 'tempestad', 'olas', 'galilea', 'pescador', 'bogad', 'tormenta', 'navegar'],
+    'dormia': ['dormido', 'duerme', 'durmiendo'],
+    'miedo': ['temor', 'confianza', 'paz', 'seguridad', 'guardara', 'amparo', 'angustia', 'temer'],
+    'temor': ['miedo', 'confianza', 'paz', 'seguridad', 'guardara', 'amparo'],
+    'cruz': ['calvario', 'sangre', 'sacrificio', 'golgota', 'redencion', 'madero', 'morir', 'perdon'],
+    'calvario': ['cruz', 'golgota', 'sangre', 'sacrificio', 'monte', 'madero'],
+    'perdon': ['gracia', 'culpa', 'limpio', 'misericordia', 'clemencia', 'salvacion', 'arrepentimiento', 'lavo', 'perdonar'],
+    'arrepentimiento': ['perdon', 'volver', 'llorar', 'quebrantado', 'contrito', 'nuevo', 'pecador'],
+    'gracia': ['sublime', 'favor', 'inmerecida', 'misericordia', 'salvo', 'amor'],
+    'prodigo': ['volver', 'padre', 'lejos', 'perdon', 'misericordia', 'hijo', 'arrepentido'],
+    'resurreccion': ['resucito', 'tumba', 'vencio', 'victoria', 'muerte', 'vive', 'vivo'],
+    'resucito': ['tumba', 'muerte', 'vencio', 'victoria', 'vivo', 'sepulcro'],
+    'espiritu': ['pentecostes', 'fuego', 'consolador', 'promesa', 'poder', 'uncion', 'llena', 'bautismo'],
+    'pentecostes': ['espiritu', 'fuego', 'lenguas', 'aposento', 'promesa', 'lleno'],
+    'avivamiento': ['fuego', 'llena', 'despierta', 'poder', 'obra', 'gloria'],
+    'sanidad': ['sanador', 'llagas', 'medico', 'enfermo', 'toco', 'manto', 'salud', 'dolor'],
+    'enfermo': ['sanidad', 'sano', 'medico', 'dolor', 'consuelo'],
+    'venida': ['arrebatamiento', 'trompeta', 'nubes', 'cielo', 'bodas', 'cordero', 'pronto', 'regreso'],
+    'arrebatamiento': ['nubes', 'trompeta', 'cielo', 'transformados', 'bodas'],
+    'cielo': ['mansion', 'patria', 'celestial', 'calles', 'oro', 'corona', 'gloria'],
+    'oracion': ['clamor', 'pedir', 'rodillas', 'suplica', 'ruega', 'altar'],
+    'clamor': ['oracion', 'escucha', 'socorro', 'angustia', 'pronto'],
+    'batalla': ['victoria', 'soldado', 'armadura', 'lucha', 'ejercito', 'vencedor'],
+    'soldado': ['batalla', 'armadura', 'vencedor', 'lucha', 'corona'],
+  };
 
   @override
   void initState() {
@@ -4186,22 +4248,207 @@ class _BiblicalAssistantDialogState
     }
   }
 
+  String _cleanSnippet(String raw) {
+    final lines = raw.split('\n');
+    final meaningfulLines = <String>[];
+    for (var line in lines) {
+      var l = line.trim();
+      if (l.isEmpty) continue;
+      l = l.replaceAll(RegExp(r'\((C|M|m|[A-G][#b]?)\)'), '');
+      l = l.replaceAll(RegExp(r'/{2,}'), '');
+      l = l.replaceAll(RegExp(r'[-_]{2,}'), '');
+      l = l.replaceAll(RegExp(r'^\d+\.\s*'), '');
+      l = l.replaceAll(RegExp(r'^(CORO|Coro|ESTRIBILLO|Estribillo):?\s*', caseSensitive: false), '');
+      l = l.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (l.isEmpty) continue;
+
+      final words = l.split(' ');
+      final isChordOnly = words.isNotEmpty && words.every((w) => RegExp(r'^(DO|RE|MI|FA|SOL|LA|SI|[CDEFGAB])(m|M|maj7|7|dim|aug|sus4|#|b|-|\+)*$', caseSensitive: false).hasMatch(w));
+      if (isChordOnly) continue;
+
+      meaningfulLines.add(l);
+      if (meaningfulLines.length >= 2) break;
+    }
+    return meaningfulLines.join(' · ');
+  }
+
+  List<Map<String, dynamic>> _rankHymnsLocally(String query, List<Hymn> allHymns) {
+    final normQuery = Hymn.normalizeString(query);
+    final rawTokens = normQuery.split(' ').where((w) => w.isNotEmpty).toList();
+
+    final queryNumbers = <String>[];
+    final specificKeywords = <String>[];
+    final generalKeywords = <String>[];
+    final secondaryKeywords = <String>{};
+
+    final isExplicitHymnNumber = query.contains(RegExp(r'\b(himno|canto|n°|nro|#)\s*\d+\b', caseSensitive: false)) ||
+        (rawTokens.length == 1 && RegExp(r'^\d+$').hasMatch(rawTokens.first));
+
+    for (final token in rawTokens) {
+      if (RegExp(r'^\d+$').hasMatch(token)) {
+        if (isExplicitHymnNumber) queryNumbers.add(token);
+      } else if (token.length >= 3 && !_stopWords.contains(token)) {
+        if (_ubiquitousWords.contains(token)) {
+          generalKeywords.add(token);
+        } else {
+          specificKeywords.add(token);
+          if (_thematicSynonyms.containsKey(token)) {
+            secondaryKeywords.addAll(_thematicSynonyms[token]!);
+          }
+        }
+      }
+    }
+
+    if (specificKeywords.isEmpty && generalKeywords.isNotEmpty) {
+      specificKeywords.addAll(generalKeywords);
+      generalKeywords.clear();
+    }
+
+    secondaryKeywords.removeAll(specificKeywords);
+    secondaryKeywords.removeAll(generalKeywords);
+
+    final scoredList = <Map<String, dynamic>>[];
+
+    for (final h in allHymns) {
+      double baseScore = 0;
+      int matchedSpecificCount = 0;
+      final matchedTerms = <String>{};
+
+      for (final numStr in queryNumbers) {
+        if (h.id.toString() == numStr) {
+          baseScore += 250;
+        }
+      }
+
+      if (normQuery.length > 5) {
+        if (h.normalizedTitle.contains(normQuery)) {
+          baseScore += 120;
+        } else if (h.normalizedSearchableText.contains(normQuery)) {
+          baseScore += 50;
+        }
+      }
+
+      for (final pk in specificKeywords) {
+        final wordsInTitle = h.normalizedTitle.split(' ');
+        if (wordsInTitle.contains(pk)) {
+          baseScore += 40;
+          matchedSpecificCount++;
+          matchedTerms.add(pk);
+        } else if (h.normalizedTitle.contains(pk)) {
+          baseScore += 22;
+          matchedSpecificCount++;
+          matchedTerms.add(pk);
+        }
+      }
+
+      for (final sk in secondaryKeywords) {
+        if (h.normalizedTitle.contains(sk)) {
+          baseScore += 15;
+        }
+      }
+
+      for (final gk in generalKeywords) {
+        if (h.normalizedTitle.contains(gk)) {
+          baseScore += 5;
+        }
+      }
+
+      final blocks = h.lyrics.split(RegExp(r'\n\s*\n'));
+      String bestRawBlock = '';
+      double bestBlockDensity = -1;
+
+      for (final rawBlock in blocks) {
+        final blockClean = rawBlock.trim();
+        if (blockClean.isEmpty) continue;
+        final blockNorm = Hymn.normalizeString(blockClean);
+        final isChorus = blockClean.toLowerCase().contains('coro') || blockClean.toLowerCase().contains('estribillo');
+        final chorusMultiplier = isChorus ? 2.0 : 1.0;
+
+        double blockScore = 0;
+
+        for (final pk in specificKeywords) {
+          final matches = RegExp('\\b$pk').allMatches(blockNorm).length;
+          if (matches > 0) {
+            if (!matchedTerms.contains(pk)) {
+              matchedTerms.add(pk);
+              matchedSpecificCount++;
+            }
+            final cappedMatches = matches > 3 ? 3 : matches;
+            baseScore += (cappedMatches * (isChorus ? 9 : 5));
+            blockScore += (cappedMatches * 8 * chorusMultiplier);
+          }
+        }
+
+        for (final sk in secondaryKeywords) {
+          if (blockNorm.contains(sk)) {
+            baseScore += (isChorus ? 3.5 : 2.0);
+            blockScore += (4 * chorusMultiplier);
+          }
+        }
+
+        for (final gk in generalKeywords) {
+          if (blockNorm.contains(gk)) {
+            baseScore += 1.0;
+          }
+        }
+
+        if (blockScore > bestBlockDensity) {
+          bestBlockDensity = blockScore;
+          bestRawBlock = blockClean;
+        }
+      }
+
+      double coverageMultiplier = 1.0;
+      if (specificKeywords.isNotEmpty) {
+        final ratio = matchedSpecificCount / specificKeywords.length;
+        if (ratio >= 1.0 && specificKeywords.length >= 2) {
+          coverageMultiplier = 2.8;
+        } else if (ratio >= 0.7 && specificKeywords.length >= 3) {
+          coverageMultiplier = 2.0;
+        } else if (matchedSpecificCount >= 2) {
+          coverageMultiplier = 1.5;
+        } else if (matchedSpecificCount == 0 && secondaryKeywords.isEmpty) {
+          coverageMultiplier = 0.2;
+        }
+      }
+
+      final finalScore = (baseScore * coverageMultiplier).roundToDouble();
+
+      String snippet = bestRawBlock.isNotEmpty ? _cleanSnippet(bestRawBlock) : '';
+      if (snippet.isEmpty && finalScore > 0) {
+        snippet = 'Coincidencia temática con el título del canto.';
+      }
+
+      if (finalScore > 0) {
+        scoredList.add({
+          'id': h.id,
+          'collection': h.collection,
+          'title': h.title,
+          'score': finalScore,
+          'matchedCount': matchedSpecificCount,
+          'snippet': snippet,
+          'reason': matchedTerms.isNotEmpty
+              ? 'Temas centrales: ${matchedTerms.join(', ')} · «$snippet»'
+              : '«$snippet»',
+        });
+      }
+    }
+
+    scoredList.sort((a, b) => (b['score'] as double).compareTo(a['score'] as double));
+    return scoredList;
+  }
+
   Future<void> _performAssistantSearch() async {
     final userInput = _inputController.text.trim();
     if (userInput.isEmpty) return;
 
-    if (geminiKey.trim().isEmpty) {
-      setState(() {
-        errorMessage = 'Por favor ingresa una API Key de Gemini válida.';
-      });
-      return;
-    }
-
     setState(() {
       isSearching = true;
       errorMessage = '';
+      rawErrorDetails = '';
       recommendations.clear();
       hasSearched = false;
+      isAiPowered = false;
     });
 
     final allHymnsGlobal = ref.read(allHymnsGlobalProvider).value ?? [];
@@ -4218,211 +4465,152 @@ class _BiblicalAssistantDialogState
         return;
       }
 
-      // Pre-filtrar cantos basados en palabras clave de la consulta del usuario
-      final normInput = Hymn.normalizeString(userInput);
-      final queryWords = normInput.split(' ').where((w) {
-        if (w.isEmpty) return false;
-        // Permitir números de cualquier longitud (para pasajes como Juan 3, Salmo 23)
-        final isDigit = RegExp(r'^\d+$').hasMatch(w);
-        if (isDigit) return true;
+      totalAnalyzed = allHymns.length;
 
-        // Para palabras comunes, exigir más de 2 letras y excluir conectores
-        return w.length > 2 &&
-            w != 'del' &&
-            w != 'por' &&
-            w != 'con' &&
-            w != 'para' &&
-            w != 'sobre' &&
-            w != 'una' &&
-            w != 'los' &&
-            w != 'las' &&
-            w != 'que';
-      }).toList();
+      // 1. Análisis exhaustivo de relevancia en el 100% de la base de datos
+      final localCandidates = _rankHymnsLocally(userInput, allHymns);
 
-      List<Hymn> filteredList = [];
-      if (queryWords.isEmpty) {
-        filteredList = allHymns;
-      } else {
-        final scoredHymns = allHymns
-            .map((h) {
-              int score = 0;
-              final titleNorm = Hymn.normalizeString(h.title);
-              final lyricsNorm = Hymn.normalizeString(h.lyrics);
-              final idStr = h.id.toString();
-              for (final word in queryWords) {
-                if (idStr == word) score += 50;
-                if (titleNorm.contains(word))
-                  score += 15; // mayor peso a coincidencias en título
-                final matches = word.allMatches(lyricsNorm).length;
-                score += matches.clamp(
-                  0,
-                  4,
-                ); // limitar para evitar que la repetición artificial ahogue himnos tradicionales
-              }
-              return MapEntry(h, score);
-            })
-            .where((entry) => entry.value > 0)
-            .toList();
-
-        scoredHymns.sort((a, b) => b.value.compareTo(a.value));
-
-        if (scoredHymns.isNotEmpty) {
-          filteredList = scoredHymns.map((e) => e.key).take(90).toList();
-        } else {
-          filteredList = allHymns;
-        }
-      }
-
-      final compactCatalog = filteredList
-          .map(
-            (h) => {'id': h.id, 'title': h.title, 'collection': h.collection},
-          )
-          .toList();
-
-      final requestBody = jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {
-                'text':
-                    'Analiza la siguiente lectura bíblica o tema de predicación: "$userInput". \n'
-                    'De la siguiente lista de cantos en formato JSON que tenemos en nuestra aplicación:\n'
-                    '${jsonEncode(compactCatalog)}\n\n'
-                    'Recomienda un máximo de 5 cantos de esa lista que guarden estrecha relación temática, teológica o emocional con el tema/lectura bíblica. No sugieras ningún canto que no esté explícitamente en la lista proporcionada. \n'
-                    'Para cada recomendación, incluye una justificación teológica o contextual de una frase explicando por qué se relaciona con la palabra.\n'
-                    'Retorna el resultado en este formato JSON:\n'
-                    '{\n'
-                    '  "recommendations": [\n'
-                    '    {\n'
-                    '      "id": 123,\n'
-                    '      "collection": "nombre_de_coleccion",\n'
-                    '      "title": "Título del canto",\n'
-                    '      "reason": "Explicación de la relación."\n'
-                    '    }\n'
-                    '  ]\n'
-                    '}',
-              },
-            ],
-          },
-        ],
-        'generation_config': {'response_mime_type': 'application/json'},
-      });
-
-      final attempts = [
-        {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
-        {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-        {'model': 'gemini-1.5-flash', 'api': 'v1'},
-      ];
-
-      http.Response? response;
-      List<String> errors = [];
-
-      for (final attempt in attempts) {
-        final model = attempt['model']!;
-        final api = attempt['api']!;
-        try {
-          final url = Uri.parse(
-            'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$geminiKey',
-          );
-          final res = await http
-              .post(
-                url,
-                headers: {'Content-Type': 'application/json'},
-                body: requestBody,
-              )
-              .timeout(const Duration(seconds: 12));
-          if (res.statusCode == 200) {
-            response = res;
-            break;
-          } else {
-            String detailedError = '${res.statusCode}';
-            try {
-              final parsedBody = jsonDecode(res.body);
-              if (parsedBody['error'] != null &&
-                  parsedBody['error']['message'] != null) {
-                detailedError =
-                    '${res.statusCode}: ${parsedBody['error']['message']}';
-              }
-            } catch (_) {}
-            errors.add('$model ($api): $detailedError');
-          }
-        } catch (e) {
-          errors.add('$model ($api) Exc: $e');
-        }
-      }
-
-      if (response != null && response.statusCode == 200) {
-        final respData = jsonDecode(response.body);
-        String rawText =
-            respData['candidates'][0]['content']['parts'][0]['text'] as String;
-
-        rawText = rawText.trim();
-        if (rawText.startsWith('```json')) {
-          rawText = rawText.substring(7);
-        } else if (rawText.startsWith('```')) {
-          rawText = rawText.substring(3);
-        }
-        if (rawText.endsWith('```')) {
-          rawText = rawText.substring(0, rawText.length - 3);
-        }
-        rawText = rawText.trim();
-
-        final parsed = jsonDecode(rawText);
-        final recs = List<Map<String, dynamic>>.from(
-          parsed['recommendations'] ?? [],
-        );
-
+      if (localCandidates.isEmpty) {
         setState(() {
-          recommendations = recs;
+          recommendations = [];
+          errorMessage = 'No se encontraron cantos relacionados con los términos ingresados. Prueba con otras palabras o una cita bíblica.';
           isSearching = false;
           hasSearched = true;
         });
-      } else {
-        // FALLBACK LOCAL: Si la API de Google falla o la clave no tiene acceso, buscar coincidencias locales
-        _performLocalFallbackSearch(userInput, allHymns);
-      }
-    } catch (e) {
-      _performLocalFallbackSearch(userInput, allHymns);
-    }
-  }
-
-  void _performLocalFallbackSearch(String query, List<Hymn> allHymns) {
-    final normQuery = Hymn.normalizeString(query);
-    final words = normQuery.split(' ').where((w) => w.length > 2).toList();
-
-    List<Map<String, dynamic>> localRecs = [];
-    for (final h in allHymns) {
-      final titleNorm = Hymn.normalizeString(h.title);
-      final lyricsNorm = Hymn.normalizeString(h.lyrics);
-
-      int score = 0;
-      for (final word in words) {
-        if (titleNorm.contains(word)) score += 3;
-        if (lyricsNorm.contains(word)) score += 1;
+        return;
       }
 
-      if (score > 0) {
-        localRecs.add({
-          'id': h.id,
-          'collection': h.collection,
-          'title': h.title,
-          'reason':
-              'Sugerencia local basada en coincidencias de texto con "$query".',
+      // 2. Si hay API Key de Gemini configurada, potenciar con IA seleccionando entre los mejores candidatos reales
+      if (geminiKey.trim().isNotEmpty) {
+        final topForGemini = localCandidates.take(15).map((c) => {
+          'id': c['id'],
+          'title': c['title'],
+          'collection': c['collection'],
+          'snippet': c['snippet'],
+        }).toList();
+
+        final requestBody = jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text':
+                      'Actúa como un pastor y director de alabanza. Analiza la siguiente lectura bíblica o tema de predicación: "$userInput". \n'
+                      'De los siguientes cantos preseleccionados de nuestro catálogo con sus estrofas más relevantes:\n'
+                      '${jsonEncode(topForGemini)}\n\n'
+                      'Selecciona un máximo de 5 cantos ideales que mejor acompañen este mensaje en el culto. No sugieras cantos que no estén en la lista proporcionada.\n'
+                      'Para cada recomendación, escribe una justificación pastoral/teológica de una sola frase explicando por qué se adapta al mensaje.\n'
+                      'Retorna el resultado en este formato JSON exacto:\n'
+                      '{\n'
+                      '  "recommendations": [\n'
+                      '    {\n'
+                      '      "id": 123,\n'
+                      '      "collection": "nombre_de_coleccion",\n'
+                      '      "title": "Título del canto",\n'
+                      '      "reason": "Explicación pastoral de una frase."\n'
+                      '    }\n'
+                      '  ]\n'
+                      '}',
+                },
+              ],
+            },
+          ],
+          'generation_config': {'response_mime_type': 'application/json'},
         });
+
+        final attempts = [
+          {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
+          {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+          {'model': 'gemini-1.5-flash', 'api': 'v1'},
+        ];
+
+        http.Response? response;
+        List<String> errors = [];
+
+        for (final attempt in attempts) {
+          final model = attempt['model']!;
+          final api = attempt['api']!;
+          try {
+            final url = Uri.parse(
+              'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$geminiKey',
+            );
+            final res = await http
+                .post(
+                  url,
+                  headers: {'Content-Type': 'application/json'},
+                  body: requestBody,
+                )
+                .timeout(const Duration(seconds: 12));
+            if (res.statusCode == 200) {
+              response = res;
+              break;
+            } else {
+              String detailedError = '${res.statusCode}';
+              try {
+                final parsedBody = jsonDecode(res.body);
+                if (parsedBody['error'] != null &&
+                    parsedBody['error']['message'] != null) {
+                  detailedError =
+                      '${res.statusCode}: ${parsedBody['error']['message']}';
+                }
+              } catch (_) {}
+              errors.add('$model ($api): $detailedError');
+            }
+          } catch (e) {
+            errors.add('$model ($api) Exc: $e');
+          }
+        }
+
+        if (response != null && response.statusCode == 200) {
+          final respData = jsonDecode(response.body);
+          String rawText =
+              respData['candidates'][0]['content']['parts'][0]['text'] as String;
+
+          rawText = rawText.trim();
+          if (rawText.startsWith('```json')) {
+            rawText = rawText.substring(7);
+          } else if (rawText.startsWith('```')) {
+            rawText = rawText.substring(3);
+          }
+          if (rawText.endsWith('```')) {
+            rawText = rawText.substring(0, rawText.length - 3);
+          }
+          rawText = rawText.trim();
+
+          final parsed = jsonDecode(rawText);
+          final recs = List<Map<String, dynamic>>.from(
+            parsed['recommendations'] ?? [],
+          );
+
+          if (recs.isNotEmpty) {
+            setState(() {
+              recommendations = recs;
+              isAiPowered = true;
+              isSearching = false;
+              hasSearched = true;
+            });
+            return;
+          }
+        } else {
+          rawErrorDetails = errors.join('\n');
+        }
       }
 
-      if (localRecs.length >= 10) break;
+      // 3. Modo Local Inteligente (o fallback si Gemini no estuvo disponible):
+      // Retorna los 10 mejores cantos ordenados de mayor a menor relevancia
+      setState(() {
+        recommendations = localCandidates.take(10).toList();
+        isAiPowered = false;
+        isSearching = false;
+        hasSearched = true;
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Ocurrió un error inesperado al analizar el catálogo.';
+        rawErrorDetails = '$e';
+        isSearching = false;
+      });
     }
-
-    setState(() {
-      recommendations = localRecs;
-      isSearching = false;
-      hasSearched = true;
-      if (localRecs.isEmpty) {
-        errorMessage =
-            'No se encontraron cantos relacionados con el término buscado.';
-      }
-    });
   }
 
   @override
@@ -4440,25 +4628,33 @@ class _BiblicalAssistantDialogState
       );
     }
 
-    if (geminiKey.trim().isEmpty || showKeySetup) {
+    if (showKeySetup) {
       return AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
-          'Configurar API Key de Gemini',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            const Icon(Icons.vpn_key_rounded, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              'API Key de Gemini',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Esta app requiere una API Key de Gemini para sugerir cantos automáticamente a partir de lecturas bíblicas y temas de predicación.',
-                style: GoogleFonts.nunito(fontSize: 14),
+                'Opcional: Si ingresas una API Key de Google Gemini, la IA redactará recomendaciones pastorales personalizadas para cada canto.\n\n'
+                'Nota: Si no tienes clave, no te preocupes; la app buscará y ordenará por relevancia en el 100% de la base de datos de forma local.',
+                style: GoogleFonts.nunito(fontSize: 13, height: 1.4),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               OutlinedButton.icon(
                 icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                label: const Text('Obtener API Key (Gratis y Segura)'),
+                label: const Text('Obtener API Key gratuita'),
                 onPressed: () async {
                   final url = Uri.parse(
                     'https://aistudio.google.com/app/apikey',
@@ -4479,11 +4675,12 @@ class _BiblicalAssistantDialogState
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextField(
                 controller: _keyController,
                 decoration: InputDecoration(
-                  labelText: 'API Key de Gemini',
+                  labelText: 'Pegar API Key aquí',
+                  hintText: 'AIzaSy...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -4495,27 +4692,25 @@ class _BiblicalAssistantDialogState
         actions: [
           TextButton(
             onPressed: () {
-              if (showKeySetup) {
-                setState(() {
-                  showKeySetup = false;
-                });
-              } else {
-                Navigator.pop(context);
-              }
+              setState(() {
+                showKeySetup = false;
+              });
             },
-            child: Text('Cancelar', style: GoogleFonts.nunito()),
+            child: Text('Cerrar', style: GoogleFonts.nunito()),
           ),
           ElevatedButton(
             onPressed: () async {
               final key = _keyController.text.trim();
+              final prefs = await SharedPreferences.getInstance();
               if (key.isNotEmpty) {
-                final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('gemini_api_key', key);
-                setState(() {
-                  geminiKey = key;
-                  showKeySetup = false;
-                });
+              } else {
+                await prefs.remove('gemini_api_key');
               }
+              setState(() {
+                geminiKey = key;
+                showKeySetup = false;
+              });
             },
             child: Text(
               'Guardar',
@@ -4536,7 +4731,9 @@ class _BiblicalAssistantDialogState
             const CircularProgressIndicator(),
             const SizedBox(height: 24),
             Text(
-              'Analizando catálogo de cantos...',
+              geminiKey.isNotEmpty
+                  ? 'Analizando toda la BD con IA...'
+                  : 'Evaluando 100% de la base de datos...',
               style: GoogleFonts.nunito(color: Colors.grey),
             ),
             const SizedBox(height: 8),
@@ -4564,21 +4761,42 @@ class _BiblicalAssistantDialogState
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              'Encontrar Cantos por Palabra',
-              style: GoogleFonts.outfit(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cantos por Predicación',
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                Text(
+                  geminiKey.isNotEmpty
+                      ? '✨ IA Gemini activa'
+                      : '⚡ Búsqueda inteligente en toda la BD',
+                  style: GoogleFonts.nunito(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: geminiKey.isNotEmpty
+                        ? Colors.amber.shade700
+                        : theme.colorScheme.outline,
+                  ),
+                ),
+              ],
             ),
           ),
           IconButton(
             icon: Icon(
               Icons.vpn_key_rounded,
-              color: theme.colorScheme.primary,
+              color: geminiKey.isNotEmpty
+                  ? Colors.amber.shade700
+                  : theme.colorScheme.outline,
               size: 20,
             ),
-            tooltip: 'Configurar API Key',
+            tooltip: geminiKey.isNotEmpty
+                ? 'API Key configurada (toca para cambiar)'
+                : 'Configurar API Key (opcional)',
             onPressed: () {
               setState(() {
                 showKeySetup = true;
@@ -4595,7 +4813,7 @@ class _BiblicalAssistantDialogState
             children: [
               if (!hasSearched) ...[
                 Text(
-                  'Ingresa el pasaje leído o describe de qué trató la predicación para sugerirte los cantos ideales en el culto.',
+                  'Ingresa el pasaje leído o el tema del mensaje para encontrar los cantos más apropiados de todo el catálogo.',
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     color: isDark ? Colors.white70 : Colors.black87,
@@ -4675,7 +4893,7 @@ class _BiblicalAssistantDialogState
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     hintText:
-                        'Ej: Salmo 23 (El Señor es mi pastor) / Sobre tener fe y confianza en Dios en medio del desierto',
+                        'Ej: Salmo 23 (El Señor es mi pastor) / Mensaje sobre el perdón de los pecados y la cruz',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -4695,7 +4913,7 @@ class _BiblicalAssistantDialogState
                 ),
               ] else ...[
                 Text(
-                  'Recomendaciones para:\n"${_inputController.text}"',
+                  'Resultados para:\n"${_inputController.text}"',
                   style: GoogleFonts.nunito(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.primary,
@@ -4703,6 +4921,27 @@ class _BiblicalAssistantDialogState
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (recommendations.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isAiPowered
+                          ? '✨ 5 sugerencias pastorales con IA (de $totalAnalyzed cantos analizados)'
+                          : '⚡ Top ${recommendations.length} cantos más apropiados (de $totalAnalyzed analizados)',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 if (recommendations.isEmpty)
                   Text(
@@ -4730,15 +4969,7 @@ class _BiblicalAssistantDialogState
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
-                          Navigator.pop(context);
-
-                          {
-                            final location = GoRouterState.of(context).uri.path;
-                            final target = location.endsWith('/')
-                                ? '${location}hymn/$recCollection-$recId'
-                                : '$location/hymn/$recCollection-$recId';
-                            context.push(target);
-                          }
+                          Navigator.pop(context, '$recCollection-$recId');
                         },
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
@@ -4799,8 +5030,8 @@ class _BiblicalAssistantDialogState
                                   style: GoogleFonts.nunito(
                                     fontSize: 12,
                                     color: isDark
-                                        ? Colors.white60
-                                        : Colors.black54,
+                                        ? Colors.white70
+                                        : Colors.black87,
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
@@ -4813,9 +5044,11 @@ class _BiblicalAssistantDialogState
                   }),
               ],
               if (errorMessage.isNotEmpty) ...[
+                const SizedBox(height: 8),
                 Text(
                   errorMessage,
                   style: GoogleFonts.nunito(color: Colors.red, fontSize: 13),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 if (rawErrorDetails.isNotEmpty)
