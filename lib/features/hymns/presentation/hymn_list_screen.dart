@@ -19,6 +19,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../favorites/domain/favorites_notifier.dart';
 import 'notation_provider.dart';
 import 'widgets/duplicate_pairs_dialog.dart';
+import 'widgets/semantic_search_dialog.dart';
 import 'add_hymn_screen.dart';
 import 'package:flutter/services.dart';
 
@@ -610,6 +611,26 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
       context: context,
       barrierDismissible: true,
       builder: (context) => const BiblicalAssistantDialog(),
+    );
+
+    if (selectedKey != null && context.mounted) {
+      final location = GoRouterState.of(context).uri.path;
+      final target = location.endsWith('/')
+          ? '${location}hymn/$selectedKey'
+          : '$location/hymn/$selectedKey';
+      context.push(target);
+    }
+  }
+
+  Future<void> _showSemanticSearchDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    String? initialQuery,
+  }) async {
+    final selectedKey = await showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => SemanticSearchDialog(initialQuery: initialQuery),
     );
 
     if (selectedKey != null && context.mounted) {
@@ -1348,6 +1369,22 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                           ),
                                         ),
                                         trailing: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.auto_awesome_rounded,
+                                              color: Colors.amber,
+                                              size: 22,
+                                            ),
+                                            tooltip: 'Búsqueda Semántica con IA',
+                                            onPressed: () {
+                                              final currentQuery = ref.read(searchQueryProvider);
+                                              _showSemanticSearchDialog(
+                                                context,
+                                                ref,
+                                                initialQuery: currentQuery,
+                                              );
+                                            },
+                                          ),
                                           if (ref
                                               .watch(searchQueryProvider)
                                               .isNotEmpty)
@@ -1600,11 +1637,12 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    if (query.isNotEmpty &&
-                                        (!kIsWeb || adminMode)) ...[
-                                      const SizedBox(height: 24),
+                                    if (query.isNotEmpty) ...[
+                                      const SizedBox(height: 18),
                                       ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.amber.shade700,
+                                          foregroundColor: Colors.white,
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 20,
                                             vertical: 12,
@@ -1616,21 +1654,53 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                           ),
                                         ),
                                         icon: const Icon(
-                                          Icons.cloud_sync_rounded,
+                                          Icons.auto_awesome_rounded,
+                                          color: Colors.white,
+                                          size: 20,
                                         ),
                                         label: Text(
-                                          'Buscar en Internet',
+                                          'Búsqueda Semántica con IA ✨',
                                           style: GoogleFonts.nunito(
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                        onPressed: () =>
-                                            _showOnlineSearchDialog(
-                                              context,
-                                              ref,
-                                              query,
-                                            ),
+                                        onPressed: () => _showSemanticSearchDialog(
+                                          context,
+                                          ref,
+                                          initialQuery: query,
+                                        ),
                                       ),
+                                      if (!kIsWeb || adminMode) ...[
+                                        const SizedBox(height: 10),
+                                        OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 20,
+                                              vertical: 12,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(
+                                                16,
+                                              ),
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.cloud_sync_rounded,
+                                          ),
+                                          label: Text(
+                                            'Buscar en Internet',
+                                            style: GoogleFonts.nunito(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          onPressed: () =>
+                                              _showOnlineSearchDialog(
+                                                context,
+                                                ref,
+                                                query,
+                                              ),
+                                        ),
+                                      ],
                                     ],
                                   ],
                                 ),
@@ -4471,9 +4541,41 @@ class _BiblicalAssistantDialogState
       final localCandidates = _rankHymnsLocally(userInput, allHymns);
 
       if (localCandidates.isEmpty) {
+        if (geminiKey.trim().isNotEmpty) {
+          try {
+            final semanticResp = await GeminiAiService.searchHymnsSemantically(
+              context: context,
+              query: userInput,
+              catalog: allHymns,
+              allowedCollections: _selectedCollections,
+            );
+            final matches =
+                List<Map<String, dynamic>>.from(semanticResp['matches'] ?? []);
+            if (matches.isNotEmpty) {
+              setState(() {
+                recommendations = matches.map((m) {
+                  final Hymn h = m['hymn'] as Hymn;
+                  return {
+                    'id': h.id,
+                    'collection': h.collection,
+                    'title': h.title,
+                    'reason': m['relevanceReason'] ??
+                        'Coincidencia conceptual encontrada por IA',
+                  };
+                }).toList();
+                isAiPowered = true;
+                isSearching = false;
+                hasSearched = true;
+              });
+              return;
+            }
+          } catch (_) {}
+        }
+
         setState(() {
           recommendations = [];
-          errorMessage = 'No se encontraron cantos relacionados con los términos ingresados. Prueba con otras palabras o una cita bíblica.';
+          errorMessage =
+              'No se encontraron cantos relacionados con los términos ingresados. Prueba con otras palabras o una cita bíblica.';
           isSearching = false;
           hasSearched = true;
         });

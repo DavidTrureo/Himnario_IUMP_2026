@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'spanish_grammar_corrector.dart';
+import '../../features/hymns/domain/hymn.dart';
 
 class GeminiAiService {
   static const String _keyPref = 'gemini_api_key';
@@ -651,4 +652,244 @@ JSON esperado:
     }
   }
 
+  /// Realiza una búsqueda semántica y conceptual en el catálogo de cantos utilizando Gemini IA.
+  /// Conecta con Gemini para permitir búsquedas conceptuales como:
+  /// "Himnos que hablen del mar tempestuoso o de la armadura de Dios"
+  /// cuando el usuario no recuerda el número ni el título exacto.
+  static Future<Map<String, dynamic>> searchHymnsSemantically({
+    required BuildContext context,
+    required String query,
+    required List<Hymn> catalog,
+    Set<String>? allowedCollections,
+  }) async {
+    // 1. Obtener la clave API de Gemini
+    String apiKey = await getApiKey();
+    if (apiKey.isEmpty) {
+      if (!context.mounted) {
+        throw Exception('API Key de Gemini no configurada');
+      }
+      final enteredKey = await showApiKeyInputDialog(
+        context,
+        reason:
+            'Para realizar búsquedas conceptuales con Inteligencia Artificial necesitas ingresar tu API Key de Google Gemini.',
+      );
+      if (enteredKey == null || enteredKey.trim().isEmpty) {
+        throw Exception('Se requiere una clave API de Gemini para la búsqueda semántica.');
+      }
+      apiKey = enteredKey.trim();
+    }
+
+    final filteredCatalog = allowedCollections == null || allowedCollections.isEmpty
+        ? catalog
+        : catalog
+            .where((h) => allowedCollections.contains(h.collection))
+            .toList();
+
+    if (filteredCatalog.isEmpty) {
+      return {
+        'summary': 'No hay cantos en las colecciones seleccionadas.',
+        'matches': <Map<String, dynamic>>[],
+        'keywords': <String>[],
+      };
+    }
+
+    // 2. Construir índice resumido y compacto de los cantos para contexto en el prompt
+    // Formato ultra-compacto: ID|coleccion|TITULO
+    final buffer = StringBuffer();
+    for (final h in filteredCatalog) {
+      buffer.writeln('${h.id}|${h.collection}|${h.title}');
+    }
+
+    final catalogIndex = buffer.toString();
+
+    final prompt = '''
+Actúa como un teólogo e himnólogo experto en el Himnario Cristiano Evangélico (Himnario Oficial IUMP, Alabanzas Especiales y Coros Pentecostales).
+El usuario está buscando cantos basados en un CONCEPTO, HISTORIA BÍBLICA, METÁFORA O TEMÁTICA, porque no recuerda el título ni el número exacto:
+
+CONSULTA DEL USUARIO:
+"$query"
+
+Tienes a tu disposición el catálogo oficial de la app en formato [ID|COLECCIÓN|TÍTULO]:
+$catalogIndex
+
+INSTRUCCIONES CLAVE:
+1. Analiza el sentido teológico, poético y bíblico de la consulta.
+   - Si menciona metáforas de tormenta, mar tempestuoso o naufragio (ej: "Va mi barca", "Cual faro en el mar", "Cariñoso Salvador", "Un ancla").
+   - Si menciona la armadura de Dios, la batalla de la fe o guerra espiritual (ej: "Estad por Cristo firmes", "Firmes y adelante").
+   - Si menciona múltiples temas (ej: "mar tempestuoso O armadura de Dios"), incluye los mejores cantos para CADA uno de los temas solicitados.
+2. Selecciona entre 3 y 8 cantos del catálogo que mejor coincidan conceptual o espiritualmente con lo que el usuario busca.
+3. Para cada recomendación, redacta una explicación breve y precisa (1 o 2 oraciones) indicando por qué coincide y qué estrofa o idea aborda.
+4. Indica también una lista de palabras clave relevantes.
+
+RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markdown ```json, sin texto decorativo):
+{
+  "summary": "Breve resumen del análisis conceptual",
+  "results": [
+    {
+      "id": 123,
+      "collection": "iump",
+      "title": "TÍTULO DEL CANTO",
+      "relevanceReason": "Explicación clara de por qué coincide con el concepto solicitado."
+    }
+  ],
+  "keywords": ["palabra1", "palabra2"]
+}
+''';
+
+    final requestBody = jsonEncode({
+      'contents': [
+        {
+          'parts': [
+            {'text': prompt}
+          ]
+        }
+      ],
+      'generationConfig': {
+        'response_mime_type': 'application/json',
+        'temperature': 0.2,
+      }
+    });
+
+    final modelsToTry = [
+      {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+      {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
+      {'model': 'gemini-1.5-flash', 'api': 'v1'},
+      {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
+    ];
+
+    http.Response? response;
+    List<String> errors = [];
+
+    for (final item in modelsToTry) {
+      final model = item['model']!;
+      final api = item['api']!;
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$apiKey',
+      );
+
+      try {
+        final res = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: requestBody,
+        ).timeout(const Duration(seconds: 22));
+
+        if (res.statusCode == 200) {
+          response = res;
+          break;
+        } else {
+          errors.add('$model ($api): ${res.statusCode}');
+        }
+      } catch (e) {
+        errors.add('$model ($api) exc: $e');
+      }
+    }
+
+    if (response == null || response.statusCode != 200) {
+      final localMatches = _findLocalThematicMatches(query, filteredCatalog);
+      if (localMatches.isNotEmpty) {
+        return {
+          'summary': 'Coincidencias temáticas locales (Modo sin conexión)',
+          'matches': localMatches,
+          'keywords': <String>[],
+        };
+      }
+      throw Exception('No se pudo conectar con Gemini IA. Detalle: ${errors.join(', ')}');
+    }
+
+    final data = jsonDecode(response.body);
+    final text = data['candidates'][0]['content']['parts'][0]['text'] as String;
+
+    String cleanText = text.trim();
+    if (cleanText.startsWith('```json')) {
+      cleanText = cleanText.substring(7);
+    } else if (cleanText.startsWith('```')) {
+      cleanText = cleanText.substring(3);
+    }
+    if (cleanText.endsWith('```')) {
+      cleanText = cleanText.substring(0, cleanText.length - 3);
+    }
+
+    final parsed = jsonDecode(cleanText.trim()) as Map<String, dynamic>;
+    final rawResults = (parsed['results'] as List?) ?? [];
+    final summary = parsed['summary']?.toString() ??
+        'Resultados conceptuales encontrados por Gemini IA';
+    final keywords = (parsed['keywords'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+
+    // Mapear los resultados hacia los objetos Hymn reales del catálogo
+    final List<Map<String, dynamic>> finalMatches = [];
+    final catalogMap = {
+      for (var h in filteredCatalog) '${h.collection}-${h.id}': h
+    };
+
+    for (final item in rawResults) {
+      final col = item['collection']?.toString().toLowerCase().trim() ?? 'iump';
+      final id = int.tryParse(item['id']?.toString() ?? '') ?? 0;
+      final title = item['title']?.toString() ?? '';
+      final reason =
+          item['relevanceReason']?.toString() ?? 'Coincidencia conceptual';
+
+      Hymn? matchedHymn = catalogMap['$col-$id'];
+
+      // Fallback por si la colección o ID varían levemente
+      if (matchedHymn == null) {
+        final normTitle = Hymn.normalizeString(title);
+        matchedHymn = filteredCatalog.cast<Hymn?>().firstWhere(
+          (h) => h != null && h.normalizedTitle == normTitle,
+          orElse: () => null,
+        );
+      }
+
+      if (matchedHymn != null) {
+        finalMatches.add({
+          'hymn': matchedHymn,
+          'relevanceReason': reason,
+        });
+      }
+    }
+
+    return {
+      'summary': summary,
+      'matches': finalMatches,
+      'keywords': keywords,
+    };
+  }
+
+  static List<Map<String, dynamic>> _findLocalThematicMatches(
+    String query,
+    List<Hymn> catalog,
+  ) {
+    final normQuery = Hymn.normalizeString(query);
+    final rawWords =
+        normQuery.split(' ').where((w) => w.length >= 4).toList();
+    if (rawWords.isEmpty) return [];
+
+    final scored = <Map<String, dynamic>>[];
+    for (final h in catalog) {
+      int score = 0;
+      final matchedTerms = <String>[];
+      for (final w in rawWords) {
+        if (h.normalizedTitle.contains(w)) {
+          score += 30;
+          matchedTerms.add(w);
+        } else if (h.normalizedSearchableText.contains(w)) {
+          score += 10;
+          matchedTerms.add(w);
+        }
+      }
+      if (score > 0) {
+        scored.add({
+          'hymn': h,
+          'relevanceReason':
+              'Coincidencia con los términos: ${matchedTerms.join(', ')}',
+          'score': score,
+        });
+      }
+    }
+    scored.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+    return scored.take(6).toList();
+  }
 }
