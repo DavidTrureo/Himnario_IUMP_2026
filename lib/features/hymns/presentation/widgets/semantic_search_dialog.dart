@@ -27,6 +27,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
   bool _isLoading = false;
   String? _errorMessage;
   String? _summary;
+  String? _biblicalPassage;
   String? _biblicalContext;
   String? _spiritualTone;
   List<Map<String, dynamic>> _results = [];
@@ -34,15 +35,46 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
   final Set<String> _selectedCollections = {'iump', 'especiales', 'coros'};
 
   final List<Map<String, String>> _biblicalSuggestions = [
-    {'title': 'Salmo 23', 'query': 'Salmo 23: Jehová es mi Pastor y nada me faltará'},
-    {'title': 'Efesios 6 (Armadura)', 'query': 'Efesios 6:10-18: Vestíos de toda la armadura de Dios para la batalla de la fe'},
-    {'title': 'Isaías 53 (La Cruz)', 'query': 'Isaías 53: Mas él herido fue por nuestras rebeliones, el siervo sufriente'},
-    {'title': 'Lucas 15 (Hijo Pródigo)', 'query': 'Lucas 15: El hijo pródigo, la gracia del Padre y el perdón de pecados'},
-    {'title': 'Hechos 2 (Pentecostés)', 'query': 'Hechos 2: El derramamiento del Espíritu Santo y fuego de Pentecostés'},
-    {'title': 'Isaías 40 (Nuevas Fuerzas)', 'query': 'Isaías 40: Los que esperan a Jehová tendrán nuevas fuerzas como las águilas'},
-    {'title': 'Consuelo en la Prueba', 'query': 'Mensaje de consuelo y fortaleza para los que están pasando por aflicción y dolor'},
-    {'title': 'Llamado al Altar', 'query': 'Llamado al arrepentimiento, quebrantamiento, entrega total y consagración a Dios'},
-    {'title': 'Segunda Venida', 'query': 'La venida del Señor, el arrebatamiento de la Iglesia y la trompeta final'},
+    {
+      'title': 'Salmo 23 (Valle de sombra)',
+      'query': 'aunque ande en valle de sombra de muerte no temeré mal alguno',
+    },
+    {
+      'title': 'Isaías 43 (Aguas y fuego)',
+      'query': 'cuando pases por las aguas yo estaré contigo y por los ríos no te anegarán',
+    },
+    {
+      'title': '1 Reyes 19 (Elías desanimado)',
+      'query': 'el profeta Elías cansado en el desierto debajo del enebro pidiendo la muerte',
+    },
+    {
+      'title': 'Efesios 6 (Armadura)',
+      'query': 'vestíos de toda la armadura de Dios para estar firmes contra las asechanzas del enemigo',
+    },
+    {
+      'title': 'Isaías 40 (Águilas/Fuerzas)',
+      'query': 'los que esperan a Jehová tendrán nuevas fuerzas levantarán alas como las águilas',
+    },
+    {
+      'title': 'Isaías 53 (La Cruz y Sanidad)',
+      'query': 'herido fue por nuestras rebeliones y por su llaga fuimos nosotros curados',
+    },
+    {
+      'title': 'Lucas 15 (Hijo Pródigo)',
+      'query': 'el hijo pródigo que regresa arrepentido pidiendo perdón a su padre',
+    },
+    {
+      'title': 'Hechos 2 (Pentecostés)',
+      'query': 'el derramamiento del Espíritu Santo como viento recio y fuego de Pentecostés',
+    },
+    {
+      'title': 'Llamado al Altar',
+      'query': 'mensaje de quebrantamiento, arrepentimiento, entrega total y consagración a Dios',
+    },
+    {
+      'title': 'Consuelo en Aflicción',
+      'query': 'palabra de consuelo, paz y fortaleza en medio del dolor, lágrimas y prueba difícil',
+    },
   ];
 
   final List<Map<String, String>> _conceptualSuggestions = [
@@ -83,6 +115,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       _errorMessage = null;
       _results = [];
       _summary = null;
+      _biblicalPassage = null;
       _biblicalContext = null;
       _spiritualTone = null;
       _keywords = [];
@@ -115,6 +148,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
         setState(() {
           _isLoading = false;
           _summary = searchResponse['summary']?.toString();
+          _biblicalPassage = searchResponse['biblicalPassage']?.toString();
           _biblicalContext = searchResponse['biblicalContext']?.toString();
           _spiritualTone = searchResponse['spiritualTone']?.toString();
           _results =
@@ -323,7 +357,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                       onSubmitted: (_) => _performSearch(),
                       decoration: InputDecoration(
                         hintText: _activeMode == 'biblical'
-                            ? 'Ej: Romanos 8:28 / Salmo 91 / El pastor predicó sobre vencer el desánimo...'
+                            ? 'Ej: "aunque ande en valle de sombra" / "Elías en el desierto" / Romanos 8:28...'
                             : 'Ej: Himnos que hablen del mar tempestuoso o de la armadura de Dios...',
                         hintStyle: GoogleFonts.nunito(fontSize: 13, color: Colors.grey),
                         prefixIcon: Icon(
@@ -571,7 +605,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
             const SizedBox(height: 12),
             Text(
               _activeMode == 'biblical'
-                  ? 'Ingresa una cita bíblica o el resumen de la predicación'
+                  ? 'Escribe un versículo, una frase bíblica o lo predicado'
                   : 'Ingresa cualquier temática, metáfora o frase de alabanza',
               style: GoogleFonts.nunito(
                 fontSize: 15,
@@ -582,7 +616,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Gemini entenderá el contexto espiritual y te sugerirá los cantos más idóneos para ministrar',
+              _activeMode == 'biblical'
+                  ? 'Gemini identificará el pasaje sagrado, comprenderá el contexto espiritual y te sugerirá los cantos más idóneos para ministrar'
+                  : 'Gemini entenderá la figura poética y te sugerirá los cantos más afines del catálogo',
               style: GoogleFonts.nunito(
                 fontSize: 12,
                 color: isDark ? Colors.white38 : Colors.black38,
@@ -658,6 +694,36 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                       ),
                   ],
                 ),
+                if (_biblicalPassage != null && _biblicalPassage!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.menu_book_rounded, size: 14, color: Colors.amber),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Pasaje Bíblico: $_biblicalPassage',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 if (_biblicalContext != null && _biblicalContext!.isNotEmpty)
                   Text(

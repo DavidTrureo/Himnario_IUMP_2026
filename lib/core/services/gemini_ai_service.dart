@@ -706,21 +706,26 @@ JSON esperado:
 
     final modeGuidance = searchMode == 'biblical'
         ? '''
-MODO: ASISTENTE BÍBLICO Y CONTEXTO DE PREDICACIÓN / SERMÓN
-Misión: Actuar como un pastor, teólogo bíblico e himnólogo cristiano con profundo conocimiento de las Sagradas Escrituras (Biblia Reina-Valera 1960) y de la himnología evangélica pentecostal (Himnario Oficial IUMP, Alabanzas Especiales y Coros Pentecostales).
+MODO: ASISTENTE BÍBLICO Y HERMENÉUTICA DE PREDICACIÓN / SERMÓN
+Misión: Actuar como un erudito teólogo bíblico, pastor e himnólogo cristiano con profundo conocimiento de las Sagradas Escrituras (Biblia Reina-Valera 1960) y de la himnología evangélica pentecostal (Himnario Oficial IUMP, Alabanzas Especiales y Coros Pentecostales).
 
-1. ACCESO BÍBLICO Y EXÉGESIS PROFUNDA:
-   - Si la consulta contiene una CITA O PASAJE BÍBLICO (ej: "Romanos 8:28", "Salmo 23", "Efesios 6:10-18", "Isaías 53", "Lucas 15"):
-     * En "biblicalContext", resume con profundidad teológica el contexto histórico-doctrinal del pasaje, el mensaje central, las promesas de Dios y su aplicación espiritual.
-   - Si la consulta describe un TEMA DE PREDICACIÓN O EXHORTACIÓN (ej: "el pastor predicó sobre vencer el desánimo en la prueba", "mensaje de consagración y santidad", "consuelo en el duelo"):
-     * En "biblicalContext", sintetiza el sentir pastoral y la necesidad espiritual de la congregación ante este mensaje.
-   - En "spiritualTone", define la atmósfera espiritual (ej: "Consagración", "Guerra Espiritual", "Fe en la Prueba", "Gracia y Perdón", "Adoración y Alabanza").
+REGLA DE ORO FUNDAMENTAL:
+QUEDA ESTRICTAMENTE PROHIBIDO buscar por simple coincidencia superficial de palabras textuales aisladas (ejemplo: si el usuario escribe "pastor", NO debes limitarte a buscar cantos que contengan la palabra literal "pastor").
+Tu función como IA Bíblica Avanzada es comprender el fondo teológico y espiritual:
 
-2. SELECCIÓN DE CANTOS DEL CATÁLOGO REAL:
-   - Selecciona entre 4 y 7 cantos del catálogo proporcionado que mejor sellen, acompañen o ministren esta palabra en el culto.
+1. LOCALIZACIÓN E IDENTIFICACIÓN BÍBLICA:
+   - A partir de cualquier fragmento de versículo recordado a medias (ej: "aunque pase por aguas profundas no me ahogaré", "valle de sombra de muerte", "el profeta Elías cansado en el desierto"), cita bíblica o resumen de la predicación:
+   - Identifica con precisión qué pasaje sagrado es (Libro, Capítulo y Versículos) y regístralo en "biblicalPassage" (ej: "Isaías 43:1-3", "Salmo 23:1-6", "1 Reyes 19:4-8", "Efesios 6:10-18", "Lucas 15:11-32").
+
+2. EXÉGESIS Y CONTEXTO ESPIRITUAL REAL:
+   - En "biblicalContext", analiza en 2-3 oraciones el sentido espiritual profundo: el trasfondo histórico-doctrinal, qué necesidad del alma atiende (consuelo en aflicción, desánimo espiritual, llamado a la santidad, etc.) y las promesas de Dios.
+   - En "spiritualTone", define la atmósfera espiritual (ej: "Consagración", "Fe en la Prueba", "Guerra Espiritual", "Consuelo y Esperanza", "Gracia y Perdón", "Adoración y Alabanza").
+
+3. HERMENÉUTICA CON EL CATÁLOGO DE CANTOS:
+   - Selecciona entre 4 y 7 cantos del catálogo proporcionado cuyo mensaje teológico y espiritual de fondo abrace y ministre esta palabra, AUNQUE EL CANTO NO CONTENGA LAS PALABRAS LITERALES DEL PASAJE.
    - Para cada canto:
-     * "worshipMoment": Momento litúrgico ideal ("Sellar la Predicación", "Llamado al Altar / Consagración", "Oración por los Afligidos", "Alabanza Congregacional").
-     * "relevanceReason": Explica con precisión pastoral qué estrofa, verso o verdad teológica conecta directamente con la predicación o pasaje bíblico.
+     * "worshipMoment": Momento litúrgico idóneo ("Sellar la Predicación", "Llamado al Altar / Consagración", "Oración de Fe / Afligidos", "Alabanza Congregacional").
+     * "relevanceReason": Explica con claridad pastoral qué verdad teológica o estrofa del canto sella espiritualmente la enseñanza de la Palabra de Dios.
 '''
         : '''
 MODO: BÚSQUEDA CONCEPTUAL Y METAFÓRICA DE CANTOS
@@ -743,18 +748,19 @@ $catalogIndex
 RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markdown ```json, sin texto adicional):
 {
   "summary": "Breve resumen del mensaje o concepto (1 frase)",
+  "biblicalPassage": "Libro Capítulo:Versículos identificados (ej: Isaías 43:1-3, Salmo 23:1-6)",
   "biblicalContext": "Análisis exegético del pasaje bíblico o trasfondo doctrinal del sermón (2-3 oraciones claras)",
-  "spiritualTone": "Consagración | Fe y Victoria | Consuelo | Guerra Espiritual | Gracia y Perdón | Adoración",
+  "spiritualTone": "Consagración | Fe en la Prueba | Consuelo y Esperanza | Guerra Espiritual | Gracia y Perdón | Adoración",
   "results": [
     {
       "id": 123,
       "collection": "iump",
       "title": "TÍTULO DEL CANTO",
-      "relevanceReason": "Conexión pastoral/doctrinal explicando qué estrofa o verdad aborda...",
+      "relevanceReason": "Conexión pastoral/doctrinal explicando qué estrofa o verdad teológica abraza la palabra...",
       "worshipMoment": "Sellar la Predicación | Llamado al Altar | Oración de Fe | Congregacional"
     }
   ],
-  "keywords": ["palabra1", "palabra2"]
+  "keywords": ["tema1", "tema2"]
 }
 ''';
 
@@ -812,6 +818,7 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
       if (localMatches.isNotEmpty) {
         return {
           'summary': 'Coincidencias temáticas locales (Modo sin conexión)',
+          'biblicalPassage': null,
           'biblicalContext': 'Modo sin conexión a internet: Se aplicó coincidencia temática local directa sobre el catálogo.',
           'spiritualTone': 'Alabanza y Fe',
           'matches': localMatches,
@@ -838,6 +845,7 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
     final rawResults = (parsed['results'] as List?) ?? [];
     final summary = parsed['summary']?.toString() ??
         'Resultados conceptuales encontrados por Gemini IA';
+    final biblicalPassage = parsed['biblicalPassage']?.toString();
     final biblicalContext = parsed['biblicalContext']?.toString();
     final spiritualTone = parsed['spiritualTone']?.toString();
     final keywords = (parsed['keywords'] as List?)
@@ -881,6 +889,7 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
 
     return {
       'summary': summary,
+      'biblicalPassage': biblicalPassage,
       'biblicalContext': biblicalContext,
       'spiritualTone': spiritualTone,
       'matches': finalMatches,
