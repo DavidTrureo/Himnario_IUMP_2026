@@ -8,36 +8,56 @@ import '../hymn_list_screen.dart';
 
 class SemanticSearchDialog extends ConsumerStatefulWidget {
   final String? initialQuery;
+  final String defaultMode; // 'biblical' o 'conceptual'
 
-  const SemanticSearchDialog({super.key, this.initialQuery});
+  const SemanticSearchDialog({
+    super.key,
+    this.initialQuery,
+    this.defaultMode = 'biblical',
+  });
 
   @override
-  ConsumerState<SemanticSearchDialog> createState() => _SemanticSearchDialogState();
+  ConsumerState<SemanticSearchDialog> createState() =>
+      _SemanticSearchDialogState();
 }
 
 class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
   late final TextEditingController _controller;
+  late String _activeMode; // 'biblical' o 'conceptual'
   bool _isLoading = false;
   String? _errorMessage;
   String? _summary;
+  String? _biblicalContext;
+  String? _spiritualTone;
   List<Map<String, dynamic>> _results = [];
   List<String> _keywords = [];
   final Set<String> _selectedCollections = {'iump', 'especiales', 'coros'};
 
-  final List<String> _exampleQueries = [
-    'Mar tempestuoso o la barca',
-    'La armadura de Dios y la fe',
-    'El Buen Pastor y Salmo 23',
-    'El perdón de pecados y la Cruz',
-    'El Alfarero y el barro',
-    'Espíritu Santo y fuego de Pentecostés',
-    'Consuelo en momentos de prueba y dolor',
-    'Segunda venida de Cristo y trompeta final',
+  final List<Map<String, String>> _biblicalSuggestions = [
+    {'title': 'Salmo 23', 'query': 'Salmo 23: Jehová es mi Pastor y nada me faltará'},
+    {'title': 'Efesios 6 (Armadura)', 'query': 'Efesios 6:10-18: Vestíos de toda la armadura de Dios para la batalla de la fe'},
+    {'title': 'Isaías 53 (La Cruz)', 'query': 'Isaías 53: Mas él herido fue por nuestras rebeliones, el siervo sufriente'},
+    {'title': 'Lucas 15 (Hijo Pródigo)', 'query': 'Lucas 15: El hijo pródigo, la gracia del Padre y el perdón de pecados'},
+    {'title': 'Hechos 2 (Pentecostés)', 'query': 'Hechos 2: El derramamiento del Espíritu Santo y fuego de Pentecostés'},
+    {'title': 'Isaías 40 (Nuevas Fuerzas)', 'query': 'Isaías 40: Los que esperan a Jehová tendrán nuevas fuerzas como las águilas'},
+    {'title': 'Consuelo en la Prueba', 'query': 'Mensaje de consuelo y fortaleza para los que están pasando por aflicción y dolor'},
+    {'title': 'Llamado al Altar', 'query': 'Llamado al arrepentimiento, quebrantamiento, entrega total y consagración a Dios'},
+    {'title': 'Segunda Venida', 'query': 'La venida del Señor, el arrebatamiento de la Iglesia y la trompeta final'},
+  ];
+
+  final List<Map<String, String>> _conceptualSuggestions = [
+    {'title': 'Mar tempestuoso', 'query': 'Himnos que hablen del mar tempestuoso, la barca y Jesús calmando la tempestad'},
+    {'title': 'Armadura de Dios', 'query': 'Himnos sobre la armadura de Dios, la lucha espiritual y ser soldado de Cristo'},
+    {'title': 'El Alfarero y el Barro', 'query': 'Himno del alfarero que rompe el vaso de barro y lo hace de nuevo'},
+    {'title': '99 Ovejas en el Redil', 'query': 'Canto sobre las noventa y nueve ovejas y el Pastor buscando a la perdida'},
+    {'title': 'La Zarza que ardía', 'query': 'Alabanza sobre la zarza en el monte que ardía y no se consumía'},
+    {'title': 'Un ancla en la tormenta', 'query': 'Tenemos un ancla firme y segura en medio de las olas del mar'},
   ];
 
   @override
   void initState() {
     super.initState();
+    _activeMode = widget.defaultMode;
     _controller = TextEditingController(text: widget.initialQuery ?? '');
     if ((widget.initialQuery ?? '').trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -63,6 +83,8 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       _errorMessage = null;
       _results = [];
       _summary = null;
+      _biblicalContext = null;
+      _spiritualTone = null;
       _keywords = [];
     });
 
@@ -76,7 +98,8 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
         }
       }
       if (allHymns.isEmpty) {
-        throw Exception('El catálogo de cantos aún se está cargando. Intenta en unos segundos.');
+        throw Exception(
+            'El catálogo de cantos aún se está cargando. Intenta en unos segundos.');
       }
       if (!mounted) return;
 
@@ -85,16 +108,21 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
         query: query,
         catalog: allHymns,
         allowedCollections: _selectedCollections,
+        searchMode: _activeMode,
       );
 
       if (mounted) {
         setState(() {
           _isLoading = false;
           _summary = searchResponse['summary']?.toString();
-          _results = List<Map<String, dynamic>>.from(searchResponse['matches'] ?? []);
+          _biblicalContext = searchResponse['biblicalContext']?.toString();
+          _spiritualTone = searchResponse['spiritualTone']?.toString();
+          _results =
+              List<Map<String, dynamic>>.from(searchResponse['matches'] ?? []);
           _keywords = List<String>.from(searchResponse['keywords'] ?? []);
           if (_results.isEmpty) {
-            _errorMessage = 'Gemini no encontró coincidencias para esta búsqueda conceptual. Intenta describir el tema con otras palabras.';
+            _errorMessage =
+                'Gemini no encontró coincidencias para esta búsqueda. Intenta describir el tema bíblico con otras palabras.';
           }
         });
       }
@@ -134,6 +162,23 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     }
   }
 
+  Color _getMomentColor(String? moment) {
+    final m = (moment ?? '').toLowerCase();
+    if (m.contains('altar') || m.contains('consagra') || m.contains('entrega')) {
+      return Colors.deepOrange;
+    }
+    if (m.contains('oración') || m.contains('afligid') || m.contains('enferm')) {
+      return Colors.indigo;
+    }
+    if (m.contains('sellar') || m.contains('predica') || m.contains('mensaje')) {
+      return Colors.teal;
+    }
+    if (m.contains('congrega') || m.contains('apertura')) {
+      return Colors.green.shade700;
+    }
+    return Colors.amber.shade800;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -145,13 +190,13 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       backgroundColor: theme.colorScheme.surface,
       insetPadding: EdgeInsets.symmetric(
-        horizontal: isCompact ? 16 : 40,
-        vertical: isCompact ? 24 : 36,
+        horizontal: isCompact ? 14 : 36,
+        vertical: isCompact ? 20 : 32,
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 720,
-          maxHeight: size.height * 0.88,
+          maxWidth: 780,
+          maxHeight: size.height * 0.90,
         ),
         child: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -166,21 +211,21 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.amber.shade600, Colors.orange.shade700],
+                        colors: [Colors.amber.shade600, Colors.deepOrange.shade600],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.amber.withValues(alpha: 0.3),
+                          color: Colors.amber.withValues(alpha: 0.35),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
                       ],
                     ),
                     child: const Icon(
-                      Icons.auto_awesome_rounded,
+                      Icons.auto_stories_rounded,
                       color: Colors.white,
                       size: 24,
                     ),
@@ -190,15 +235,35 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Búsqueda Semántica con IA',
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Asistente Bíblico con IA',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Gemini Flash',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.amber.shade300 : Colors.amber.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         Text(
-                          'Encuentra cantos por concepto, historia o metáfora',
+                          'Exégesis de predicación, contexto bíblico y búsqueda de cantos',
                           style: GoogleFonts.nunito(
                             fontSize: 12,
                             color: isDark ? Colors.white60 : Colors.black54,
@@ -214,7 +279,36 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+
+              // Selector de Modo (Pestañas Segmentadas)
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment<String>(
+                    value: 'biblical',
+                    icon: Icon(Icons.menu_book_rounded, size: 16),
+                    label: Text('Predicación / Cita Bíblica'),
+                  ),
+                  ButtonSegment<String>(
+                    value: 'conceptual',
+                    icon: Icon(Icons.lightbulb_outline_rounded, size: 16),
+                    label: Text('Búsqueda por Tema / Metáfora'),
+                  ),
+                ],
+                selected: {_activeMode},
+                onSelectionChanged: (Set<String> newSelection) {
+                  setState(() {
+                    _activeMode = newSelection.first;
+                  });
+                },
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: WidgetStatePropertyAll(
+                    GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
 
               // Barra de entrada y botón de búsqueda
               Row(
@@ -228,9 +322,16 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _performSearch(),
                       decoration: InputDecoration(
-                        hintText: 'Ej: Himnos que hablen del mar tempestuoso o de la armadura de Dios...',
+                        hintText: _activeMode == 'biblical'
+                            ? 'Ej: Romanos 8:28 / Salmo 91 / El pastor predicó sobre vencer el desánimo...'
+                            : 'Ej: Himnos que hablen del mar tempestuoso o de la armadura de Dios...',
                         hintStyle: GoogleFonts.nunito(fontSize: 13, color: Colors.grey),
-                        prefixIcon: const Icon(Icons.search_rounded),
+                        prefixIcon: Icon(
+                          _activeMode == 'biblical'
+                              ? Icons.auto_stories_rounded
+                              : Icons.search_rounded,
+                          size: 20,
+                        ),
                         suffixIcon: _controller.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear_rounded, size: 20),
@@ -243,7 +344,8 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                       style: GoogleFonts.nunito(fontSize: 14),
                       onChanged: (_) => setState(() {}),
@@ -275,15 +377,15 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                             children: [
                               Icon(Icons.auto_awesome_rounded, size: 18),
                               SizedBox(width: 6),
-                              Text('Buscar', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text('Analizar', style: TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-              // Filtros de colección y sugerencias rápidas
+              // Filtros de colecciones
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
@@ -341,12 +443,14 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
-              // Sugerencias de ejemplo
+              // Chips de sugerencia rápida según modo
               if (_results.isEmpty && !_isLoading && _errorMessage == null) ...[
                 Text(
-                  'Ideas populares para probar:',
+                  _activeMode == 'biblical'
+                      ? 'Pasajes célebres y temas para ministrar:'
+                      : 'Conceptos y metáforas populares:',
                   style: GoogleFonts.nunito(
                     fontSize: 12,
                     color: isDark ? Colors.white54 : Colors.black54,
@@ -358,30 +462,33 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                   height: 34,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: _exampleQueries.length,
+                    itemCount: _activeMode == 'biblical'
+                        ? _biblicalSuggestions.length
+                        : _conceptualSuggestions.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, idx) {
-                      final ex = _exampleQueries[idx];
+                      final item = _activeMode == 'biblical'
+                          ? _biblicalSuggestions[idx]
+                          : _conceptualSuggestions[idx];
                       return ActionChip(
-                        label: Text(ex, style: GoogleFonts.nunito(fontSize: 11)),
+                        label: Text(item['title']!, style: GoogleFonts.nunito(fontSize: 11)),
                         backgroundColor: isDark
                             ? Colors.white.withValues(alpha: 0.05)
                             : Colors.grey.shade100,
                         onPressed: () {
-                          _controller.text = ex;
+                          _controller.text = item['query']!;
                           _performSearch();
                         },
                       );
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
               ],
 
-              // Divider
-              const Divider(height: 16),
+              const Divider(height: 14),
 
-              // Contenido dinámico (Loading, Error o Lista de Resultados)
+              // Cuerpo con Resultados / Loading / Error
               Expanded(
                 child: _buildBody(context, theme, isDark),
               ),
@@ -399,17 +506,19 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             Text(
-              'Consultando a Gemini IA...',
+              _activeMode == 'biblical'
+                  ? 'Analizando contexto bíblico y teológico...'
+                  : 'Buscando metáforas y conceptos en el catálogo...',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              'Analizando metáforas, pasajes bíblicos y estrofas del catálogo',
+              'Gemini IA está cruzando las Escrituras con el catálogo de himnos y coros',
               style: GoogleFonts.nunito(
                 fontSize: 13,
                 color: isDark ? Colors.white60 : Colors.black54,
@@ -453,22 +562,27 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.search_rounded,
-              size: 56,
+              _activeMode == 'biblical'
+                  ? Icons.menu_book_rounded
+                  : Icons.search_rounded,
+              size: 52,
               color: isDark ? Colors.white24 : Colors.black12,
             ),
             const SizedBox(height: 12),
             Text(
-              'Ingresa cualquier tema, frase o metáfora',
+              _activeMode == 'biblical'
+                  ? 'Ingresa una cita bíblica o el resumen de la predicación'
+                  : 'Ingresa cualquier temática, metáfora o frase de alabanza',
               style: GoogleFonts.nunito(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: isDark ? Colors.white60 : Colors.black54,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
-              'Gemini buscará en las estrofas y contexto teológico de todos los cantos',
+              'Gemini entenderá el contexto espiritual y te sugerirá los cantos más idóneos para ministrar',
               style: GoogleFonts.nunito(
                 fontSize: 12,
                 color: isDark ? Colors.white38 : Colors.black38,
@@ -483,16 +597,23 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Resumen conceptual devuelto por Gemini
-        if (_summary != null)
+        // Tarjeta de Exégesis Bíblica / Contexto Doctrinal
+        if ((_biblicalContext != null && _biblicalContext!.isNotEmpty) ||
+            (_summary != null && _summary!.isNotEmpty))
           Container(
-            padding: const EdgeInsets.all(10),
-            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: isDark ? 0.12 : 0.08),
-              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [Colors.blueGrey.shade900, Colors.black]
+                    : [Colors.amber.shade50, Colors.orange.shade50],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Colors.amber.withValues(alpha: 0.3),
+                color: Colors.amber.withValues(alpha: 0.35),
               ),
             ),
             child: Column(
@@ -500,39 +621,88 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.lightbulb_rounded, color: Colors.amber, size: 20),
+                    Icon(
+                      _activeMode == 'biblical'
+                          ? Icons.auto_stories_rounded
+                          : Icons.lightbulb_outline_rounded,
+                      color: Colors.amber,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _summary!,
-                        style: GoogleFonts.nunito(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
-                        ),
+                    Text(
+                      _activeMode == 'biblical'
+                          ? 'Contexto Bíblico & Exhortación'
+                          : 'Interpretación Espiritual',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.amber.shade300 : Colors.amber.shade900,
                       ),
                     ),
+                    const Spacer(),
+                    if (_spiritualTone != null && _spiritualTone!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '🕊️ $_spiritualTone',
+                          style: GoogleFonts.nunito(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                if (_biblicalContext != null && _biblicalContext!.isNotEmpty)
+                  Text(
+                    _biblicalContext!,
+                    style: GoogleFonts.nunito(
+                      fontSize: 12.5,
+                      height: 1.35,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                if (_summary != null && _summary!.isNotEmpty && _summary != _biblicalContext) ...[
+                  if (_biblicalContext != null && _biblicalContext!.isNotEmpty)
+                    const SizedBox(height: 4),
+                  Text(
+                    _summary!,
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                  ),
+                ],
                 if (_keywords.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
-                    children: _keywords.map((kw) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '#$kw',
-                        style: GoogleFonts.nunito(
-                          fontSize: 10,
-                          color: isDark ? Colors.white70 : Colors.black54,
-                        ),
-                      ),
-                    )).toList(),
+                    children: _keywords
+                        .map((kw) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white10
+                                    : Colors.black.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '#$kw',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 10,
+                                  color: isDark ? Colors.white60 : Colors.black54,
+                                ),
+                              ),
+                            ))
+                        .toList(),
                   ),
                 ],
               ],
@@ -548,7 +718,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
               final item = _results[index];
               final Hymn hymn = item['hymn'] as Hymn;
               final reason = item['relevanceReason'] as String? ?? '';
+              final moment = item['worshipMoment'] as String?;
               final colColor = _getCollectionColor(hymn.collection, theme);
+              final momentColor = _getMomentColor(moment);
 
               return Card(
                 elevation: 0,
@@ -588,17 +760,45 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 8),
+                            if (moment != null && moment.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: momentColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.label_important_outline_rounded,
+                                        size: 12, color: momentColor),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      moment,
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: momentColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             const Spacer(),
                             if (hymn.toneNote.isNotEmpty)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                                  color: isDark
+                                      ? Colors.white10
+                                      : Colors.black.withValues(alpha: 0.05),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   hymn.toneNote,
-                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600),
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11, fontWeight: FontWeight.w600),
                                 ),
                               ),
                           ],
@@ -616,7 +816,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.grey.shade50,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.03)
+                                  : Colors.grey.shade50,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.04),
@@ -631,7 +833,6 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                                     reason,
                                     style: GoogleFonts.nunito(
                                       fontSize: 12.5,
-                                      fontStyle: FontStyle.italic,
                                       color: isDark ? Colors.white70 : Colors.black87,
                                     ),
                                   ),

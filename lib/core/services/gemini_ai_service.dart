@@ -397,9 +397,9 @@ JSON esperado:
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.teal.withOpacity(0.1),
+                        color: Colors.teal.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                        border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         suggestedTitle,
@@ -433,9 +433,9 @@ JSON esperado:
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.teal.withOpacity(0.05),
+                                  color: Colors.teal.withValues(alpha: 0.05),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                                  border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
                                 ),
                                 child: SingleChildScrollView(
                                   child: SelectableText(
@@ -448,9 +448,9 @@ JSON esperado:
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.04),
+                                  color: Colors.red.withValues(alpha: 0.04),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.red.withOpacity(0.2)),
+                                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                                 ),
                                 child: SingleChildScrollView(
                                   child: SelectableText(
@@ -661,6 +661,7 @@ JSON esperado:
     required String query,
     required List<Hymn> catalog,
     Set<String>? allowedCollections,
+    String searchMode = 'biblical', // 'biblical' o 'conceptual'
   }) async {
     // 1. Obtener la clave API de Gemini
     String apiKey = await getApiKey();
@@ -671,10 +672,10 @@ JSON esperado:
       final enteredKey = await showApiKeyInputDialog(
         context,
         reason:
-            'Para realizar búsquedas conceptuales con Inteligencia Artificial necesitas ingresar tu API Key de Google Gemini.',
+            'Para acceder al Asistente Bíblico e Inteligencia Artificial necesitas ingresar tu API Key de Google Gemini.',
       );
       if (enteredKey == null || enteredKey.trim().isEmpty) {
-        throw Exception('Se requiere una clave API de Gemini para la búsqueda semántica.');
+        throw Exception('Se requiere una clave API de Gemini para el Asistente Bíblico.');
       }
       apiKey = enteredKey.trim();
     }
@@ -688,13 +689,14 @@ JSON esperado:
     if (filteredCatalog.isEmpty) {
       return {
         'summary': 'No hay cantos en las colecciones seleccionadas.',
+        'biblicalContext': null,
+        'spiritualTone': null,
         'matches': <Map<String, dynamic>>[],
         'keywords': <String>[],
       };
     }
 
     // 2. Construir índice resumido y compacto de los cantos para contexto en el prompt
-    // Formato ultra-compacto: ID|coleccion|TITULO
     final buffer = StringBuffer();
     for (final h in filteredCatalog) {
       buffer.writeln('${h.id}|${h.collection}|${h.title}');
@@ -702,34 +704,54 @@ JSON esperado:
 
     final catalogIndex = buffer.toString();
 
-    final prompt = '''
-Actúa como un teólogo e himnólogo experto en el Himnario Cristiano Evangélico (Himnario Oficial IUMP, Alabanzas Especiales y Coros Pentecostales).
-El usuario está buscando cantos basados en un CONCEPTO, HISTORIA BÍBLICA, METÁFORA O TEMÁTICA, porque no recuerda el título ni el número exacto:
+    final modeGuidance = searchMode == 'biblical'
+        ? '''
+MODO: ASISTENTE BÍBLICO Y CONTEXTO DE PREDICACIÓN / SERMÓN
+Misión: Actuar como un pastor, teólogo bíblico e himnólogo cristiano con profundo conocimiento de las Sagradas Escrituras (Biblia Reina-Valera 1960) y de la himnología evangélica pentecostal (Himnario Oficial IUMP, Alabanzas Especiales y Coros Pentecostales).
 
-CONSULTA DEL USUARIO:
+1. ACCESO BÍBLICO Y EXÉGESIS PROFUNDA:
+   - Si la consulta contiene una CITA O PASAJE BÍBLICO (ej: "Romanos 8:28", "Salmo 23", "Efesios 6:10-18", "Isaías 53", "Lucas 15"):
+     * En "biblicalContext", resume con profundidad teológica el contexto histórico-doctrinal del pasaje, el mensaje central, las promesas de Dios y su aplicación espiritual.
+   - Si la consulta describe un TEMA DE PREDICACIÓN O EXHORTACIÓN (ej: "el pastor predicó sobre vencer el desánimo en la prueba", "mensaje de consagración y santidad", "consuelo en el duelo"):
+     * En "biblicalContext", sintetiza el sentir pastoral y la necesidad espiritual de la congregación ante este mensaje.
+   - En "spiritualTone", define la atmósfera espiritual (ej: "Consagración", "Guerra Espiritual", "Fe en la Prueba", "Gracia y Perdón", "Adoración y Alabanza").
+
+2. SELECCIÓN DE CANTOS DEL CATÁLOGO REAL:
+   - Selecciona entre 4 y 7 cantos del catálogo proporcionado que mejor sellen, acompañen o ministren esta palabra en el culto.
+   - Para cada canto:
+     * "worshipMoment": Momento litúrgico ideal ("Sellar la Predicación", "Llamado al Altar / Consagración", "Oración por los Afligidos", "Alabanza Congregacional").
+     * "relevanceReason": Explica con precisión pastoral qué estrofa, verso o verdad teológica conecta directamente con la predicación o pasaje bíblico.
+'''
+        : '''
+MODO: BÚSQUEDA CONCEPTUAL Y METAFÓRICA DE CANTOS
+Misión: Ayudar a encontrar cantos a partir de un recuerdo difuso, metáfora, frase o historia:
+1. Analiza el sentido poético y espiritual de la consulta (ej: "mar tempestuoso", "armadura de Dios", "el alfarero que rompe el vaso").
+2. Identifica los cantos del catálogo que abordan directa o metafóricamente estas ideas. Si se mencionan múltiples temas, incluye los mejores para cada uno.
+3. En "relevanceReason", detalla por qué coincide y qué estrofa o idea aborda.
+4. En "worshipMoment", sugiere el momento del culto adecuado.
+''';
+
+    final prompt = '''
+$modeGuidance
+
+CONSULTA DEL MINISTRO O CONGREGANTE:
 "$query"
 
-Tienes a tu disposición el catálogo oficial de la app en formato [ID|COLECCIÓN|TÍTULO]:
+CATÁLOGO OFICIAL DE CANTOS DISPONIBLES EN LA APP [ID|COLECCIÓN|TÍTULO]:
 $catalogIndex
 
-INSTRUCCIONES CLAVE:
-1. Analiza el sentido teológico, poético y bíblico de la consulta.
-   - Si menciona metáforas de tormenta, mar tempestuoso o naufragio (ej: "Va mi barca", "Cual faro en el mar", "Cariñoso Salvador", "Un ancla").
-   - Si menciona la armadura de Dios, la batalla de la fe o guerra espiritual (ej: "Estad por Cristo firmes", "Firmes y adelante").
-   - Si menciona múltiples temas (ej: "mar tempestuoso O armadura de Dios"), incluye los mejores cantos para CADA uno de los temas solicitados.
-2. Selecciona entre 3 y 8 cantos del catálogo que mejor coincidan conceptual o espiritualmente con lo que el usuario busca.
-3. Para cada recomendación, redacta una explicación breve y precisa (1 o 2 oraciones) indicando por qué coincide y qué estrofa o idea aborda.
-4. Indica también una lista de palabras clave relevantes.
-
-RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markdown ```json, sin texto decorativo):
+RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markdown ```json, sin texto adicional):
 {
-  "summary": "Breve resumen del análisis conceptual",
+  "summary": "Breve resumen del mensaje o concepto (1 frase)",
+  "biblicalContext": "Análisis exegético del pasaje bíblico o trasfondo doctrinal del sermón (2-3 oraciones claras)",
+  "spiritualTone": "Consagración | Fe y Victoria | Consuelo | Guerra Espiritual | Gracia y Perdón | Adoración",
   "results": [
     {
       "id": 123,
       "collection": "iump",
       "title": "TÍTULO DEL CANTO",
-      "relevanceReason": "Explicación clara de por qué coincide con el concepto solicitado."
+      "relevanceReason": "Conexión pastoral/doctrinal explicando qué estrofa o verdad aborda...",
+      "worshipMoment": "Sellar la Predicación | Llamado al Altar | Oración de Fe | Congregacional"
     }
   ],
   "keywords": ["palabra1", "palabra2"]
@@ -790,6 +812,8 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
       if (localMatches.isNotEmpty) {
         return {
           'summary': 'Coincidencias temáticas locales (Modo sin conexión)',
+          'biblicalContext': 'Modo sin conexión a internet: Se aplicó coincidencia temática local directa sobre el catálogo.',
+          'spiritualTone': 'Alabanza y Fe',
           'matches': localMatches,
           'keywords': <String>[],
         };
@@ -814,6 +838,8 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
     final rawResults = (parsed['results'] as List?) ?? [];
     final summary = parsed['summary']?.toString() ??
         'Resultados conceptuales encontrados por Gemini IA';
+    final biblicalContext = parsed['biblicalContext']?.toString();
+    final spiritualTone = parsed['spiritualTone']?.toString();
     final keywords = (parsed['keywords'] as List?)
             ?.map((e) => e.toString())
             .toList() ??
@@ -831,6 +857,7 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
       final title = item['title']?.toString() ?? '';
       final reason =
           item['relevanceReason']?.toString() ?? 'Coincidencia conceptual';
+      final moment = item['worshipMoment']?.toString() ?? 'Sellar la Predicación';
 
       Hymn? matchedHymn = catalogMap['$col-$id'];
 
@@ -847,16 +874,20 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
         finalMatches.add({
           'hymn': matchedHymn,
           'relevanceReason': reason,
+          'worshipMoment': moment,
         });
       }
     }
 
     return {
       'summary': summary,
+      'biblicalContext': biblicalContext,
+      'spiritualTone': spiritualTone,
       'matches': finalMatches,
       'keywords': keywords,
     };
   }
+
 
   static List<Map<String, dynamic>> _findLocalThematicMatches(
     String query,
