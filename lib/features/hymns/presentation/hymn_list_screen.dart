@@ -3212,9 +3212,9 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
       http.Response? response;
       final modelsToTry = [
         'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
         'gemini-2.0-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-flash',
+        'gemini-2.5-pro',
       ];
 
       for (final model in modelsToTry) {
@@ -3497,9 +3497,9 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
       });
       final modelsToTry = [
         'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
         'gemini-2.0-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-flash',
+        'gemini-2.5-pro',
       ];
 
       for (final model in modelsToTry) {

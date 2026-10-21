@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'spanish_grammar_corrector.dart';
 import '../../features/hymns/domain/hymn.dart';
 
@@ -108,6 +109,18 @@ class GeminiAiService {
     int totalCorrections = localResult.correctionsCount;
 
     String apiKey = (await getApiKey()).trim();
+    if (apiKey.isEmpty && context.mounted) {
+      final inputKey = await showApiKeyInputDialog(
+        context,
+        reason:
+            'Para corregir tildes, comas, puntuación y mayúsculas con los modelos más avanzados de IA (Gemini 2.5 / 2.0), ingresa tu API Key gratuita de Google Studio:',
+      );
+      if (inputKey != null && inputKey.trim().isNotEmpty) {
+        apiKey = inputKey.trim();
+        await saveApiKey(apiKey);
+      }
+    }
+
     bool isAiAssisted = false;
     bool geminiFailed = false;
     bool isProgressShown = false;
@@ -149,6 +162,32 @@ class GeminiAiService {
       }
 
       try {
+        // 1. Intentar primero mediante Cloud Function (resuelve 100% de CORS en Web y usa Gemini 2.5/2.0 en el backend)
+        bool remoteSuccess = false;
+        try {
+        final callable = FirebaseFunctions.instance.httpsCallable('correctGrammarWithAi');
+        final cfRes = await callable.call({
+          'title': currentTitle,
+          'lyrics': currentLyrics,
+          'apiKey': apiKey,
+        }).timeout(const Duration(seconds: 30));
+
+        final data = cfRes.data;
+        if (data is Map && data['success'] == true) {
+          final aiTitle = data['title']?.toString().trim() ?? currentTitle;
+          final aiLyrics = data['lyrics']?.toString().trim() ?? currentLyrics;
+          if (aiTitle.isNotEmpty) currentTitle = aiTitle.toUpperCase();
+          if (aiLyrics.isNotEmpty) currentLyrics = aiLyrics;
+          isAiAssisted = true;
+          remoteSuccess = true;
+          debugPrint('>>> Corrección IA completada con éxito vía Cloud Function (${data['modelUsed']})');
+        }
+      } catch (cfError) {
+        debugPrint('Cloud Function no respondió o falló: $cfError. Procediendo a HTTP directo...');
+      }
+
+      // 2. Si no respondió la Cloud Function, consultar directamente la API de Google con los modelos más modernos
+      if (!remoteSuccess) {
         final promptText = '''Actúa como un corrector de estilo y editor lingüístico experto, aplicando estrictamente las normas ortográficas, gramaticales y de puntuación de la Real Academia Española (RAE). 
 
 Tu tarea es revisar, corregir y formatear la letra de un canto cristiano respetando las siguientes reglas de manera obligatoria:
@@ -215,11 +254,10 @@ JSON esperado:
         http.Response? response;
         final modelsToTry = [
           {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
+          {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
           {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-          {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
-          {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
           {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-          {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
+          {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
         ];
 
         List<String> modelErrors = [];
@@ -231,9 +269,12 @@ JSON esperado:
                 'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$apiKey');
             final res = await http.post(
               url,
-              headers: {'Content-Type': 'application/json'},
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
               body: requestBody,
-            ).timeout(const Duration(seconds: 15));
+            ).timeout(const Duration(seconds: 18));
 
             if (res.statusCode == 200) {
               response = res;
@@ -271,6 +312,7 @@ JSON esperado:
           geminiFailed = true;
           debugPrint('>>> Consulta remota Gemini falló: ${modelErrors.join(' | ')}. Se aplicó la corrección ortográfica local.');
         }
+      }
       } catch (e) {
         geminiFailed = true;
         debugPrint('>>> Error en consulta remota Gemini: $e. Se aplicó la corrección ortográfica local.');
@@ -662,11 +704,10 @@ JSON esperado:
 
     final modelsToTry = [
       {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
+      {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
       {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
       {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
+      {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
     ];
     
     List<String> errors = [];
@@ -733,11 +774,10 @@ JSON esperado:
       http.Response? response;
       final modelsToTry = [
         {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
+        {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
         {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-        {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
-        {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
         {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-        {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
+        {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
       ];
 
       for (final item in modelsToTry) {
@@ -904,11 +944,10 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
 
     final modelsToTry = [
       {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
+      {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
       {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
       {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
+      {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
     ];
 
     http.Response? response;
