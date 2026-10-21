@@ -107,57 +107,47 @@ class GeminiAiService {
     String currentLyrics = localResult.lyrics;
     int totalCorrections = localResult.correctionsCount;
 
-    String apiKey = await getApiKey();
-
-    if (apiKey.isEmpty && context.mounted) {
-      final newKey = await showApiKeyInputDialog(
-        context, 
-        reason: 'Para aplicar puntuación inteligente de la RAE (comas, puntos) necesitas tu propia llave de API gratuita de Google AI Studio. De lo contrario, solo se aplicarán tildes básicas.'
-      );
-      if (newKey != null && newKey.isNotEmpty) {
-        apiKey = newKey;
-      } else {
-        // If they still don't have a key, just return the local result directly without showing the spinner
-        return {'title': currentTitle, 'lyrics': currentLyrics, 'corrections': totalCorrections.toString()};
-      }
-    }
-
-    // Mostrar modal con indicador de progreso
-    if (context.mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: Row(
-            children: [
-              const CircularProgressIndicator(color: Colors.amber),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Puliendo Ortografía y Tildes...',
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Aplicando tildes obligatorias, vocativos (¡Oh, Señor!), comas y acordes intactos.',
-                      style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    String apiKey = (await getApiKey()).trim();
+    bool isAiAssisted = false;
+    bool geminiFailed = false;
+    bool isProgressShown = false;
 
     // Si hay clave API, consultar Gemini para perfeccionamiento contextual adicional
     if (apiKey.isNotEmpty) {
+      if (context.mounted) {
+        isProgressShown = true;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            content: Row(
+              children: [
+                const CircularProgressIndicator(color: Colors.amber),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Puliendo Ortografía y Tildes...',
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Aplicando tildes obligatorias, vocativos (¡Oh, Señor!), comas y acordes intactos.',
+                        style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
       try {
         final promptText = '''Actúa como un corrector de estilo y editor lingüístico experto, aplicando estrictamente las normas ortográficas, gramaticales y de puntuación de la Real Academia Española (RAE). 
 
@@ -224,9 +214,12 @@ JSON esperado:
 
         http.Response? response;
         final modelsToTry = [
+          {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
           {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+          {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
           {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
-          {'model': 'gemini-1.5-flash', 'api': 'v1'},
+          {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
+          {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
         ];
 
         List<String> modelErrors = [];
@@ -240,24 +233,22 @@ JSON esperado:
               url,
               headers: {'Content-Type': 'application/json'},
               body: requestBody,
-            ).timeout(const Duration(seconds: 20));
+            ).timeout(const Duration(seconds: 15));
 
             if (res.statusCode == 200) {
               response = res;
               break;
             } else {
-              modelErrors.add('$model ($api) failed with status ${res.statusCode}');
+              debugPrint('Gemini corrector intent [$model ($api)]: status ${res.statusCode}');
+              modelErrors.add('$model ($api) status ${res.statusCode}');
             }
           } catch (e) {
-            modelErrors.add('$model ($api) exception: $e');
+            debugPrint('Gemini corrector exception [$model ($api)]: $e');
+            modelErrors.add('$model ($api) exc: $e');
           }
         }
-        
-        if (response == null) {
-          throw Exception('All models failed: ${modelErrors.join(' | ')}');
-        }
 
-        if (response.statusCode == 200) {
+        if (response != null && response.statusCode == 200) {
           final jsonRes = jsonDecode(response.body);
           final candidates = jsonRes['candidates'] as List?;
           if (candidates != null && candidates.isNotEmpty) {
@@ -272,13 +263,22 @@ JSON esperado:
                 final aiLyrics = parsed['lyrics']?.toString().trim() ?? currentLyrics;
                 if (aiTitle.isNotEmpty) currentTitle = aiTitle.toUpperCase();
                 if (aiLyrics.isNotEmpty) currentLyrics = aiLyrics;
+                isAiAssisted = true;
               }
             }
           }
+        } else {
+          geminiFailed = true;
+          debugPrint('>>> Consulta remota Gemini falló: ${modelErrors.join(' | ')}. Se aplicó la corrección ortográfica local.');
         }
       } catch (e) {
-        debugPrint('>>> Error en consulta remota Gemini: $e');
-        currentLyrics = "[ERROR GEMINI: $e]\n\n$currentLyrics";
+        geminiFailed = true;
+        debugPrint('>>> Error en consulta remota Gemini: $e. Se aplicó la corrección ortográfica local.');
+        // NUNCA inyectar strings de error técnico en las letras de los cantos
+      } finally {
+        if (isProgressShown && context.mounted) {
+          Navigator.pop(context);
+        }
       }
     }
 
@@ -292,12 +292,8 @@ JSON esperado:
     currentLyrics = doubleCheck.lyrics;
     totalCorrections += doubleCheck.correctionsCount;
 
-    // Cerrar modal de carga
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
-
     // 2. Abrir el Modal de Resumen de Cambios (Antes vs Después)
+    if (!context.mounted) return null;
     return showGrammarReviewDialog(
       context: context,
       originalTitle: title,
@@ -305,6 +301,9 @@ JSON esperado:
       suggestedTitle: currentTitle,
       suggestedLyrics: currentLyrics,
       correctionsCount: totalCorrections,
+      isAiAssisted: isAiAssisted,
+      geminiFailed: geminiFailed,
+      noApiKey: apiKey.isEmpty,
     );
   }
 
@@ -316,6 +315,9 @@ JSON esperado:
     required String suggestedTitle,
     required String suggestedLyrics,
     required int correctionsCount,
+    bool isAiAssisted = false,
+    bool geminiFailed = false,
+    bool noApiKey = false,
   }) async {
     if (!context.mounted) return null;
 
@@ -358,7 +360,11 @@ JSON esperado:
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           title: Row(
             children: [
-              const Icon(Icons.auto_awesome_rounded, color: Colors.amber, size: 28),
+              Icon(
+                isAiAssisted ? Icons.auto_awesome_rounded : Icons.spellcheck_rounded,
+                color: isAiAssisted ? Colors.amber : Colors.teal,
+                size: 28,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -369,8 +375,14 @@ JSON esperado:
                       style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                     Text(
-                      'Se detectaron sugerencias de mejora ($correctionsCount ajustes)',
-                      style: GoogleFonts.nunito(fontSize: 12, color: Colors.teal[700], fontWeight: FontWeight.w600),
+                      isAiAssisted
+                          ? 'Mejora con IA Gemini y Motor RAE ($correctionsCount ajustes)'
+                          : 'Corrección Ortográfica RAE ($correctionsCount ajustes)',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        color: isAiAssisted ? Colors.amber[800] : Colors.teal[700],
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -384,6 +396,105 @@ JSON esperado:
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (geminiFailed) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Se aplicó la corrección ortográfica local. La IA de Google no respondió (revisa tu clave de API).',
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.amber[200]
+                                    : Colors.amber[900],
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: () async {
+                              Navigator.pop(dialogContext, null);
+                              final newKey = await showApiKeyInputDialog(
+                                context,
+                                reason: 'Actualiza tu Clave API de Google AI Studio:',
+                              );
+                              if (newKey != null && newKey.isNotEmpty && context.mounted) {
+                                correctHymnGrammar(
+                                  context: context,
+                                  title: originalTitle,
+                                  lyrics: originalLyrics,
+                                );
+                              }
+                            },
+                            child: const Text('Cambiar Key', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (noApiKey) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.teal.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline_rounded, color: Colors.teal, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Corrector ortográfico local aplicado (tildes, mayúsculas, vocativos).',
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.teal[200]
+                                    : Colors.teal[900],
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: () async {
+                              Navigator.pop(dialogContext, null);
+                              final newKey = await showApiKeyInputDialog(
+                                context,
+                                reason: 'Ingresa tu Clave API de Gemini para habilitar puntuación avanzada con IA:',
+                              );
+                              if (newKey != null && newKey.isNotEmpty && context.mounted) {
+                                correctHymnGrammar(
+                                  context: context,
+                                  title: originalTitle,
+                                  lyrics: originalLyrics,
+                                );
+                              }
+                            },
+                            child: const Text('+ Activar IA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   Text(
                     'Compara cómo estaba antes y cómo quedará después:',
                     style: GoogleFonts.nunito(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey[300] : Colors.grey[700]),
@@ -419,9 +530,9 @@ JSON esperado:
                           labelColor: Theme.of(context).primaryColor,
                           unselectedLabelColor: Colors.grey[600],
                           indicatorColor: Theme.of(context).primaryColor,
-                          tabs: const [
-                            Tab(text: 'Propuesta Corregida ✨'),
-                            Tab(text: 'Texto Original'),
+                          tabs: [
+                            Tab(text: isAiAssisted ? 'Propuesta Corregida ✨' : 'Propuesta Corregida 🛡️'),
+                            const Tab(text: 'Texto Original'),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -542,9 +653,11 @@ JSON esperado:
     });
 
     final modelsToTry = [
+      {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
       {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+      {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
       {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-flash', 'api': 'v1'},
+      {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
       {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
     ];
     
@@ -611,9 +724,12 @@ JSON esperado:
 
       http.Response? response;
       final modelsToTry = [
+        {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
         {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+        {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
         {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
-        {'model': 'gemini-1.5-flash', 'api': 'v1'},
+        {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
+        {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
       ];
 
       for (final item in modelsToTry) {
@@ -779,9 +895,11 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
     });
 
     final modelsToTry = [
+      {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
       {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
+      {'model': 'gemini-1.5-flash-latest', 'api': 'v1beta'},
       {'model': 'gemini-1.5-flash', 'api': 'v1beta'},
-      {'model': 'gemini-1.5-flash', 'api': 'v1'},
+      {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
       {'model': 'gemini-1.5-pro', 'api': 'v1beta'},
     ];
 
