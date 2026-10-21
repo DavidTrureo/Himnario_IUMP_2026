@@ -527,11 +527,19 @@ JSON esperado:
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         TabBar(
-                          labelColor: Theme.of(context).primaryColor,
-                          unselectedLabelColor: Colors.grey[600],
-                          indicatorColor: Theme.of(context).primaryColor,
+                          labelColor: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF2DD4BF)
+                              : Colors.teal[800],
+                          unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
+                          labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                          unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 13),
+                          indicatorColor: Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xFF2DD4BF)
+                              : Colors.teal[700],
                           tabs: [
-                            Tab(text: isAiAssisted ? 'Propuesta Corregida ✨' : 'Propuesta Corregida 🛡️'),
+                            Tab(text: isAiAssisted ? 'Propuesta con IA ✨' : 'Propuesta Corregida 🛡️'),
                             const Tab(text: 'Texto Original'),
                           ],
                         ),
