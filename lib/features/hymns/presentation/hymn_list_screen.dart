@@ -1598,16 +1598,58 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                     const SizedBox(height: 16),
                                     Text(
                                       showFavorites
-                                          ? 'No tienes cantos en tus favoritos'
+                                          ? (query.isNotEmpty
+                                              ? 'No tienes cantos en tus favoritos con "$query"'
+                                              : 'No tienes cantos en tus favoritos')
                                           : 'No se encontraron himnos locales',
                                       style: GoogleFonts.nunito(
                                         fontSize: 16,
                                         color: Colors.grey,
                                         fontWeight: FontWeight.bold,
                                       ),
+                                      textAlign: TextAlign.center,
                                     ),
                                     if (query.isNotEmpty) ...[
                                       const SizedBox(height: 18),
+                                      if (showFavorites) ...[
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: theme.colorScheme.primary,
+                                            foregroundColor: theme.colorScheme.onPrimary,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 20,
+                                              vertical: 12,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(16),
+                                            ),
+                                            elevation: 2,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.travel_explore_rounded,
+                                            size: 20,
+                                          ),
+                                          label: Text(
+                                            'Buscar "$query" en todo el Himnario',
+                                            style: GoogleFonts.nunito(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          onPressed: () {
+                                            ref
+                                                .read(showFavoritesProvider.notifier)
+                                                .setFavorites(false);
+                                            ref
+                                                .read(activeCollectionProvider.notifier)
+                                                .setCollection('all');
+                                            if (widget.isFavoritesTab) {
+                                              context.go('/hymns');
+                                            }
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
                                       ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.amber.shade700,
