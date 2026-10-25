@@ -32,10 +32,24 @@ def pull_collection(project_id, token, collection_name, filename):
                 for doc in res_data.get('documents', []):
                     fields = doc.get('fields', {})
                     
-                    hymn_id = int(fields.get('id', {}).get('integerValue', 0))
-                    title = fields.get('title', {}).get('stringValue', '')
-                    tone = fields.get('tone', {}).get('stringValue', '')
-                    lyrics = fields.get('lyrics', {}).get('stringValue', '')
+                    raw_id = fields.get('id', {})
+                    hymn_id = int(raw_id.get('integerValue') or raw_id.get('stringValue') or 0)
+                    title = fields.get('title', {}).get('stringValue', '').strip()
+                    lyrics = fields.get('lyrics', {}).get('stringValue', '').strip()
+                    tone = fields.get('tone', {}).get('stringValue', '').strip()
+                    tone_note = fields.get('toneNote', {}).get('stringValue', '').strip()
+                    beats = fields.get('beats', {}).get('stringValue', '').strip()
+                    time_signature = fields.get('timeSignature', {}).get('stringValue', '').strip()
+                    category = fields.get('category', {}).get('stringValue', '').strip()
+                    audio_url = fields.get('audioUrl', {}).get('stringValue', '').strip()
+                    
+                    sheet_music = []
+                    if 'sheetMusicUrls' in fields and 'arrayValue' in fields['sheetMusicUrls']:
+                        sheet_music = [
+                            v.get('stringValue', '') 
+                            for v in fields['sheetMusicUrls']['arrayValue'].get('values', [])
+                            if v.get('stringValue')
+                        ]
                     
                     doc_obj = {
                         "id": hymn_id,
@@ -44,6 +58,18 @@ def pull_collection(project_id, token, collection_name, filename):
                     }
                     if tone:
                         doc_obj["tone"] = tone
+                    if tone_note:
+                        doc_obj["toneNote"] = tone_note
+                    if beats:
+                        doc_obj["beats"] = beats
+                    if time_signature:
+                        doc_obj["timeSignature"] = time_signature
+                    if category:
+                        doc_obj["category"] = category
+                    if audio_url:
+                        doc_obj["audioUrl"] = audio_url
+                    if sheet_music:
+                        doc_obj["sheetMusicUrls"] = sheet_music
                         
                     documents.append(doc_obj)
                 

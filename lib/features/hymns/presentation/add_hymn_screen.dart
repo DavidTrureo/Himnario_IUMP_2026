@@ -52,14 +52,13 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
 
 
   Future<void> _scanText() async {
-    final prefs = await SharedPreferences.getInstance();
-    String apiKey = prefs.getString('gemini_api_key') ?? '';
+    String apiKey = await GeminiAiService.getApiKey();
     if (apiKey.isEmpty) {
       if (!mounted) return;
       final enteredKey = await GeminiAiService.showApiKeyInputDialog(context, reason: 'Para usar el escáner OCR con IA necesitas tu propia llave de API gratuita de Google AI Studio.');
       if (enteredKey == null || enteredKey.trim().isEmpty) return;
       apiKey = enteredKey.trim();
-      await prefs.setString('gemini_api_key', apiKey);
+      await GeminiAiService.saveApiKey(apiKey);
     }
 
     if (!mounted) return;

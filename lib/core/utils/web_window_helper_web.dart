@@ -1,53 +1,42 @@
-// ignore_for_file: avoid_web_libraries_in_flutter
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 
 import 'dart:html' as html;
 import 'dart:convert';
-import 'dart:js_util' as js_util;
+import 'dart:js' as js;
 
 /// Web implementation using BroadcastChannel and window.open
 class WebWindowHelper {
   static html.BroadcastChannel? _channel;
 
-  static void openProjectorWindow(String url) async {
+  static void openProjectorWindow(String url) {
     try {
-      if (js_util.hasProperty(html.window, 'getScreenDetails')) {
-        final screenDetails = await js_util.promiseToFuture(
-            js_util.callMethod(html.window, 'getScreenDetails', []));
-        final screens = js_util.getProperty(screenDetails, 'screens') as List;
-        final currentScreen = js_util.getProperty(screenDetails, 'currentScreen');
-
-        Object? targetScreen;
-        for (var s in screens) {
-          if (js_util.getProperty(s, 'isInternal') == false) {
-            targetScreen = s;
-            break;
-          }
-        }
-        
-        if (targetScreen == null) {
-          for (var s in screens) {
-            if (s != currentScreen) {
-              targetScreen = s;
-              break;
+      js.context.callMethod('eval', [
+        '''
+        (async function() {
+          try {
+            if (window.getScreenDetails) {
+              const screenDetails = await window.getScreenDetails();
+              const screens = screenDetails.screens || [];
+              const currentScreen = screenDetails.currentScreen;
+              let targetScreen = screens.find(s => s.isInternal === false) || screens.find(s => s !== currentScreen);
+              if (targetScreen) {
+                const left = targetScreen.availLeft;
+                const top = targetScreen.availTop;
+                const width = targetScreen.availWidth;
+                const height = targetScreen.availHeight;
+                window.open('$url', 'ProjectorView', `left=\${left},top=\${top},width=\${width},height=\${height},menubar=no,toolbar=no,popup=1,fullscreen=yes`);
+                return;
+              }
             }
-          }
-        }
+          } catch (e) {}
+          window.open('$url', 'ProjectorView', 'width=1280,height=720,menubar=no,toolbar=no,popup=1,fullscreen=yes');
+        })();
+        '''
+      ]);
+      return;
+    } catch (_) {}
 
-        if (targetScreen != null) {
-          final left = js_util.getProperty(targetScreen, 'availLeft');
-          final top = js_util.getProperty(targetScreen, 'availTop');
-          final width = js_util.getProperty(targetScreen, 'availWidth');
-          final height = js_util.getProperty(targetScreen, 'availHeight');
-
-          html.window.open(url, 'ProjectorView', 'left=$left,top=$top,width=$width,height=$height,menubar=no,toolbar=no,popup=1,fullscreen=yes');
-          return;
-        }
-      }
-    } catch (e) {
-      // Ignorar si el navegador no soporta la API o deniegan el permiso
-    }
-
-    // Abre una nueva ventana en el monitor principal por defecto
+    // Fallback: Abre una nueva ventana en el monitor principal
     html.window.open(url, 'ProjectorView', 'width=1280,height=720,menubar=no,toolbar=no,popup=1,fullscreen=yes');
   }
 

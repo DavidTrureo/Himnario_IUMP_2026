@@ -11,9 +11,17 @@ import '../../features/hymns/domain/hymn.dart';
 class GeminiAiService {
   static const String _keyPref = 'gemini_api_key';
 
+  /// Clave oficial del servidor para que los usuarios no tengan que configurar nada
+  static const String defaultServerApiKey =
+      'AQ.Ab8RN6LMJy9J1QN_8lmyiI0Sq57kavrWWN8O2ST8b07Qbf1eKQ';
+
   static Future<String> getApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyPref) ?? '';
+    final customKey = prefs.getString(_keyPref)?.trim() ?? '';
+    if (customKey.isNotEmpty) {
+      return customKey;
+    }
+    return defaultServerApiKey;
   }
 
   static Future<void> saveApiKey(String apiKey) async {
@@ -665,6 +673,29 @@ JSON esperado:
   /// Analiza una imagen (fotografía de cancionero o letra escrita) y extrae el texto limpio del canto
   static Future<Map<String, dynamic>?> transcribeSheetMusic(String base64Image, {String mimeType = 'image/jpeg'}) async {
     String apiKey = await getApiKey();
+
+    // 1. Intentar primero a través de Cloud Function
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('scanHymnWithAi');
+      final cfRes = await callable.call({
+        'base64Image': base64Image,
+        'mimeType': mimeType,
+        'apiKey': apiKey,
+      }).timeout(const Duration(seconds: 35));
+
+      final cfData = cfRes.data;
+      if (cfData is Map && cfData['success'] == true) {
+        return {
+          'title': cfData['title']?.toString() ?? '',
+          'key': cfData['key']?.toString() ?? '',
+          'timeSignature': cfData['timeSignature']?.toString() ?? '',
+          'lyrics': cfData['lyrics']?.toString() ?? '',
+        };
+      }
+    } catch (cfErr) {
+      debugPrint('Cloud Function scanHymnWithAi falló o sin conexión: $cfErr. Probando llamada directa...');
+    }
+
     if (apiKey.isEmpty) return null;
 
     final promptText = '''Eres un experto transcriptor de cantos e himnos cristianos. Analiza la imagen adjunta, que contiene la letra de un canto (puede tener acordes escritos arriba o entremedio).
@@ -868,6 +899,45 @@ JSON esperado:
 
     final catalogIndex = buffer.toString();
 
+    // 3. Intentar primero a través de Cloud Function (aprovecha la caché inteligente en Firestore)
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('searchHymnsWithAi');
+      final cfRes = await callable.call({
+        'query': query,
+        'searchMode': searchMode,
+        'catalogIndex': catalogIndex,
+        'apiKey': apiKey,
+      }).timeout(const Duration(seconds: 25));
+
+      final cfData = cfRes.data;
+      if (cfData is Map && cfData['success'] == true) {
+        final rawResults = (cfData['results'] as List?) ?? [];
+        final summary = cfData['summary']?.toString() ??
+            'Resultados identificados por el Asistente Bíblico';
+        final biblicalPassage = cfData['biblicalPassage']?.toString();
+        final biblicalContext = cfData['biblicalContext']?.toString();
+        final spiritualTone = cfData['spiritualTone']?.toString();
+        final keywords = (cfData['keywords'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [];
+
+        final matches = _mapRawResultsToHymns(rawResults, filteredCatalog);
+        if (matches.isNotEmpty) {
+          return {
+            'summary': summary,
+            'biblicalPassage': biblicalPassage,
+            'biblicalContext': biblicalContext,
+            'spiritualTone': spiritualTone,
+            'matches': matches,
+            'keywords': keywords,
+          };
+        }
+      }
+    } catch (cfError) {
+      debugPrint('Cloud Function searchHymnsWithAi falló o sin red directa: $cfError. Intentando HTTP directo...');
+    }
+
     final modeGuidance = searchMode == 'biblical'
         ? '''
 MODO: ASISTENTE BÍBLICO Y HERMENÉUTICA DE PREDICACIÓN / SERMÓN
@@ -1018,7 +1088,22 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
             .toList() ??
         [];
 
-    // Mapear los resultados hacia los objetos Hymn reales del catálogo
+    final finalMatches = _mapRawResultsToHymns(rawResults, filteredCatalog);
+
+    return {
+      'summary': summary,
+      'biblicalPassage': biblicalPassage,
+      'biblicalContext': biblicalContext,
+      'spiritualTone': spiritualTone,
+      'matches': finalMatches,
+      'keywords': keywords,
+    };
+  }
+
+  static List<Map<String, dynamic>> _mapRawResultsToHymns(
+    List rawResults,
+    List<Hymn> filteredCatalog,
+  ) {
     final List<Map<String, dynamic>> finalMatches = [];
     final catalogMap = {
       for (var h in filteredCatalog) '${h.collection}-${h.id}': h
@@ -1051,15 +1136,7 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
         });
       }
     }
-
-    return {
-      'summary': summary,
-      'biblicalPassage': biblicalPassage,
-      'biblicalContext': biblicalContext,
-      'spiritualTone': spiritualTone,
-      'matches': finalMatches,
-      'keywords': keywords,
-    };
+    return finalMatches;
   }
 
 

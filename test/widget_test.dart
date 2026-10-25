@@ -1,30 +1,74 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:himnario_iump/main.dart';
+import 'package:himnario_iump/features/hymns/domain/hymn.dart';
+import 'package:himnario_iump/core/services/spanish_accent_engine.dart';
+import 'package:himnario_iump/core/services/spanish_grammar_corrector.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('Hymn Model Tests', () {
+    test('Hymn parseToneComponents desglosa tono, métrica y compás correctamente', () {
+      final parsed = Hymn.parseToneComponents('SOL / 3 TIEMPOS (3/4)');
+      expect(parsed['toneNote'], 'SOL');
+      expect(parsed['beats'], '3');
+      expect(parsed['timeSignature'], '3/4');
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('Hymn normalización de búsqueda elimina acentos y puntuación', () {
+      final hymn = Hymn(
+        id: 1,
+        title: '¡VEN, OH TODOPODEROSO!',
+        toneNote: 'SOL',
+        beats: '3 TIEMPOS',
+        timeSignature: '3/4',
+        lyrics: 'Padre Santo, cariñoso, manifiesta tu amor.',
+        collection: 'iump',
+      );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      expect(hymn.normalizedTitle, contains('ven oh todopoderoso'));
+      expect(hymn.normalizedSearchableText, contains('padre santo'));
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('Hymn serialización toJson y fromJson', () {
+      final jsonMap = {
+        'id': 10,
+        'title': 'GRANDE ES TU FIDELIDAD',
+        'toneNote': 'RE',
+        'beats': '3',
+        'timeSignature': '3/4',
+        'tone': 'RE / 3 TIEMPOS (3/4)',
+        'lyrics': 'Oh Dios eterno, tu misericordia...',
+        'collection': 'iump',
+        'audioUrl': 'https://example.com/audio.mp3',
+        'category': 'Adoración',
+      };
+
+      final hymn = Hymn.fromJson(jsonMap, 'iump');
+      expect(hymn.id, 10);
+      expect(hymn.title, 'GRANDE ES TU FIDELIDAD');
+      expect(hymn.toneNote, 'RE');
+      expect(hymn.category, 'Adoración');
+
+      final serialized = hymn.toJson();
+      expect(serialized['id'], 10);
+      expect(serialized['title'], 'GRANDE ES TU FIDELIDAD');
+    });
+  });
+
+  group('Spanish Accent Engine & Grammar Corrector Tests', () {
+    test('SpanishAccentEngine.processWord corrige acentuación de palabras litúrgicas respetando casing', () {
+      expect(SpanishAccentEngine.processWord('Jehova'), 'Jehová');
+      expect(SpanishAccentEngine.processWord('Espiritu'), 'Espíritu');
+      expect(SpanishAccentEngine.processWord('oracion'), 'oración');
+      expect(SpanishAccentEngine.processWord('ORACION'), 'ORACIÓN');
+    });
+
+    test('SpanishGrammarCorrector.correctText formatea y corrige mayúsculas y tildes', () {
+      final result = SpanishGrammarCorrector.correctText(
+        title: 'dios de mi salvacion',
+        lyrics: '1.\njesus me amo y se entrego por mi.\nel es mi pastor.',
+      );
+
+      expect(result.title, contains('SALVACIÓN'));
+      expect(result.lyrics, contains('Jesús me amó'));
+    });
   });
 }

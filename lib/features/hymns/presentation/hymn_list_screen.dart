@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../../../core/services/gemini_ai_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -3487,10 +3488,10 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
   }
 
   Future<void> _loadApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
+    final key = await GeminiAiService.getApiKey();
     if (mounted) {
       setState(() {
-        geminiKey = prefs.getString('gemini_api_key') ?? '';
+        geminiKey = key;
         keyController.text = geminiKey;
         isLoadingKey = false;
       });
@@ -3513,6 +3514,34 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
       errorMessage = '';
       hasSearched = false;
     });
+
+    // 1. Intentar primero a través de Cloud Function
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('searchOnlineHymnWithAi');
+      final cfRes = await callable.call({
+        'query': '${searchTitleController.text} ${searchAuthorController.text}'.trim(),
+        'apiKey': geminiKey,
+      }).timeout(const Duration(seconds: 25));
+
+      final cfData = cfRes.data;
+      if (cfData is Map && cfData['success'] == true) {
+        final foundTitle = cfData['title']?.toString().trim() ?? '';
+        final foundLyrics = cfData['lyrics']?.toString().trim() ?? '';
+        if (foundTitle.isNotEmpty && foundLyrics.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              titleController.text = foundTitle;
+              lyricsController.text = foundLyrics;
+              isSearching = false;
+              hasSearched = true;
+            });
+            return;
+          }
+        }
+      }
+    } catch (cfErr) {
+      debugPrint('searchOnlineHymnWithAi Cloud Function falló: $cfErr. Probando llamada directa...');
+    }
 
     List<String> errors = [];
 

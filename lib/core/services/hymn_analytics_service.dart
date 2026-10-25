@@ -40,7 +40,7 @@ class HymnAnalyticsService {
 
           final matching = allHymns.firstWhere(
             (h) => h.collection == col && h.id == idNum,
-            orElse: () => const Hymn(id: 0, title: '', toneNote: '', beats: '', timeSignature: '', lyrics: '', collection: ''),
+            orElse: () => Hymn(id: 0, title: '', toneNote: '', beats: '', timeSignature: '', lyrics: '', collection: ''),
           );
 
           if (matching.id != 0 && count > 0) {
