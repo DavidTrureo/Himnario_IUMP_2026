@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getStorage } = require("firebase-admin/storage");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const admin = require("firebase-admin");
 const youtubedl = require("youtube-dl-exec");
 const path = require("path");
@@ -21,10 +22,14 @@ const GEMINI_MODELS = [
 ];
 
 /**
- * Función genérica para invocar Gemini con fallback en cascada de modelos
+ * Función genérica para invocar Gemini con fallback en cascada de modelos y claves
  */
 async function callGeminiApi({ prompt, inlineData = null, jsonOutput = true, temperature = 0.2, apiKey = null }) {
-  const effectiveKey = (apiKey && apiKey.trim().length > 0) ? apiKey.trim() : SERVER_GEMINI_KEY;
+  const keysToTry = [];
+  if (apiKey && apiKey.trim().length > 0 && apiKey.trim() !== SERVER_GEMINI_KEY) {
+    keysToTry.push(apiKey.trim());
+  }
+  keysToTry.push(SERVER_GEMINI_KEY);
 
   const parts = [{ text: prompt }];
   if (inlineData && inlineData.data) {
@@ -45,37 +50,39 @@ async function callGeminiApi({ prompt, inlineData = null, jsonOutput = true, tem
   });
 
   let lastError = null;
-  for (const model of GEMINI_MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: requestBody,
-      });
+  for (const currentKey of keysToTry) {
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: requestBody,
+        });
 
-      if (res.ok) {
-        const jsonRes = await res.json();
-        const candidates = jsonRes.candidates;
-        if (candidates && candidates.length > 0) {
-          const resParts = candidates[0].content && candidates[0].content.parts;
-          if (resParts && resParts.length > 0) {
-            let text = resParts[0].text || "";
-            if (jsonOutput) {
-              text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-              return { data: JSON.parse(text), modelUsed: model, success: true };
+        if (res.ok) {
+          const jsonRes = await res.json();
+          const candidates = jsonRes.candidates;
+          if (candidates && candidates.length > 0) {
+            const resParts = candidates[0].content && candidates[0].content.parts;
+            if (resParts && resParts.length > 0) {
+              let text = resParts[0].text || "";
+              if (jsonOutput) {
+                text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                return { data: JSON.parse(text), modelUsed: model, success: true };
+              }
+              return { text, modelUsed: model, success: true };
             }
-            return { text, modelUsed: model, success: true };
           }
+        } else {
+          const errText = await res.text();
+          console.warn(`Model ${model} with key ${currentKey.substring(0, 8)}... returned ${res.status}: ${errText}`);
+          lastError = `Status ${res.status}: ${errText}`;
         }
-      } else {
-        const errText = await res.text();
-        console.warn(`Model ${model} returned ${res.status}: ${errText}`);
-        lastError = `Status ${res.status}: ${errText}`;
+      } catch (e) {
+        console.warn(`Model ${model} exception: ${e.message}`);
+        lastError = e.message;
       }
-    } catch (e) {
-      console.warn(`Model ${model} exception: ${e.message}`);
-      lastError = e.message;
     }
   }
 
@@ -179,10 +186,11 @@ exports.searchHymnsWithAi = onCall({
   const normQuery = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").trim();
   const cacheKey = crypto.createHash("sha256").update(`${normQuery}_${searchMode}`).digest("hex").substring(0, 32);
 
-  const db = admin.firestore();
-  const cacheDocRef = db.collection("ai_bible_cache").doc(cacheKey);
-
+  // Intentar leer de caché de Firestore sin bloquear en caso de error
+  let cachedResponse = null;
   try {
+    const db = getFirestore();
+    const cacheDocRef = db.collection("ai_bible_cache").doc(cacheKey);
     const cachedSnap = await cacheDocRef.get();
     if (cachedSnap.exists) {
       const cached = cachedSnap.data();
@@ -261,15 +269,20 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
 
     const responsePayload = aiResult.data;
 
-    // Guardar en Firestore ai_bible_cache asíncronamente
-    cacheDocRef.set({
-      originalQuery: query,
-      normalizedQuery: normQuery,
-      searchMode,
-      response: responsePayload,
-      modelUsed: aiResult.modelUsed,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }).catch(e => console.warn("Error guardando en caché:", e.message));
+    // Guardar en Firestore ai_bible_cache asíncronamente sin bloquear
+    try {
+      const db = getFirestore();
+      db.collection("ai_bible_cache").doc(cacheKey).set({
+        originalQuery: query,
+        normalizedQuery: normQuery,
+        searchMode,
+        response: responsePayload,
+        modelUsed: aiResult.modelUsed,
+        updatedAt: FieldValue.serverTimestamp(),
+      }).catch(e => console.warn("Error guardando en caché:", e.message));
+    } catch (e) {
+      console.warn("Error accediendo a Firestore para guardar:", e.message);
+    }
 
     return {
       ...responsePayload,

@@ -923,16 +923,14 @@ JSON esperado:
             [];
 
         final matches = _mapRawResultsToHymns(rawResults, filteredCatalog);
-        if (matches.isNotEmpty) {
-          return {
-            'summary': summary,
-            'biblicalPassage': biblicalPassage,
-            'biblicalContext': biblicalContext,
-            'spiritualTone': spiritualTone,
-            'matches': matches,
-            'keywords': keywords,
-          };
-        }
+        return {
+          'summary': summary,
+          'biblicalPassage': biblicalPassage,
+          'biblicalContext': biblicalContext,
+          'spiritualTone': spiritualTone,
+          'matches': matches,
+          'keywords': keywords,
+        };
       }
     } catch (cfError) {
       debugPrint('Cloud Function searchHymnsWithAi falló o sin red directa: $cfError. Intentando HTTP directo...');
