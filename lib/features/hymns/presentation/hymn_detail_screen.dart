@@ -103,24 +103,26 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
 
   void _updateYoutubePlayer(Hymn hymn) {
-    final audioUrl = hymn.audioUrl;
-    if (audioUrl.isNotEmpty && (audioUrl.contains('youtube.com') || audioUrl.contains('youtu.be'))) {
-      final videoId = YoutubePlayerController.convertUrlToId(audioUrl);
-      if (videoId != null) {
-        if (_youtubeController == null) {
-          _youtubeController = YoutubePlayerController.fromVideoId(
-            videoId: videoId,
-            autoPlay: false,
-            params: const YoutubePlayerParams(showControls: true, mute: false),
-          );
-        } else {
-          _youtubeController!.loadVideoById(videoId: videoId);
-          _youtubeController!.pauseVideo();
+    try {
+      final audioUrl = hymn.audioUrl;
+      if (audioUrl.isNotEmpty && (audioUrl.contains('youtube.com') || audioUrl.contains('youtu.be'))) {
+        final videoId = YoutubePlayerController.convertUrlToId(audioUrl);
+        if (videoId != null) {
+          if (_youtubeController == null) {
+            _youtubeController = YoutubePlayerController.fromVideoId(
+              videoId: videoId,
+              autoPlay: false,
+              params: const YoutubePlayerParams(showControls: true, mute: false),
+            );
+          } else {
+            _youtubeController!.loadVideoById(videoId: videoId).catchError((_) {});
+            _youtubeController!.pauseVideo().catchError((_) {});
+          }
         }
+      } else {
+        _youtubeController?.pauseVideo().catchError((_) {});
       }
-    } else {
-      _youtubeController?.pauseVideo();
-    }
+    } catch (_) {}
   }
 
   String? _lastLyricsForBlocks;

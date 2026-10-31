@@ -67,9 +67,8 @@ class ToolsScreen extends ConsumerWidget {
             iconColor: const Color(0xFF0EA5E9),
             onTap: () async {
               if (kIsWeb) {
-                final currentUrl = Uri.base.toString();
-                final baseUrl = currentUrl.split('#')[0];
-                final url = Uri.parse('$baseUrl#/tv');
+                final targetUrl = '${Uri.base.origin}/tv';
+                final url = Uri.parse(targetUrl);
                 if (await canLaunchUrl(url)) {
                   await launchUrl(url, webOnlyWindowName: '_blank');
                 } else {

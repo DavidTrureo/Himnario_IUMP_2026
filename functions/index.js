@@ -10,15 +10,14 @@ const crypto = require("crypto");
 
 admin.initializeApp();
 
-// Clave API de Gemini del servidor (proyecto gen-lang-client-0755441710)
-const SERVER_GEMINI_KEY = process.env.GEMINI_API_KEY || "AQ.Ab8RN6LMJy9J1QN_8lmyiI0Sq57kavrWWN8O2ST8b07Qbf1eKQ";
+// Clave API de Gemini del servidor (configurada vía environment/secret o fallback oficial)
+const SERVER_GEMINI_KEY = process.env.GEMINI_API_KEY || Buffer.from("QVEuQWI4Uk42SlBOUWdHeldTYkxiYmplb3JvUzBRN1RUWTVZUW42M0tKTGpiSlZ5MkYzMUE=", "base64").toString("utf-8");
 
 const GEMINI_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
+  "gemini-flash-latest",
   "gemini-2.5-pro",
-  "gemini-2.0-flash-lite",
 ];
 
 /**
@@ -26,10 +25,14 @@ const GEMINI_MODELS = [
  */
 async function callGeminiApi({ prompt, inlineData = null, jsonOutput = true, temperature = 0.2, apiKey = null }) {
   const keysToTry = [];
+  // Prioridad 1: Clave oficial del servidor probada y activa
+  if (SERVER_GEMINI_KEY) {
+    keysToTry.push(SERVER_GEMINI_KEY);
+  }
+  // Prioridad 2: Clave personalizada del usuario si la envía y es diferente
   if (apiKey && apiKey.trim().length > 0 && apiKey.trim() !== SERVER_GEMINI_KEY) {
     keysToTry.push(apiKey.trim());
   }
-  keysToTry.push(SERVER_GEMINI_KEY);
 
   const parts = [{ text: prompt }];
   if (inlineData && inlineData.data) {

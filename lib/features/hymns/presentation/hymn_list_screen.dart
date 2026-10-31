@@ -1645,7 +1645,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                 .read(activeCollectionProvider.notifier)
                                                 .setCollection('all');
                                             if (widget.isFavoritesTab) {
-                                              context.go('/hymns');
+                                              context.go('/home/hymns');
                                             }
                                           },
                                         ),
