@@ -18,10 +18,18 @@ class GeminiAiService {
   static Future<String> getApiKey() async {
     final prefs = await SharedPreferences.getInstance();
     final customKey = prefs.getString(_keyPref)?.trim() ?? '';
-    if (customKey.isNotEmpty && !customKey.contains('AQ.Ab8RN6LMJy9J1QN')) {
+    if (customKey.isNotEmpty &&
+        customKey.length > 20 &&
+        !customKey.contains('AQ.Ab8RN6LMJy9J1QN') &&
+        !customKey.contains('AQ.Ab8RN6ORMW')) {
       return customKey;
     }
     return defaultServerApiKey;
+  }
+
+  static Future<void> resetToDefaultApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyPref);
   }
 
   static Future<void> saveApiKey(String apiKey) async {
@@ -30,7 +38,8 @@ class GeminiAiService {
   }
 
   static Future<String?> showApiKeyInputDialog(BuildContext context, {String? reason}) async {
-    final controller = TextEditingController();
+    final currentKey = await getApiKey();
+    final controller = TextEditingController(text: currentKey);
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -54,7 +63,7 @@ class GeminiAiService {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                label: const Text('Obtener API Key (Gratis)'),
+                label: const Text('Obtener API Key (Gratis en AI Studio)'),
                 onPressed: () async {
                   final url = Uri.parse('https://aistudio.google.com/app/apikey');
                   try {
@@ -72,7 +81,7 @@ class GeminiAiService {
               TextField(
                 controller: controller,
                 decoration: InputDecoration(
-                  labelText: 'API Key (ej: AIzaSy...)',
+                  labelText: 'API Key (Google AI Studio)',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -80,6 +89,13 @@ class GeminiAiService {
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: () async {
+              await resetToDefaultApiKey();
+              if (context.mounted) Navigator.pop(context, defaultServerApiKey);
+            },
+            child: const Text('Restablecer Oficial'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancelar'),
@@ -269,32 +285,43 @@ JSON esperado:
         ];
 
         List<String> modelErrors = [];
-        for (final item in modelsToTry) {
-          final model = item['model']!;
-          final api = item['api']!;
-          try {
-            final url = Uri.parse(
-                'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$apiKey');
-            final res = await http.post(
-              url,
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey,
-              },
-              body: requestBody,
-            ).timeout(const Duration(seconds: 18));
+        Future<http.Response?> callModels(String keyToUse) async {
+          for (final item in modelsToTry) {
+            final model = item['model']!;
+            final api = item['api']!;
+            try {
+              final url = Uri.parse(
+                  'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$keyToUse');
+              final res = await http.post(
+                url,
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': keyToUse,
+                },
+                body: requestBody,
+              ).timeout(const Duration(seconds: 18));
 
-            if (res.statusCode == 200) {
-              response = res;
-              break;
-            } else {
-              debugPrint('Gemini corrector intent [$model ($api)]: status ${res.statusCode}');
-              modelErrors.add('$model ($api) status ${res.statusCode}');
+              if (res.statusCode == 200) {
+                return res;
+              } else {
+                debugPrint('Gemini corrector intent [$model ($api)]: status ${res.statusCode}');
+                modelErrors.add('$model ($api) status ${res.statusCode}');
+                if (res.statusCode == 400 || res.statusCode == 403) return null;
+              }
+            } catch (e) {
+              debugPrint('Gemini corrector exception [$model ($api)]: $e');
+              modelErrors.add('$model ($api) exc: $e');
             }
-          } catch (e) {
-            debugPrint('Gemini corrector exception [$model ($api)]: $e');
-            modelErrors.add('$model ($api) exc: $e');
           }
+          return null;
+        }
+
+        response = await callModels(apiKey);
+        if ((response == null || response.statusCode != 200) && apiKey != defaultServerApiKey) {
+          debugPrint('>>> Corrector: clave personalizada falló. Reintentando con defaultServerApiKey...');
+          await resetToDefaultApiKey();
+          apiKey = defaultServerApiKey;
+          response = await callModels(apiKey);
         }
 
         if (response != null && response.statusCode == 200) {
@@ -789,7 +816,7 @@ JSON esperado:
 
   static Future<String?> generateText(String prompt) async {
     try {
-      final apiKey = await getApiKey();
+      var apiKey = await getApiKey();
       if (apiKey.isEmpty) throw Exception('API Key no configurada');
 
       final requestBody = jsonEncode({
@@ -811,23 +838,33 @@ JSON esperado:
         {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
       ];
 
-      for (final item in modelsToTry) {
-        if (response != null && response.statusCode == 200) break;
-        final model = item['model']!;
-        final endpoint = item['api']!;
-        try {
-          final url = Uri.parse('https://generativelanguage.googleapis.com/$endpoint/models/$model:generateContent?key=$apiKey');
-          final res = await http.post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: requestBody,
-          ).timeout(const Duration(seconds: 25));
-          
-          if (res.statusCode == 200) {
-            response = res;
-            break;
-          }
-        } catch (_) {}
+      Future<http.Response?> callModels(String keyToUse) async {
+        for (final item in modelsToTry) {
+          final model = item['model']!;
+          final endpoint = item['api']!;
+          try {
+            final url = Uri.parse('https://generativelanguage.googleapis.com/$endpoint/models/$model:generateContent?key=$keyToUse');
+            final res = await http.post(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: requestBody,
+            ).timeout(const Duration(seconds: 25));
+            
+            if (res.statusCode == 200) {
+              return res;
+            } else if (res.statusCode == 400 || res.statusCode == 403) {
+              return null;
+            }
+          } catch (_) {}
+        }
+        return null;
+      }
+
+      response = await callModels(apiKey);
+      if ((response == null || response.statusCode != 200) && apiKey != defaultServerApiKey) {
+        await resetToDefaultApiKey();
+        apiKey = defaultServerApiKey;
+        response = await callModels(apiKey);
       }
 
       if (response != null && response.statusCode == 200) {
@@ -1021,29 +1058,47 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
     http.Response? response;
     List<String> errors = [];
 
-    for (final item in modelsToTry) {
-      final model = item['model']!;
-      final api = item['api']!;
-      final url = Uri.parse(
-        'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$apiKey',
-      );
+    Future<http.Response?> callModelsWithKey(String keyToUse) async {
+      for (final item in modelsToTry) {
+        final model = item['model']!;
+        final api = item['api']!;
+        final url = Uri.parse(
+          'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$keyToUse',
+        );
 
-      try {
-        final res = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: requestBody,
-        ).timeout(const Duration(seconds: 22));
+        try {
+          final res = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: requestBody,
+          ).timeout(const Duration(seconds: 22));
 
-        if (res.statusCode == 200) {
-          response = res;
-          break;
-        } else {
-          errors.add('$model ($api): ${res.statusCode}');
+          if (res.statusCode == 200) {
+            return res;
+          } else {
+            errors.add('$model ($api): ${res.statusCode}');
+            // Si es un error 400 (Bad Request / API_KEY_INVALID) o 403 (Forbidden),
+            // la clave no es válida para ningún modelo. Cortamos de inmediato.
+            if (res.statusCode == 400 || res.statusCode == 403) {
+              return null;
+            }
+          }
+        } catch (e) {
+          errors.add('$model ($api) exc: $e');
         }
-      } catch (e) {
-        errors.add('$model ($api) exc: $e');
       }
+      return null;
+    }
+
+    response = await callModelsWithKey(apiKey);
+
+    // Si falló y la clave usada no era la oficial (ej: clave vieja o revocada guardada en SharedPreferences),
+    // reintentamos automáticamente con la clave oficial activa
+    if ((response == null || response.statusCode != 200) && apiKey != defaultServerApiKey) {
+      debugPrint('>>> Clave API personalizada falló o expiró. Reintentando de inmediato con la clave oficial activa...');
+      await resetToDefaultApiKey();
+      apiKey = defaultServerApiKey;
+      response = await callModelsWithKey(apiKey);
     }
 
     if (response == null || response.statusCode != 200) {

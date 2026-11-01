@@ -400,6 +400,28 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                     ),
                   ),
                   IconButton(
+                    icon: const Icon(Icons.vpn_key_rounded, size: 20),
+                    tooltip: 'Configurar Clave API',
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final newKey = await GeminiAiService.showApiKeyInputDialog(
+                        context,
+                        reason: 'Configura o actualiza tu Clave API de Gemini (Google AI Studio) para el Asistente Bíblico:',
+                      );
+                      if (newKey != null && newKey.isNotEmpty && mounted) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Clave API actualizada correctamente'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        if (_controller.text.trim().isNotEmpty) {
+                          _performSearch();
+                        }
+                      }
+                    },
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.close_rounded),
                     tooltip: 'Cerrar',
                     onPressed: () => Navigator.pop(context),
@@ -971,6 +993,30 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                         fontStyle: FontStyle.italic,
                         color: isDark ? Colors.white60 : Colors.black54,
                       ),
+                    ),
+                  ],
+                  if (_biblicalContext?.contains('Modo sin conexión') == true ||
+                      _summary?.contains('Modo sin conexión') == true) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? Colors.amber.shade300 : Colors.amber.shade900,
+                        side: BorderSide(color: Colors.amber.withValues(alpha: 0.5)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.vpn_key_rounded, size: 14),
+                      label: const Text('Revisar o Actualizar Clave API', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        final newKey = await GeminiAiService.showApiKeyInputDialog(
+                          context,
+                          reason: 'Actualiza o restablece la Clave API de Gemini para habilitar el análisis bíblico con IA:',
+                        );
+                        if (newKey != null && newKey.isNotEmpty && mounted) {
+                          _performSearch();
+                        }
+                      },
                     ),
                   ],
                   if (_keywords.isNotEmpty) ...[
