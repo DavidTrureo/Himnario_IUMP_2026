@@ -18,10 +18,17 @@ class GeminiAiService {
   static Future<String> getApiKey() async {
     final prefs = await SharedPreferences.getInstance();
     final customKey = prefs.getString(_keyPref)?.trim() ?? '';
-    if (customKey.isNotEmpty &&
-        customKey.length > 20 &&
-        !customKey.contains('AQ.Ab8RN6LMJy9J1QN') &&
-        !customKey.contains('AQ.Ab8RN6ORMW')) {
+    if (customKey == defaultServerApiKey) {
+      return defaultServerApiKey;
+    }
+    // Como se eliminaron todas las claves antiguas de Google AI Studio,
+    // cualquier clave anterior guardada en el dispositivo es inválida y debe ser purgada.
+    if (customKey.isNotEmpty && (customKey.startsWith('AQ.') || customKey.length < 20)) {
+      debugPrint('Purgando clave guardada obsoleta en dispositivo: $customKey. Usando clave activa oficial.');
+      await prefs.remove(_keyPref);
+      return defaultServerApiKey;
+    }
+    if (customKey.isNotEmpty && customKey.startsWith('AIzaSy')) {
       return customKey;
     }
     return defaultServerApiKey;
@@ -769,47 +776,58 @@ JSON esperado:
     ];
     
     List<String> errors = [];
+    Future<Map<String, dynamic>?> tryModels(String keyToUse) async {
+      for (final item in modelsToTry) {
+        final model = item['model']!;
+        final api = item['api']!;
+        final url = Uri.parse('https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$keyToUse');
 
-    for (final item in modelsToTry) {
-      final model = item['model']!;
-      final api = item['api']!;
-      final url = Uri.parse('https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$apiKey');
+        try {
+          final response = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: requestBody,
+          ).timeout(const Duration(seconds: 22));
 
-      try {
-        final response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: requestBody,
-        ).timeout(const Duration(seconds: 22));
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final text = data['candidates'][0]['content']['parts'][0]['text'];
-          
-          var cleanText = text.toString().trim();
-          if (cleanText.startsWith('```json')) {
-            cleanText = cleanText.substring(7);
-          } else if (cleanText.startsWith('```')) {
-            cleanText = cleanText.substring(3);
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final text = data['candidates'][0]['content']['parts'][0]['text'];
+            
+            var cleanText = text.toString().trim();
+            if (cleanText.startsWith('```json')) {
+              cleanText = cleanText.substring(7);
+            } else if (cleanText.startsWith('```')) {
+              cleanText = cleanText.substring(3);
+            }
+            if (cleanText.endsWith('```')) {
+              cleanText = cleanText.substring(0, cleanText.length - 3);
+            }
+            
+            final parsed = jsonDecode(cleanText.trim());
+            return {
+              'title': parsed['title']?.toString() ?? '',
+              'key': parsed['key']?.toString() ?? '',
+              'timeSignature': parsed['timeSignature']?.toString() ?? '',
+              'lyrics': parsed['lyrics']?.toString() ?? '',
+            };
+          } else {
+            errors.add('$model ($api) status ${response.statusCode}');
+            if (response.statusCode == 400 || response.statusCode == 403) return null;
           }
-          if (cleanText.endsWith('```')) {
-            cleanText = cleanText.substring(0, cleanText.length - 3);
-          }
-          
-          final parsed = jsonDecode(cleanText.trim());
-          return {
-            'title': parsed['title']?.toString() ?? '',
-            'key': parsed['key']?.toString() ?? '',
-            'timeSignature': parsed['timeSignature']?.toString() ?? '',
-            'lyrics': parsed['lyrics']?.toString() ?? '',
-          };
-        } else {
-          errors.add('$model ($api) status ${response.statusCode}');
+        } catch (e) {
+          errors.add('$model ($api) exc: $e');
         }
-      } catch (e) {
-        errors.add('$model ($api) exc: $e');
       }
+      return null;
     }
+
+    var result = await tryModels(apiKey);
+    if (result == null && apiKey != defaultServerApiKey) {
+      await resetToDefaultApiKey();
+      apiKey = defaultServerApiKey;
+      result = await tryModels(apiKey);
+    }
+    if (result != null) return result;
     
     throw Exception('No se pudo transcribir la imagen. Errores: ${errors.join(', ')}');
   }
