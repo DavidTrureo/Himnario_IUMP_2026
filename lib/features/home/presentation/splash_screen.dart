@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'web_helper.dart' if (dart.library.html) 'web_helper_web.dart';
 
 import 'dart:async';
@@ -47,8 +48,19 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     });
 
     // Aumentamos a 3.5s para apreciar la animacion
-    Timer(const Duration(milliseconds: 3500), () {
+    Timer(const Duration(milliseconds: 3500), () async {
       if (mounted && !_hasRedirected) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final lastHymnId = prefs.getString('last_hymn_id');
+          final lastHymnTime = prefs.getInt('last_hymn_time') ?? 0;
+          final elapsed = DateTime.now().millisecondsSinceEpoch - lastHymnTime;
+          // Si el usuario estaba viendo un himno hace menos de 2 horas (e.g. app cerrada en segundo plano)
+          if (lastHymnId != null && lastHymnId.isNotEmpty && elapsed < 2 * 60 * 60 * 1000) {
+            context.go('/home/hymn/$lastHymnId');
+            return;
+          }
+        } catch (_) {}
         context.go('/home');
       }
     });

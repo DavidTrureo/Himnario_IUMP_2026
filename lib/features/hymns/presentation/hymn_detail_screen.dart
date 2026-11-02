@@ -181,6 +181,22 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     await prefs.setString('pref_chords_notation', _notation);
   }
 
+  Future<void> _saveLastViewedHymn(Hymn hymn) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_hymn_id', '${hymn.collection}-${hymn.id}');
+      await prefs.setInt('last_hymn_time', DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {}
+  }
+
+  Future<void> _clearLastViewedHymn() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('last_hymn_id');
+      await prefs.remove('last_hymn_time');
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -282,8 +298,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
     _initialized = true;
     if (_currentIndex != null && _currentIndex! < _sortedHymns.length) {
+      final currentH = _sortedHymns[_currentIndex!];
+      _saveLastViewedHymn(currentH);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _updateYoutubePlayer(_sortedHymns[_currentIndex!]);
+        _updateYoutubePlayer(currentH);
       });
     }
   }
@@ -382,6 +400,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     return PopScope(
       canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          _clearLastViewedHymn();
+        }
+      },
       child: Focus(
         autofocus: true,
         onKeyEvent: (node, event) {
@@ -421,16 +444,25 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () {
+              _clearLastViewedHymn();
               context.pop();
             },
           ),
           flexibleSpace: ClipRect(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
               child: Container(
-                color: isDark 
-                  ? theme.colorScheme.surface.withValues(alpha: 0.5) 
-                  : Colors.white.withValues(alpha: 0.4),
+                decoration: BoxDecoration(
+                  color: isDark 
+                    ? theme.colorScheme.surface.withValues(alpha: 0.88) 
+                    : Colors.white.withValues(alpha: 0.88),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                      width: 0.8,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -719,28 +751,35 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 ),
               ),
 
-              // PageView Deslizable con las Alabanzas
-              Positioned.fill(
+              // PageView Deslizable con las Alabanzas (Con recorte estricto bajo el AppBar)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + kToolbarHeight,
+                left: 0,
+                right: 0,
+                bottom: 0,
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 900),
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: _sortedHymns.length,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentIndex = index;
-                      _transposeOffset = 0; // Resetear transposición al cambiar de himno
-                      _showPlayerCard = false;
-                      _audioPlayer?.stop(); // Detener el audio al cambiar de canto
-                      _updateYoutubePlayer(_sortedHymns[index]);
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final currentHymn = _sortedHymns[index];
-                    return _buildHymnPage(context, currentHymn, fontSize, isDark, theme);
-                  },
-                ),
+                    child: ClipRect(
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: _sortedHymns.length,
+                        onPageChanged: (index) {
+                          setState(() {
+                            _currentIndex = index;
+                            _transposeOffset = 0; // Resetear transposición al cambiar de himno
+                            _showPlayerCard = false;
+                            _audioPlayer?.stop(); // Detener el audio al cambiar de canto
+                            _updateYoutubePlayer(_sortedHymns[index]);
+                            _saveLastViewedHymn(_sortedHymns[index]);
+                          });
+                        },
+                        itemBuilder: (context, index) {
+                          final currentHymn = _sortedHymns[index];
+                          return _buildHymnPage(context, currentHymn, fontSize, isDark, theme);
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1618,8 +1657,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: YoutubePlayer(
-                controller: _youtubeController!,
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: YoutubePlayer(
+                  controller: _youtubeController!,
+                ),
               ),
             ),
           ),
@@ -1677,6 +1719,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     return SizedBox.expand(
       child: SafeArea(
+        top: false,
         bottom: false,
         child: _viewMode == 'texto'
             ? Scrollbar(

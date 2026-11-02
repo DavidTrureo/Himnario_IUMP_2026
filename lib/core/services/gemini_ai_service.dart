@@ -21,14 +21,15 @@ class GeminiAiService {
     if (customKey == defaultServerApiKey) {
       return defaultServerApiKey;
     }
-    // Como se eliminaron todas las claves antiguas de Google AI Studio,
-    // cualquier clave anterior guardada en el dispositivo es inválida y debe ser purgada.
-    if (customKey.isNotEmpty && (customKey.startsWith('AQ.') || customKey.length < 20)) {
+    // Si el usuario tiene guardada una clave revocada o corrupta, purgarla
+    if (customKey.contains('AQ.Ab8RN6LMJy9J1QN') ||
+        customKey.contains('AQ.Ab8RN6ORMW') ||
+        (customKey.isNotEmpty && customKey.length < 20)) {
       debugPrint('Purgando clave guardada obsoleta en dispositivo: $customKey. Usando clave activa oficial.');
       await prefs.remove(_keyPref);
       return defaultServerApiKey;
     }
-    if (customKey.isNotEmpty && customKey.startsWith('AIzaSy')) {
+    if (customKey.isNotEmpty) {
       return customKey;
     }
     return defaultServerApiKey;
