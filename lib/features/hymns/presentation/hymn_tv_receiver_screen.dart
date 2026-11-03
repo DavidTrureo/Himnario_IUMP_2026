@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 class HymnTvReceiverScreen extends StatefulWidget {
   const HymnTvReceiverScreen({super.key});
@@ -36,23 +37,67 @@ class _HymnTvReceiverScreenState extends State<HymnTvReceiverScreen> {
     });
   }
 
+  void _exit(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
+
+  Widget _buildExitButton(BuildContext context) {
+    return Positioned(
+      top: 16,
+      left: 16,
+      child: SafeArea(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(30),
+            onTap: () => _exit(context),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white24, width: 1.5),
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_roomId == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator()),
+        body: Stack(
+          children: [
+            const Center(child: CircularProgressIndicator()),
+            _buildExitButton(context),
+          ],
+        ),
       );
     }
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('tv_rooms').doc(_roomId).snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            return _buildWaitingScreen();
-          }
+      body: Stack(
+        children: [
+          StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance.collection('tv_rooms').doc(_roomId).snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || !snapshot.data!.exists) {
+                return _buildWaitingScreen();
+              }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final currentBlock = data['currentBlock'] as String? ?? '';
@@ -242,7 +287,10 @@ class _HymnTvReceiverScreenState extends State<HymnTvReceiverScreen> {
           );
         },
       ),
-    );
+      _buildExitButton(context),
+    ],
+  ),
+);
   }
 
   Widget _buildWaitingScreen({String? title}) {
@@ -281,6 +329,26 @@ class _HymnTvReceiverScreenState extends State<HymnTvReceiverScreen> {
                 ),
               ),
             ),
+          const SizedBox(height: 36),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.white.withValues(alpha: 0.08),
+              side: const BorderSide(color: Colors.white30, width: 1.5),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            icon: const Icon(Icons.arrow_back_rounded, size: 22),
+            label: Text(
+              'Salir del Modo Proyector',
+              style: GoogleFonts.notoSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+            onPressed: () => _exit(context),
+          ),
         ],
       ),
     );

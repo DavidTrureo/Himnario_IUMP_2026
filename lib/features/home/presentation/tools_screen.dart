@@ -432,10 +432,51 @@ class _PremiumAboutDialog extends ConsumerWidget {
                     // Sección de Historia y Propósito (Cards Elegantes)
                     _buildInfoCard(
                       isDark: isDark,
-                      icon: Icons.auto_awesome_rounded,
+                      icon: Icons.church_rounded,
                       iconColor: Colors.amber,
                       title: 'Nuestra Historia',
                       content: 'Nuestra Iglesia Primera San Bernardo fue fundada el 01 de Septiembre de 1971 y es parte de la gran familia de la Iglesia Unida Metodista Pentecostal (IUMP).',
+                      bottomWidget: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _openChurchMap,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDark 
+                                ? const Color(0xFF38BDF8).withValues(alpha: 0.12)
+                                : const Color(0xFF0284C7).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isDark 
+                                  ? const Color(0xFF38BDF8).withValues(alpha: 0.3)
+                                  : const Color(0xFF0284C7).withValues(alpha: 0.2),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFF0284C7)),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Vecinal Norte 740, El Bosque',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.open_in_new_rounded, size: 13, color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _buildInfoCard(
@@ -617,12 +658,37 @@ class _PremiumAboutDialog extends ConsumerWidget {
     );
   }
 
+  Future<void> _openChurchMap() async {
+    const query = 'Vecinal Norte 740, El Bosque, Región Metropolitana, Chile';
+    final encodedQuery = Uri.encodeComponent(query);
+    
+    final googleMapsUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedQuery');
+    final appleMapsUrl = Uri.parse('https://maps.apple.com/?q=$encodedQuery');
+
+    try {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        if (await canLaunchUrl(appleMapsUrl)) {
+          await launchUrl(appleMapsUrl, mode: LaunchMode.externalApplication);
+          return;
+        }
+      }
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(googleMapsUrl, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      debugPrint('Error al abrir mapas: $e');
+    }
+  }
+
   Widget _buildInfoCard({
     required bool isDark,
     required IconData icon,
     required Color iconColor,
     required String title,
     required String content,
+    Widget? bottomWidget,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -658,6 +724,10 @@ class _PremiumAboutDialog extends ConsumerWidget {
                   height: 1.5,
                 ),
               ),
+              if (bottomWidget != null) ...[
+                const SizedBox(height: 10),
+                bottomWidget,
+              ],
             ],
           ),
         ),
