@@ -663,12 +663,22 @@ class _PremiumAboutDialog extends ConsumerWidget {
     final encodedQuery = Uri.encodeComponent(query);
     
     final googleMapsUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedQuery');
-    final appleMapsUrl = Uri.parse('https://maps.apple.com/?q=$encodedQuery');
+    final appleMapsUrl = Uri.parse('maps://?q=$encodedQuery');
+    final appleMapsWebUrl = Uri.parse('https://maps.apple.com/?q=$encodedQuery');
 
     try {
+      if (kIsWeb) {
+        if (await canLaunchUrl(googleMapsUrl)) {
+          await launchUrl(googleMapsUrl, mode: LaunchMode.platformDefault);
+        }
+        return;
+      }
       if (defaultTargetPlatform == TargetPlatform.iOS) {
         if (await canLaunchUrl(appleMapsUrl)) {
           await launchUrl(appleMapsUrl, mode: LaunchMode.externalApplication);
+          return;
+        } else if (await canLaunchUrl(appleMapsWebUrl)) {
+          await launchUrl(appleMapsWebUrl, mode: LaunchMode.externalApplication);
           return;
         }
       }
