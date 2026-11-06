@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -42,6 +43,28 @@ class ChurchAboutScreen extends StatelessWidget {
     } catch (e) {
       debugPrint('Error al abrir mapas: $e');
     }
+  }
+
+  void _copyAddress(BuildContext context) {
+    Clipboard.setData(const ClipboardData(text: churchAddressFull));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              'Dirección copiada al portapapeles',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF0284C7),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _launchExternalUrl(String url) async {
@@ -218,38 +241,68 @@ class ChurchAboutScreen extends StatelessWidget {
                             ),
                             child: Column(
                               children: [
-                                // Logos con plataforma visual
+                                // Logos circulares emblemáticos con divisor ornamental
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     _buildLogoItem(
                                       context: context,
                                       assetPath: 'assets/images/church_logo_clean.png',
                                       isDark: isDark,
-                                      tooltip: 'Escudo de la Iglesia',
+                                      tooltip: 'Escudo de la Iglesia (Toca para ampliar)',
+                                      label: 'Iglesia Local',
                                     ),
-                                    const SizedBox(width: 22),
-                                    Container(
-                                      width: 1.5,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.transparent,
-                                            isDark ? Colors.white24 : Colors.black12,
-                                            Colors.transparent,
-                                          ],
-                                        ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 1.5,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  Colors.transparent,
+                                                  isDark ? Colors.amber.withValues(alpha: 0.5) : Colors.amber.shade400,
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 6),
+                                            child: Icon(
+                                              Icons.church_rounded,
+                                              size: 16,
+                                              color: isDark ? Colors.amber.shade300 : Colors.amber.shade700,
+                                            ),
+                                          ),
+                                          Container(
+                                            width: 1.5,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  isDark ? Colors.amber.withValues(alpha: 0.5) : Colors.amber.shade400,
+                                                  Colors.transparent,
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(width: 22),
                                     _buildLogoItem(
                                       context: context,
                                       assetPath: 'assets/images/mission_logo_v3.png',
                                       isDark: isDark,
-                                      tooltip: 'Logo de la Misión',
+                                      tooltip: 'Logo de la Misión (Toca para ampliar)',
+                                      label: 'Misión IUMP',
                                     ),
                                   ],
                                 ),
@@ -392,47 +445,63 @@ class ChurchAboutScreen extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 18),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? Colors.black.withValues(alpha: 0.28) : Colors.white,
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => _copyAddress(context),
                                     borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(
-                                      color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.place_outlined,
-                                        size: 22,
-                                        color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              churchAddress,
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 15.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: primaryTextColor,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'Región Metropolitana, Chile',
-                                              style: GoogleFonts.nunito(
-                                                fontSize: 12.5,
-                                                color: secondaryTextColor,
-                                              ),
-                                            ),
-                                          ],
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? Colors.black.withValues(alpha: 0.28) : Colors.white,
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
                                         ),
                                       ),
-                                    ],
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.place_outlined,
+                                            size: 22,
+                                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  churchAddress,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 15.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: primaryTextColor,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'Región Metropolitana, Chile • Toca para copiar',
+                                                  style: GoogleFonts.nunito(
+                                                    fontSize: 12,
+                                                    color: secondaryTextColor,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.copy_rounded,
+                                              size: 19,
+                                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                                            ),
+                                            tooltip: 'Copiar dirección',
+                                            onPressed: () => _copyAddress(context),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -758,40 +827,77 @@ class ChurchAboutScreen extends StatelessWidget {
     required String assetPath,
     required bool isDark,
     required String tooltip,
+    required String label,
   }) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showFullLogo(context, assetPath),
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            width: 72,
-            height: 72,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isDark ? Colors.white12 : const Color(0xFFE2E8F0),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Tooltip(
+          message: tooltip,
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: () => _showFullLogo(context, assetPath),
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 100,
+                height: 100,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.65)
+                        : Colors.amber.shade400,
+                    width: 2.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? const Color(0xFFF59E0B).withValues(alpha: 0.25)
+                          : Colors.amber.shade200.withValues(alpha: 0.5),
+                      blurRadius: 18,
+                      offset: const Offset(0, 5),
+                    ),
+                    BoxShadow(
+                      color: isDark
+                          ? const Color(0xFF0284C7).withValues(alpha: 0.25)
+                          : const Color(0xFF0284C7).withValues(alpha: 0.12),
+                      blurRadius: 24,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Hero(
-              tag: assetPath,
-              child: Image.asset(assetPath, fit: BoxFit.contain),
+                child: Hero(
+                  tag: assetPath,
+                  child: ClipOval(
+                    child: Image.asset(assetPath, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
