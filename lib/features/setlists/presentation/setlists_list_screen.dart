@@ -1,4 +1,3 @@
-import '../../../core/utils/formatters.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,30 +28,40 @@ class SetlistsListScreen extends ConsumerWidget {
                 end: Alignment.bottomCenter,
                 colors: isDark 
                   ? [const Color(0xFF0F172A), const Color(0xFF020617)]
-                  : [const Color(0xFFF0F9FF), const Color(0xFFE0F2FE)],
+                  : [const Color(0xFFF8FAFC), const Color(0xFFF1F5F9)],
               ),
             ),
           ),
 
-          // Auroras decorativas de fondo
+          // Círculo decorativo aurora superior derecha
           Positioned(
-            top: -100,
-            left: -100,
+            top: -120,
+            right: -120,
             child: Container(
-              width: 250,
-              height: 250,
+              width: 320,
+              height: 320,
               decoration: BoxDecoration(
                 color: isDark 
-                  ? const Color(0xFF6366F1).withValues(alpha: 0.08) 
-                  : const Color(0xFF818CF8).withValues(alpha: 0.05),
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.18) 
+                  : const Color(0xFF818CF8).withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
             ),
           ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-              child: const SizedBox(),
+
+          // Círculo decorativo aurora inferior izquierda
+          Positioned(
+            bottom: -80,
+            left: -80,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                color: isDark 
+                  ? const Color(0xFFEC4899).withValues(alpha: 0.12) 
+                  : const Color(0xFFF472B6).withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
 

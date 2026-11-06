@@ -17,25 +17,75 @@ class ToolsScreen extends ConsumerWidget {
     final isAdmin = ref.watch(adminModeProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-      appBar: AppBar(
-        titleSpacing: 24,
-        title: Text(
-          'Herramientas',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.bold,
-            fontSize: 26,
-            color: isDark ? Colors.white : theme.colorScheme.primary,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 140.0),
-        physics: const BouncingScrollPhysics(),
+      backgroundColor: Colors.transparent,
+      body: Stack(
         children: [
+          // Fondo base gradiente (consistente con el Home)
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: isDark 
+                  ? [const Color(0xFF0F172A), const Color(0xFF020617)]
+                  : [const Color(0xFFF8FAFC), const Color(0xFFF1F5F9)],
+              ),
+            ),
+          ),
+          
+          // Círculo decorativo aurora superior derecha
+          Positioned(
+            top: -120,
+            right: -120,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                color: isDark 
+                  ? const Color(0xFF6366F1).withValues(alpha: 0.18) 
+                  : const Color(0xFF818CF8).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          
+          // Círculo decorativo aurora inferior izquierda (Ámbar eclesiástico)
+          Positioned(
+            bottom: -80,
+            left: -80,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                color: isDark 
+                  ? const Color(0xFFF59E0B).withValues(alpha: 0.10) 
+                  : const Color(0xFFFBBF24).withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 8.0),
+                  child: Text(
+                    'Herramientas',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 26,
+                      color: isDark ? Colors.white : theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 140.0),
+                    physics: const BouncingScrollPhysics(),
+                    children: [
           if (!kIsWeb || isAdmin) ...[
             _ToolCard(
               title: 'Escáner Inteligente',
@@ -110,6 +160,12 @@ class ToolsScreen extends ConsumerWidget {
             onTap: () {
               context.push('/tools/church');
             },
+          ),
+        ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
