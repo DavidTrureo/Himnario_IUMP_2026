@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +12,7 @@ import '../../features/live_worship/presentation/qr_scanner_screen.dart';
 import '../../features/hymns/presentation/detached_projector_screen.dart';
 import '../widgets/main_layout_screen.dart';
 import '../../features/home/presentation/tools_screen.dart';
+import '../../features/home/presentation/church_about_screen.dart';
 import '../../features/hymns/presentation/hymn_scanner_screen.dart';
 import '../../features/hymns/presentation/admin_suggestions_screen.dart';
 import '../../features/hymns/presentation/hymn_tv_receiver_screen.dart';
@@ -113,6 +113,12 @@ final GoRouter appRouter = GoRouter(
             GoRoute(
               path: '/tools',
               builder: (context, state) => const ToolsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'church',
+                  builder: (context, state) => const ChurchAboutScreen(),
+                ),
+              ],
             ),
           ],
         ),
