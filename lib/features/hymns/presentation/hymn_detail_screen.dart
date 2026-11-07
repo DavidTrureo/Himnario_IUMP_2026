@@ -115,9 +115,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               autoPlay: false,
               params: const YoutubePlayerParams(showControls: true, mute: false),
             );
+            if (mounted) {
+              setState(() {});
+            }
           } else {
             _youtubeController!.loadVideoById(videoId: videoId).catchError((_) {});
             _youtubeController!.pauseVideo().catchError((_) {});
+            if (mounted) {
+              setState(() {});
+            }
           }
         }
       } else {
@@ -1652,24 +1658,52 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         ),
         const SizedBox(height: 14),
         
-        if (hymn.audioUrl.isNotEmpty && _youtubeController != null && (hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')))
-          Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: YoutubePlayer(
-                  controller: _youtubeController!,
+        if (hymn.audioUrl.isNotEmpty && (hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')))
+          Builder(
+            builder: (context) {
+              final videoId = YoutubePlayerController.convertUrlToId(hymn.audioUrl);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
                 ),
-              ),
-            ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _youtubeController != null
+                        ? YoutubePlayer(
+                            controller: _youtubeController!,
+                          )
+                        : (videoId != null
+                            ? Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.network(
+                                    'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(color: Colors.black26),
+                                  ),
+                                  Center(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.65),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const SizedBox()),
+                  ),
+                ),
+              );
+            },
           ),
         
         // Chip de Tono
@@ -4021,22 +4055,23 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
             ),
             onPressed: () async {
+              // 1. En iOS / iPadOS (Safari), lanzamos directamente el esquema nativo himnario://
+              // sin bloquear en canLaunchUrl (que Safari rechaza por seguridad).
+              final customScheme = Uri.parse('himnario://hymn/$hymnKey');
+              try {
+                final opened = await launchUrl(customScheme, mode: LaunchMode.externalNonBrowserApplication);
+                if (opened) return;
+              } catch (_) {}
+
+              // 2. En Android, probamos el Intent de Chrome que abre la app si está instalada o va a Play Store
               try {
                 final uri = Uri.parse(intentUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
+                if (await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication)) {
                   return;
                 }
               } catch (_) {}
 
-              try {
-                final customScheme = Uri.parse('himnario://hymn/$hymnKey');
-                if (await canLaunchUrl(customScheme)) {
-                  await launchUrl(customScheme, mode: LaunchMode.externalApplication);
-                  return;
-                }
-              } catch (_) {}
-
+              // 3. Fallback a Google Play
               final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=org.iump.himnario2026');
               await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
             },

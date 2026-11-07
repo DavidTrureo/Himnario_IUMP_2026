@@ -3,10 +3,9 @@
     "apps": [],
     "details": [
       {
-        "appID": "org.iump.himnario2026",
-        "paths": ["/hymn/*", "/canto/*"]
+        "appID": "23PXT5LYK9.org.iump.himnario2026",
+        "paths": ["/hymn/*", "/canto/*", "/home/*", "*"]
       }
     ]
   }
 }
-
