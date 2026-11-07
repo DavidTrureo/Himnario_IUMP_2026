@@ -101,6 +101,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   YoutubePlayerController? _youtubeController;
   final ScrollController _scrollController = ScrollController();
+  bool _isModalDialogOpen = false;
 
 
 
@@ -1732,7 +1733,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   borderRadius: BorderRadius.circular(16),
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: _youtubeController != null
+                    child: (_youtubeController != null && !_isModalDialogOpen)
                         ? YoutubePlayer(
                             controller: _youtubeController!,
                           )
@@ -3231,6 +3232,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isModalDialogOpen = false;
+      });
+    }
   }
 
   List<DropdownMenuItem<String>> _getCategoryDropdownItemsForEdit(String collection) {
@@ -3501,6 +3508,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isModalDialogOpen = false;
+      });
+    }
   }
 
   void _confirmDeleteHymn(BuildContext context, WidgetRef ref, Hymn hymn) {
@@ -3553,6 +3566,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isModalDialogOpen = false;
+      });
+    }
   }
 
   Future<void> _launchYouTubeSearch(String title) async {
@@ -3780,6 +3799,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isModalDialogOpen = false;
+      });
+    }
   }
 
   Widget _buildComparisonCard(BuildContext context, Hymn hymn, String otherLyrics, bool isDark, ThemeData theme, bool isWide) {
@@ -4139,9 +4164,14 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     );
   }
 
-  void _showAndroidOnlyDialog(BuildContext context, bool isDark, ThemeData theme) {
-    showDialog(
+  Future<void> _showAndroidOnlyDialog(BuildContext context, bool isDark, ThemeData theme) async {
+    setState(() {
+      _isModalDialogOpen = true;
+    });
+
+    await showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -4234,11 +4264,21 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         ],
       ),
     );
+
+    if (mounted) {
+      setState(() {
+        _isModalDialogOpen = false;
+      });
+    }
   }
 
   void _showExportPdfModal(BuildContext context, Hymn hymn) => _showShareHymnModal(context, hymn);
 
-  void _showShareHymnModal(BuildContext context, Hymn hymn) {
+  Future<void> _showShareHymnModal(BuildContext context, Hymn hymn) async {
+    setState(() {
+      _isModalDialogOpen = true;
+    });
+
     final smartUrl = 'https://himnario-vito-2026.web.app/hymn/${hymn.collection}-${hymn.id}';
     final hymnDisplayTitle = hymn.collection == 'iump' ? 'Himno ${hymn.id} - ${hymn.title}' : hymn.title;
     final shareMessage = '''🎵 *$hymnDisplayTitle*
@@ -4249,7 +4289,7 @@ $smartUrl
 
 ✨ ¡A Dios sea la Gloria!''';
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       useRootNavigator: true,
       useSafeArea: true,
@@ -4629,6 +4669,12 @@ https://himnario-vito-2026.web.app
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isModalDialogOpen = false;
+      });
+    }
   }
 
   void _showCreateSetlistDialog(BuildContext context, WidgetRef ref, String hymnKey) {
@@ -4821,6 +4867,12 @@ https://himnario-vito-2026.web.app
         );
       },
     );
+
+    if (mounted) {
+      setState(() {
+        _isModalDialogOpen = false;
+      });
+    }
   }
 }
 
