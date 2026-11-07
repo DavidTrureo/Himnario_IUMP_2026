@@ -1746,7 +1746,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     child: Column(
                       children: [
                         if (kIsWeb)
-                          _buildWebDownloadAppBanner(context, isDark, theme),
+                          _buildWebDownloadAppBanner(context, hymn, isDark, theme),
                         header,
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 24.0),
@@ -1783,7 +1783,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     child: Column(
                       children: [
                         if (kIsWeb)
-                          _buildWebDownloadAppBanner(context, isDark, theme),
+                          _buildWebDownloadAppBanner(context, hymn, isDark, theme),
                         header,
                         const SizedBox(height: 16),
                         Expanded(
@@ -3962,7 +3962,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     );
   }
 
-  Widget _buildWebDownloadAppBanner(BuildContext context, bool isDark, ThemeData theme) {
+  Widget _buildWebDownloadAppBanner(BuildContext context, Hymn hymn, bool isDark, ThemeData theme) {
+    final hymnKey = '${hymn.collection}-${hymn.id}';
+    final intentUrl = 'intent://himnario-vito-2026.web.app/hymn/$hymnKey#Intent;scheme=https;package=org.iump.himnario2026;S.browser_fallback_url=${Uri.encodeComponent('https://play.google.com/store/apps/details?id=org.iump.himnario2026')};end';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -3994,30 +3997,49 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '¿Usas la versión Web?',
+                  'Himnario Oficial IUMP',
                   style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5),
                 ),
                 Text(
-                  'Instala la App Oficial en Google Play para guardar favoritos y cantar sin conexión.',
+                  '¿Tienes la App instalada o deseas descargarla de Google Play?',
                   style: GoogleFonts.outfit(fontSize: 11.5, color: isDark ? Colors.white70 : Colors.black87),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          FilledButton.tonal(
+          FilledButton.icon(
             style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () {
-              final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=org.iump.himnario2026');
-              launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
-            },
-            child: Text(
-              'Instalar App',
+            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+            label: Text(
+              'Abrir en la App',
               style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
             ),
+            onPressed: () async {
+              try {
+                final uri = Uri.parse(intentUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
+                  return;
+                }
+              } catch (_) {}
+
+              try {
+                final customScheme = Uri.parse('himnario://hymn/$hymnKey');
+                if (await canLaunchUrl(customScheme)) {
+                  await launchUrl(customScheme, mode: LaunchMode.externalApplication);
+                  return;
+                }
+              } catch (_) {}
+
+              final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=org.iump.himnario2026');
+              await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+            },
           ),
         ],
       ),

@@ -44,6 +44,14 @@
                     android:scheme="http"
                     android:host="himnario-vito-2026.web.app" />
             </intent-filter>
+            <!-- Soporte para esquema personalizado himnario:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="himnario" />
+            </intent-filter>
         </activity>
         <meta-data
             android:name="flutterEmbedding"
