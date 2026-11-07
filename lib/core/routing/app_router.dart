@@ -63,6 +63,59 @@ final hymnsListRoute = GoRoute(
 final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
+  redirect: (context, state) {
+    final uri = state.uri;
+    final loc = uri.toString();
+
+    // Soporte para Deep Links con esquemas personalizados (ej: himnario://hymn/especiales-373 o himnario:/hymn/...)
+    if (uri.scheme == 'himnario' || loc.startsWith('himnario:')) {
+      final match = RegExp(r'(?:hymn|canto)/([a-zA-Z0-9_-]+)').firstMatch(loc);
+      if (match != null) {
+        final hymnId = match.group(1)!;
+        return '/home/hymn/$hymnId';
+      }
+      return '/home';
+    }
+
+    return null;
+  },
+  errorBuilder: (context, state) {
+    final loc = state.uri.toString();
+    final match = RegExp(r'(?:hymn|canto)/([a-zA-Z0-9_-]+)').firstMatch(loc);
+    if (match != null) {
+      final hymnId = match.group(1)!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        appRouter.go('/home/hymn/$hymnId');
+      });
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 48, color: Colors.amber),
+            const SizedBox(height: 16),
+            const Text(
+              'Página no encontrada',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => appRouter.go('/home'),
+              child: const Text('Ir al Inicio'),
+            ),
+          ],
+        ),
+      ),
+    );
+  },
   routes: [
     GoRoute(
       path: '/',
