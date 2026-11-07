@@ -239,78 +239,94 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant HymnDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.hymnId != widget.hymnId) {
+      _initialized = false;
+      final allHymnsAsync = ref.read(allHymnsGlobalProvider);
+      final hymns = allHymnsAsync.whenOrNull(data: (d) => d);
+      if (hymns != null) {
+        _initializeHymns(hymns);
+      }
+    }
+  }
+
   void _initializeHymns(List<Hymn> hymns) {
     final parts = widget.hymnId.split('-');
     final collectionParam = parts.length > 1 ? parts[0] : 'iump';
     final idString = parts.length > 1 ? parts.sublist(1).join('-') : widget.hymnId;
     final id = int.tryParse(idString) ?? 0;
 
-    if (_initialized && _sortedHymns.isNotEmpty) {
-      final exists = _sortedHymns.any((h) => h.collection == collectionParam && h.id == id);
-      if (exists) return;
+    // Buscar el canto objetivo de manera precisa
+    Hymn? targetHymn = hymns.where((h) => h.collection == collectionParam && h.id == id).firstOrNull;
+    if (targetHymn == null) {
+      // Fallback: buscar en cualquier colección por ID
+      targetHymn = hymns.where((h) => h.id == id).firstOrNull;
     }
 
+    // Si aún no está cargado el canto (ej: Firestore aún descargando datos en segundo plano),
+    // NO inicializamos en la página 0 a ciegas para evitar mostrar una letra que no corresponde.
+    if (targetHymn == null) {
+      return;
+    }
+
+    final effectiveCollection = targetHymn.collection;
     final activeSetlist = ref.read(activeSetlistProvider);
 
-    _sortedHymns = [];
+    List<Hymn> newSortedHymns = [];
 
     if (activeSetlist != null) {
       for (final hId in activeSetlist.hymnIds) {
         final hParts = hId.split('-');
         final hCol = hParts[0];
         final hIdNum = int.tryParse(hParts.sublist(1).join('-')) ?? 0;
-        final matching = hymns.firstWhere(
-          (h) => h.collection == hCol && h.id == hIdNum,
-          orElse: () => Hymn(
-              id: 0,
-              title: '',
-              toneNote: '',
-              beats: '',
-              timeSignature: '',
-              lyrics: '',
-              collection: ''),
-        );
-        if (matching.id != 0) {
-          _sortedHymns.add(matching);
+        final matching = hymns.where((h) => h.collection == hCol && h.id == hIdNum).firstOrNull;
+        if (matching != null) {
+          newSortedHymns.add(matching);
         }
       }
     }
 
-    // Fallback 1: Si no hay cantos del setlist o el id buscado no está en el setlist, cargar la colección normal
-    var startIndex = _sortedHymns.indexWhere((h) => h.collection == collectionParam && h.id == id);
-    if (_sortedHymns.isEmpty || startIndex == -1) {
-      _sortedHymns = hymns.where((h) => h.collection == collectionParam).toList();
-      if (collectionParam == 'iump') {
-        _sortedHymns.sort((a, b) => a.id.compareTo(b.id));
+    // Si el setlist no contiene el canto buscado, cargar la colección correspondiente
+    if (newSortedHymns.isEmpty || !newSortedHymns.any((h) => h.collection == effectiveCollection && h.id == targetHymn!.id)) {
+      newSortedHymns = hymns.where((h) => h.collection == effectiveCollection).toList();
+      if (effectiveCollection == 'iump') {
+        newSortedHymns.sort((a, b) => a.id.compareTo(b.id));
       } else {
-        _sortedHymns.sort((a, b) => a.title.compareTo(b.title));
-      }
-      startIndex = _sortedHymns.indexWhere((h) => h.collection == collectionParam && h.id == id);
-    }
-
-    // Fallback 2: Buscar en todo el catálogo global por id o título
-    if (_sortedHymns.isEmpty || startIndex == -1) {
-      final globalMatch = hymns.where((h) => h.id == id).toList();
-      if (globalMatch.isNotEmpty) {
-        _sortedHymns = globalMatch;
-        startIndex = 0;
+        newSortedHymns.sort((a, b) => a.title.compareTo(b.title));
       }
     }
 
-    if (startIndex != -1 && startIndex < _sortedHymns.length) {
-      _currentIndex = startIndex;
-      _pageController = PageController(initialPage: startIndex);
-    } else if (_sortedHymns.isNotEmpty) {
-      _currentIndex = 0;
-      _pageController = PageController(initialPage: 0);
-    }
-    _initialized = true;
-    if (_currentIndex != null && _currentIndex! < _sortedHymns.length) {
-      final currentH = _sortedHymns[_currentIndex!];
+    final targetIndex = newSortedHymns.indexWhere((h) => h.collection == effectiveCollection && h.id == targetHymn!.id);
+
+    if (targetIndex != -1) {
+      _sortedHymns = newSortedHymns;
+      final wasDifferent = _currentIndex != targetIndex;
+      _currentIndex = targetIndex;
+
+      if (_pageController == null) {
+        _pageController = PageController(initialPage: targetIndex);
+      } else if (_pageController!.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pageController != null && _pageController!.hasClients) {
+            if (_pageController!.page?.round() != targetIndex) {
+              _pageController!.jumpToPage(targetIndex);
+            }
+          }
+        });
+      } else {
+        _pageController = PageController(initialPage: targetIndex);
+      }
+
+      _initialized = true;
+      final currentH = _sortedHymns[targetIndex];
       _saveLastViewedHymn(currentH);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _updateYoutubePlayer(currentH);
-      });
+      if (wasDifferent) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _updateYoutubePlayer(currentH);
+        });
+      }
     }
   }
 
@@ -360,11 +376,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     if (_sortedHymns.isEmpty || _currentIndex == null || _pageController == null) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Catálogo', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          title: Text('Cargando alabanza...', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () {
-              context.pop();
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/home');
+              }
             },
           ),
         ),
@@ -372,23 +392,23 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.music_note_outlined, size: 48, color: Colors.grey),
-              const SizedBox(height: 12),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 18),
               Text(
-                'Regresando al catálogo...',
+                'Cargando alabanza...',
                 style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Volver a la Lista'),
+              const SizedBox(height: 20),
+              TextButton.icon(
                 onPressed: () {
                   if (context.canPop()) {
                     context.pop();
                   } else {
-                    context.go('/hymns');
+                    context.go('/home');
                   }
                 },
+                icon: const Icon(Icons.home_outlined),
+                label: const Text('Volver al inicio'),
               ),
             ],
           ),
