@@ -92,6 +92,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   // Variables de estado para reproducción de audio
   AudioPlayer? _audioPlayer;
   bool _isPlaying = false;
+  bool _isLooping = false;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   bool _isLoadingAudio = false;
@@ -1196,6 +1197,34 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                     }
                                   },
                                 ),
+                                IconButton(
+                                  icon: Icon(
+                                    _isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                                    size: 22,
+                                    color: _isLooping ? theme.colorScheme.primary : (isDark ? Colors.white60 : Colors.black54),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                  tooltip: _isLooping ? 'Repetición activada (Loop)' : 'Repetir canto continuamente',
+                                  onPressed: () {
+                                    setState(() {
+                                      _isLooping = !_isLooping;
+                                      _audioPlayer?.setLoopMode(_isLooping ? LoopMode.one : LoopMode.off);
+                                    });
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          _isLooping ? '🔂 Repetición continua activada' : 'Repetición continua desactivada',
+                                          style: GoogleFonts.outfit(),
+                                        ),
+                                        duration: const Duration(seconds: 1),
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                    );
+                                  },
+                                ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: SliderTheme(
@@ -1358,6 +1387,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       _audioPlayer = player;
       _currentAudioUrl = url;
 
+      if (_isLooping) {
+        await player.setLoopMode(LoopMode.one);
+      }
+
       if (kIsWeb) {
         await player.setUrl(url);
       } else {
@@ -1385,10 +1418,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 state.processingState == ProcessingState.buffering;
 
             if (state.processingState == ProcessingState.completed) {
-              // Cuando termine, pausamos y volvemos a cero
-              _isPlaying = false;
-              player.pause();
-              player.seek(Duration.zero);
+              if (_isLooping) {
+                player.seek(Duration.zero);
+                player.play();
+              } else {
+                // Cuando termine, pausamos y volvemos a cero
+                _isPlaying = false;
+                player.pause();
+                player.seek(Duration.zero);
+              }
             }
           });
         }
@@ -4031,11 +4069,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Himnario Oficial IUMP',
+                  'Himnario Oficial IUMP (Versión Web)',
                   style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5),
                 ),
                 Text(
-                  '¿Tienes la App instalada o deseas descargarla de Google Play?',
+                  'Consulta online. Para modo 100% sin conexión, descargas y transmisión a pantallas, abre la App.',
                   style: GoogleFonts.outfit(fontSize: 11.5, color: isDark ? Colors.white70 : Colors.black87),
                 ),
               ],
@@ -4306,6 +4344,88 @@ $smartUrl
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ── INVITACIÓN A LA VERSIÓN WEB GENERAL ──
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.devices_rounded, color: Color(0xFF0284C7), size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Versión Web (PC y iPhone)',
+                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              Text(
+                                'Para hermanos sin la app instalada',
+                                style: GoogleFonts.outfit(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(Icons.share_rounded, size: 14),
+                          label: Text('Invitar', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            final box = context.findRenderObject() as RenderBox?;
+                            final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+                            if (ctx.mounted) ctx.pop();
+
+                            const webPortalMessage = '''🏛️ *Himnario Oficial IUMP 2026 - Versión Web*
+
+¿No tienes Android o estás desde un computador o iPhone?
+Accede al portal interactivo sin instalar nada:
+https://himnario-vito-2026.web.app
+
+ℹ️ *Nota:* La versión web permite consultar letras, acordes y reproducir audios vía streaming. El modo 100% sin internet, descargas y transmisión a pantallas están disponibles en la App móvil.
+
+✨ ¡A Dios sea la Gloria!''';
+
+                            if (kIsWeb) {
+                              await Clipboard.setData(const ClipboardData(text: 'https://himnario-vito-2026.web.app'));
+                              final whatsappUrl = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(webPortalMessage)}');
+                              // ignore: deprecated_member_use
+                              if (await canLaunchUrl(whatsappUrl)) {
+                                await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+                              }
+                            } else {
+                              // ignore: deprecated_member_use
+                              await Share.share(
+                                webPortalMessage,
+                                subject: 'Himnario IUMP - Versión Web',
+                                sharePositionOrigin: rect,
+                              );
+                            }
+                          },
                         ),
                       ],
                     ),
