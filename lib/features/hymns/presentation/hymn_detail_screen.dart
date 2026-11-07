@@ -664,17 +664,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       ],
                     ),
                   ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: 'share',
-                    child: Row(
-                      children: [
-                        Icon(Icons.share_rounded, size: 20, color: theme.colorScheme.primary),
-                        const SizedBox(width: 10),
-                        Text('Compartir (Enlace y PDF)', style: GoogleFonts.nunito()),
-                      ],
-                    ),
-                  ),
                   PopupMenuItem(
                     value: 'projector_pc',
                     child: Row(
