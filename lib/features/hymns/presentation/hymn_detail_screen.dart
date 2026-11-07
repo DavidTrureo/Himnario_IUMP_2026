@@ -4602,6 +4602,28 @@ https://himnario-vito-2026.web.app
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () async {
                       if (ctx.mounted) ctx.pop();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  kIsWeb ? 'Generando y descargando PDF...' : 'Preparando documento PDF...',
+                                  style: GoogleFonts.outfit(),
+                                ),
+                              ],
+                            ),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
                       await HymnPdfService.shareHymnPdf(
                         hymn,
                         transposeOffset: _transposeOffset,
@@ -4626,6 +4648,28 @@ https://himnario-vito-2026.web.app
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () async {
                       if (ctx.mounted) ctx.pop();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  kIsWeb ? 'Generando y descargando PDF...' : 'Preparando documento PDF...',
+                                  style: GoogleFonts.outfit(),
+                                ),
+                              ],
+                            ),
+                            duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
                       await HymnPdfService.shareHymnPdf(
                         hymn,
                         transposeOffset: _transposeOffset,

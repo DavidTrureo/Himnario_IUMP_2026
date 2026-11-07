@@ -1,6 +1,4 @@
-import 'dart:io';
-
-import 'package:himnario_iump/core/services/chord_transposer_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -680,9 +678,9 @@ class HymnPdfService {
         pageFormat: PdfPageFormat.letter,
       );
 
-      // En Android usamos layoutPdf para forzar el formato Carta por defecto en la impresora
-      // En iOS usamos sharePdf para evitar el congelamiento nativo al usar los botones +/- de escala
-      if (Platform.isAndroid) {
+      // En Android nativo usamos layoutPdf para forzar el formato Carta por defecto en la impresora
+      // En iOS y Web usamos sharePdf (en iOS evita congelamiento nativo; en Web descarga el PDF automáticamente)
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         await Printing.layoutPdf(
           onLayout: (PdfPageFormat format) async => pdfBytes,
           name: filename,
