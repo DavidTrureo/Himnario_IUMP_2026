@@ -92,7 +92,7 @@ class HymnPdfService {
     doc.addPage(
       pw.MultiPage(
         pageFormat: pageFormat,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 32),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 32, vertical: 26),
         header: (pw.Context context) {
           return pw.Column(
             children: [
@@ -146,9 +146,9 @@ class HymnPdfService {
                     pw.SizedBox(width: 44),
                 ],
               ),
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: 6),
               pw.Divider(color: PdfColor.fromHex('#CBD5E1'), thickness: 0.8),
-              pw.SizedBox(height: 12),
+              pw.SizedBox(height: 10),
             ],
           );
         },
@@ -186,10 +186,10 @@ class HymnPdfService {
             // Banner Encabezado del Himno
             pw.Container(
               width: double.infinity,
-              padding: const pw.EdgeInsets.all(14),
+              padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: pw.BoxDecoration(
                 color: PdfColor.fromHex('#F8FAFC'),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
                 border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0'), width: 1),
               ),
               child: pw.Column(
@@ -197,10 +197,10 @@ class HymnPdfService {
                 children: [
                   // Etiqueta Colección + Número
                   pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                     decoration: pw.BoxDecoration(
                       color: PdfColor.fromHex('#4F46E5'),
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(5)),
                     ),
                     child: pw.Text(
                       hymn.collection == 'iump'
@@ -208,23 +208,23 @@ class HymnPdfService {
                           : collectionLabel,
                       style: pw.TextStyle(
                         font: fontBold,
-                        fontSize: 9,
+                        fontSize: 8.5,
                         color: PdfColors.white,
                       ),
                     ),
                   ),
-                  pw.SizedBox(height: 8),
+                  pw.SizedBox(height: 6),
 
                   // Título del Himno
                   pw.Text(
                     hymn.title.toUpperCase(),
                     style: pw.TextStyle(
                       font: fontBold,
-                      fontSize: 18,
+                      fontSize: 16,
                       color: PdfColor.fromHex('#0F172A'),
                     ),
                   ),
-                  pw.SizedBox(height: 10),
+                  pw.SizedBox(height: 8),
 
                   // Fila de Metadatos (Tonalidad, Métrica, Tiempos)
                   pw.Row(
@@ -246,7 +246,7 @@ class HymnPdfService {
               ),
             ),
 
-            pw.SizedBox(height: 18),
+            pw.SizedBox(height: 12),
 
             // Cuerpo de la Letra
             buildLyricsPdfWidget(lyricsToRender, fontRegular, fontBold, transposeOffset, notation, forceSingleColumn: includeChords),
@@ -331,39 +331,110 @@ class HymnPdfService {
 
     // Si NO se fuerzan a 1 sola columna (ej. "Solo Letra", sin acordes)
     // Usamos 2 columnas para que quepa bonito y ahorre papel.
-    // Solo lo hacemos si hay hasta 14 bloques, para evitar overflow de pw.Row en una sola página.
+    // Solo lo hacemos si hay hasta 14 bloques y un máximo manejable de líneas por columna,
+    // garantizando que quepa en 1 sola página sin desbordar ni provocar salto de página vacío.
     if (!forceSingleColumn && blocks.length > 2 && blocks.length <= 14) {
       final int halfIndex = (blocks.length / 2).ceil();
       final leftBlocks = blocks.sublist(0, halfIndex);
       final rightBlocks = blocks.sublist(halfIndex);
-      
-      final leftChorusState = isChorusList.sublist(0, halfIndex);
-      final rightChorusState = isChorusList.sublist(halfIndex);
 
-      return pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: List.generate(leftBlocks.length, (i) => buildBlockWidget(leftBlocks[i], fontRegular, fontBold, leftChorusState[i], transposeOffset, notation)),
+      final leftLines = leftBlocks.fold<int>(0, (sum, b) => sum + b.trim().split('\n').where((l) => l.trim().isNotEmpty).length);
+      final rightLines = rightBlocks.fold<int>(0, (sum, b) => sum + b.trim().split('\n').where((l) => l.trim().isNotEmpty).length);
+      final maxColLines = leftLines > rightLines ? leftLines : rightLines;
+
+      // Si excede 36 líneas por columna (canto de más de 70 líneas),
+      // dejamos que fluya en 1 columna para que MultiPage pueda paginar libremente.
+      if (maxColLines <= 36) {
+        final leftChorusState = isChorusList.sublist(0, halfIndex);
+        final rightChorusState = isChorusList.sublist(halfIndex);
+
+        // Escala y espaciado adaptativo inteligente según densidad de líneas
+        final double adaptiveFontSize;
+        final double adaptiveLineHeight;
+        final double adaptivePadding;
+        final double adaptiveMargin;
+        final double adaptiveChorusPadding;
+
+        if (maxColLines <= 18) {
+          adaptiveFontSize = 10.0;
+          adaptiveLineHeight = 1.30;
+          adaptivePadding = 1.2;
+          adaptiveMargin = 8.0;
+          adaptiveChorusPadding = 8.0;
+        } else if (maxColLines <= 28) {
+          adaptiveFontSize = 9.0;
+          adaptiveLineHeight = 1.20;
+          adaptivePadding = 0.8;
+          adaptiveMargin = 6.0;
+          adaptiveChorusPadding = 7.0;
+        } else {
+          adaptiveFontSize = 8.2;
+          adaptiveLineHeight = 1.15;
+          adaptivePadding = 0.5;
+          adaptiveMargin = 5.0;
+          adaptiveChorusPadding = 6.0;
+        }
+
+        return pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: List.generate(
+                  leftBlocks.length,
+                  (i) => buildBlockWidget(
+                    leftBlocks[i],
+                    fontRegular,
+                    fontBold,
+                    leftChorusState[i],
+                    transposeOffset,
+                    notation,
+                    fontSize: adaptiveFontSize,
+                    lineHeight: adaptiveLineHeight,
+                    lineVerticalPadding: adaptivePadding,
+                    blockMarginBottom: adaptiveMargin,
+                    chorusPadding: adaptiveChorusPadding,
+                  ),
+                ),
+              ),
             ),
-          ),
-          pw.SizedBox(width: 14),
-          pw.Container(
-            width: 0.5,
-            height: 420,
-            color: PdfColor.fromHex('#E2E8F0'),
-          ),
-          pw.SizedBox(width: 14),
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: List.generate(rightBlocks.length, (i) => buildBlockWidget(rightBlocks[i], fontRegular, fontBold, rightChorusState[i], transposeOffset, notation)),
+            pw.SizedBox(width: 12),
+            pw.Expanded(
+              child: pw.Container(
+                padding: const pw.EdgeInsets.only(left: 12),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border(
+                    left: pw.BorderSide(
+                      color: PdfColor.fromHex('#E2E8F0'),
+                      width: 0.5,
+                    ),
+                  ),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: List.generate(
+                    rightBlocks.length,
+                    (i) => buildBlockWidget(
+                      rightBlocks[i],
+                      fontRegular,
+                      fontBold,
+                      rightChorusState[i],
+                      transposeOffset,
+                      notation,
+                      fontSize: adaptiveFontSize,
+                      lineHeight: adaptiveLineHeight,
+                      lineVerticalPadding: adaptivePadding,
+                      blockMarginBottom: adaptiveMargin,
+                      chorusPadding: adaptiveChorusPadding,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
-      );
+          ],
+        );
+      }
     }
 
     // Siempre usamos 1 sola columna para "Completo" para que MultiPage 
@@ -390,8 +461,13 @@ class HymnPdfService {
     pw.Font fontBold,
     bool isChorusBlock,
     int transposeOffset,
-    String notation,
-  ) {
+    String notation, {
+    double fontSize = 11.0,
+    double lineHeight = 1.35,
+    double lineVerticalPadding = 1.5,
+    double blockMarginBottom = 10.0,
+    double chorusPadding = 10.0,
+  }) {
     final lines = blockText.trim().split('\n');
     if (lines.isEmpty) return pw.SizedBox();
 
@@ -410,8 +486,8 @@ class HymnPdfService {
 
     if (hasExplicitChorusHeader) {
       headerWidget = pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        margin: const pw.EdgeInsets.only(bottom: 6),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        margin: pw.EdgeInsets.only(bottom: blockMarginBottom > 6 ? 6 : 4),
         decoration: pw.BoxDecoration(
           color: PdfColor.fromHex('#4F46E5'),
           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
@@ -420,7 +496,7 @@ class HymnPdfService {
           firstLine.toUpperCase(),
           style: pw.TextStyle(
             font: fontBold,
-            fontSize: 8.5,
+            fontSize: (fontSize - 1.5).clamp(7.5, 9.0),
             color: PdfColors.white,
             letterSpacing: 0.8,
           ),
@@ -429,12 +505,12 @@ class HymnPdfService {
       startIdx = 1;
     } else if (isVerseHeader && !isChorusBlock) {
       headerWidget = pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 4, bottom: 4),
+        padding: pw.EdgeInsets.only(top: 2, bottom: blockMarginBottom > 6 ? 4 : 2),
         child: pw.Text(
           firstLine,
           style: pw.TextStyle(
             font: fontBold,
-            fontSize: 11,
+            fontSize: fontSize + 0.5,
             color: PdfColor.fromHex('#1E1B4B'),
           ),
         ),
@@ -452,14 +528,14 @@ class HymnPdfService {
       } else {
         lineWidgets.add(
           pw.Padding(
-            padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+            padding: pw.EdgeInsets.symmetric(vertical: lineVerticalPadding),
             child: pw.Text(
               line,
               style: pw.TextStyle(
                 font: fontRegular,
-                fontSize: 11,
+                fontSize: fontSize,
                 color: PdfColor.fromHex('#1E293B'),
-                height: 1.35,
+                height: lineHeight,
               ),
             ),
           ),
@@ -470,12 +546,12 @@ class HymnPdfService {
     if (isChorusBlock) {
       // Tarjeta destacada elegante para el Coro
       return pw.Container(
-        margin: const pw.EdgeInsets.only(bottom: 10),
-        padding: const pw.EdgeInsets.all(10),
+        margin: pw.EdgeInsets.only(bottom: blockMarginBottom),
+        padding: pw.EdgeInsets.all(chorusPadding),
         decoration: pw.BoxDecoration(
           color: PdfColor.fromHex('#F5F3FF'),
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-          border: pw.Border.all(color: PdfColor.fromHex('#C7D2FE'), width: 1),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+          border: pw.Border.all(color: PdfColor.fromHex('#C7D2FE'), width: 0.8),
         ),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -489,7 +565,7 @@ class HymnPdfService {
 
     // Bloque estándar para Estrofas
     return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 10),
+      margin: pw.EdgeInsets.only(bottom: blockMarginBottom),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
