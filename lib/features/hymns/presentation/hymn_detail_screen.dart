@@ -33,6 +33,7 @@ import 'widgets/chord_diagram_dialog.dart';
 import 'widgets/visual_metronome_widget.dart';
 import '../../../core/widgets/app_music_icons.dart';
 import '../../../core/services/hymn_pdf_service.dart';
+import '../../../core/utils/web_window_helper.dart';
 import 'widgets/sheet_music_viewer.dart';
 import 'spinning_vinyl.dart';
 import 'obs_remote_screen.dart';
@@ -101,7 +102,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   YoutubePlayerController? _youtubeController;
   final ScrollController _scrollController = ScrollController();
-  bool _isModalDialogOpen = false;
 
 
 
@@ -1733,7 +1733,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   borderRadius: BorderRadius.circular(16),
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: (_youtubeController != null && !_isModalDialogOpen)
+                    child: _youtubeController != null
                         ? YoutubePlayer(
                             controller: _youtubeController!,
                           )
@@ -3233,11 +3233,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       },
     );
 
-    if (mounted) {
-      setState(() {
-        _isModalDialogOpen = false;
-      });
-    }
   }
 
   List<DropdownMenuItem<String>> _getCategoryDropdownItemsForEdit(String collection) {
@@ -3509,11 +3504,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       },
     );
 
-    if (mounted) {
-      setState(() {
-        _isModalDialogOpen = false;
-      });
-    }
   }
 
   void _confirmDeleteHymn(BuildContext context, WidgetRef ref, Hymn hymn) {
@@ -3567,11 +3557,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       },
     );
 
-    if (mounted) {
-      setState(() {
-        _isModalDialogOpen = false;
-      });
-    }
   }
 
   Future<void> _launchYouTubeSearch(String title) async {
@@ -3800,11 +3785,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       },
     );
 
-    if (mounted) {
-      setState(() {
-        _isModalDialogOpen = false;
-      });
-    }
   }
 
   Widget _buildComparisonCard(BuildContext context, Hymn hymn, String otherLyrics, bool isDark, ThemeData theme, bool isWide) {
@@ -4165,9 +4145,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   Future<void> _showAndroidOnlyDialog(BuildContext context, bool isDark, ThemeData theme) async {
-    setState(() {
-      _isModalDialogOpen = true;
-    });
+    WebWindowHelper.setIframesPointerEvents(false);
 
     await showDialog(
       context: context,
@@ -4265,19 +4243,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       ),
     );
 
-    if (mounted) {
-      setState(() {
-        _isModalDialogOpen = false;
-      });
-    }
+    WebWindowHelper.setIframesPointerEvents(true);
   }
 
   void _showExportPdfModal(BuildContext context, Hymn hymn) => _showShareHymnModal(context, hymn);
 
   Future<void> _showShareHymnModal(BuildContext context, Hymn hymn) async {
-    setState(() {
-      _isModalDialogOpen = true;
-    });
+    WebWindowHelper.setIframesPointerEvents(false);
 
     final smartUrl = 'https://himnario-vito-2026.web.app/hymn/${hymn.collection}-${hymn.id}';
     final hymnDisplayTitle = hymn.collection == 'iump' ? 'Himno ${hymn.id} - ${hymn.title}' : hymn.title;
@@ -4670,11 +4642,7 @@ https://himnario-vito-2026.web.app
       },
     );
 
-    if (mounted) {
-      setState(() {
-        _isModalDialogOpen = false;
-      });
-    }
+    WebWindowHelper.setIframesPointerEvents(true);
   }
 
   void _showCreateSetlistDialog(BuildContext context, WidgetRef ref, String hymnKey) {
@@ -4868,11 +4836,6 @@ https://himnario-vito-2026.web.app
       },
     );
 
-    if (mounted) {
-      setState(() {
-        _isModalDialogOpen = false;
-      });
-    }
   }
 }
 

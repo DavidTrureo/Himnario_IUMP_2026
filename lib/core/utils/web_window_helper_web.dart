@@ -78,4 +78,32 @@ class WebWindowHelper {
     _channel?.close();
     _channel = null;
   }
+
+  static void setIframesPointerEvents(bool enabled) {
+    try {
+      final value = enabled ? 'auto' : 'none';
+
+      // 1. Light DOM: iframes y elementos de plataforma Flutter
+      final elements = html.document.querySelectorAll('iframe, flt-platform-view');
+      for (final el in elements) {
+        if (el is html.HtmlElement) {
+          el.style.pointerEvents = value;
+        }
+      }
+
+      // 2. Shadow DOM (utilizado por el motor CanvasKit / GlassPane de Flutter Web)
+      final glassPanes = html.document.querySelectorAll('flt-glass-pane');
+      for (final gp in glassPanes) {
+        final shadow = gp.shadowRoot;
+        if (shadow != null) {
+          final shadowElements = shadow.querySelectorAll('iframe, flt-platform-view');
+          for (final el in shadowElements) {
+            if (el is html.HtmlElement) {
+              el.style.pointerEvents = value;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
 }

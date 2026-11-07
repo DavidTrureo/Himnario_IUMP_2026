@@ -15,4 +15,8 @@ class WebWindowHelper {
   static void dispose() {
     // No-op en móvil
   }
+
+  static void setIframesPointerEvents(bool enabled) {
+    // No-op en móvil
+  }
 }
