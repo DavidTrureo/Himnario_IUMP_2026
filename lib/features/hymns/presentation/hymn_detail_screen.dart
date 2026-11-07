@@ -10,7 +10,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -4093,7 +4093,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5),
                 ),
                 Text(
-                  'Consulta online. Para modo 100% sin conexión, descargas y transmisión a pantallas, abre la App.',
+                  'Consulta online. La app oficial está disponible actualmente para dispositivos Android (próximamente en iOS).',
                   style: GoogleFonts.outfit(fontSize: 11.5, color: isDark ? Colors.white70 : Colors.black87),
                 ),
               ],
@@ -4113,15 +4113,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
             ),
             onPressed: () async {
-              // 1. En iOS / iPadOS (Safari), lanzamos directamente el esquema nativo himnario://
-              // sin bloquear en canLaunchUrl (que Safari rechaza por seguridad).
-              final customScheme = Uri.parse('himnario://hymn/$hymnKey');
-              try {
-                final opened = await launchUrl(customScheme, mode: LaunchMode.externalNonBrowserApplication);
-                if (opened) return;
-              } catch (_) {}
+              final isAndroid = defaultTargetPlatform == TargetPlatform.android;
 
-              // 2. En Android, probamos el Intent de Chrome que abre la app si está instalada o va a Play Store
+              // En iOS, iPadOS y escritorio, informamos con total claridad que la app instalable
+              // está en Android (Google Play) y próximamente en iOS, evitando el error de Safari.
+              if (!isAndroid) {
+                _showAndroidOnlyDialog(context, isDark, theme);
+                return;
+              }
+
+              // En dispositivos Android, usamos el Intent oficial de Chrome
               try {
                 final uri = Uri.parse(intentUrl);
                 if (await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication)) {
@@ -4129,7 +4130,103 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 }
               } catch (_) {}
 
-              // 3. Fallback a Google Play
+              final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=org.iump.himnario2026');
+              await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAndroidOnlyDialog(BuildContext context, bool isDark, ThemeData theme) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.phone_android_rounded, color: theme.colorScheme.primary, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Disponible para Android',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Por ahora, la aplicación nativa instalable está disponible exclusivamente para dispositivos Android en Google Play Store.',
+              style: GoogleFonts.outfit(fontSize: 13.5, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? Colors.white12 : Colors.black12,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.apple_rounded, size: 28, color: isDark ? Colors.white70 : Colors.black87),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'La versión para iPhone e iPad (iOS / iPadOS) estará disponible próximamente en la App Store.',
+                      style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '¡Mientras tanto, puedes continuar utilizando y cantando todas las alabanzas directamente en este portal Web interactivo sin necesidad de instalar nada!',
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                color: isDark ? Colors.white70 : Colors.black54,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Continuar en la Web',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+            ),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.shop_rounded, size: 16),
+            label: Text(
+              'Ver en Google Play',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12.5),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
               final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=org.iump.himnario2026');
               await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
             },
