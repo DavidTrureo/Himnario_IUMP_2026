@@ -125,6 +125,37 @@ final GoRouter appRouter = GoRouter(
       ],
     ),
     // Rutas fuera del BottomNavigationBar
+    // Soporte para Deep Links y enlaces compartidos (Web / App Links)
+    GoRoute(
+      path: '/hymn/:id',
+      redirect: (context, state) {
+        final hymnId = state.pathParameters['id']!;
+        return '/home/hymn/$hymnId';
+      },
+    ),
+    GoRoute(
+      path: '/hymn/:collection/:id',
+      redirect: (context, state) {
+        final col = state.pathParameters['collection']!;
+        final id = state.pathParameters['id']!;
+        return '/home/hymn/$col-$id';
+      },
+    ),
+    GoRoute(
+      path: '/canto/:id',
+      redirect: (context, state) {
+        final hymnId = state.pathParameters['id']!;
+        return '/home/hymn/$hymnId';
+      },
+    ),
+    GoRoute(
+      path: '/canto/:collection/:id',
+      redirect: (context, state) {
+        final col = state.pathParameters['collection']!;
+        final id = state.pathParameters['id']!;
+        return '/home/hymn/$col-$id';
+      },
+    ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/projector-view/:collection/:id',

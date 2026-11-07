@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import '../domain/hymn.dart';
 import '../../../core/services/gemini_ai_service.dart';
 import 'hymn_list_screen.dart';
@@ -443,11 +444,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             backgroundColor: Colors.transparent,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
-            onPressed: () {
-              _clearLastViewedHymn();
-              context.pop();
-            },
-          ),
+              onPressed: () {
+                _clearLastViewedHymn();
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/home');
+                }
+              },
+            ),
           flexibleSpace: ClipRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
@@ -548,10 +553,22 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ref.read(favoritesProvider.notifier).toggleFavorite('${hymn.collection}-${hymn.id}');
                 },
               ),
+              IconButton(
+                icon: const Icon(Icons.share_rounded),
+                tooltip: 'Compartir canto (Enlace y PDF)',
+                onPressed: () {
+                  _showShareHymnModal(context, hymn);
+                },
+              ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) {
-                  switch (value) {                    case 'obs_remote':
+                  switch (value) {
+                    case 'share':
+                    case 'pdf':
+                      _showShareHymnModal(context, hymn);
+                      break;
+                    case 'obs_remote':
                       Navigator.of(context).push(MaterialPageRoute(
                         builder: (context) => ObsRemoteScreen(hymn: hymn),
                       ));
@@ -649,12 +666,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ),
                   const PopupMenuDivider(),
                   PopupMenuItem(
-                    value: 'pdf',
+                    value: 'share',
                     child: Row(
                       children: [
-                        const Icon(Icons.picture_as_pdf_rounded, size: 20, color: Color(0xFF4F46E5)),
+                        Icon(Icons.share_rounded, size: 20, color: theme.colorScheme.primary),
                         const SizedBox(width: 10),
-                        Text('Compartir Canto en PDF', style: GoogleFonts.nunito()),
+                        Text('Compartir (Enlace y PDF)', style: GoogleFonts.nunito()),
                       ],
                     ),
                   ),
@@ -1739,6 +1756,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     constraints: const BoxConstraints(maxWidth: 700),
                     child: Column(
                       children: [
+                        if (kIsWeb)
+                          _buildWebDownloadAppBanner(context, isDark, theme),
                         header,
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 24.0),
@@ -1774,6 +1793,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                     constraints: const BoxConstraints(maxWidth: 700),
                     child: Column(
                       children: [
+                        if (kIsWeb)
+                          _buildWebDownloadAppBanner(context, isDark, theme),
                         header,
                         const SizedBox(height: 16),
                         Expanded(
@@ -3952,98 +3973,374 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     );
   }
 
-  void _showExportPdfModal(BuildContext context, Hymn hymn) {
+  Widget _buildWebDownloadAppBanner(BuildContext context, bool isDark, ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+              : [const Color(0xFFEFF6FF), const Color(0xFFDBEAFE)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.phone_android_rounded, color: theme.colorScheme.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '¿Usas la versión Web?',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13.5),
+                ),
+                Text(
+                  'Instala la App Oficial en Google Play para guardar favoritos y cantar sin conexión.',
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: isDark ? Colors.white70 : Colors.black87),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              final playStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=org.iump.himnario2026');
+              launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+            },
+            child: Text(
+              'Instalar App',
+              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExportPdfModal(BuildContext context, Hymn hymn) => _showShareHymnModal(context, hymn);
+
+  void _showShareHymnModal(BuildContext context, Hymn hymn) {
+    final smartUrl = 'https://himnario-vito-2026.web.app/hymn/${hymn.collection}-${hymn.id}';
+    final hymnDisplayTitle = hymn.collection == 'iump' ? 'Himno ${hymn.id} - ${hymn.title}' : hymn.title;
+    final shareMessage = '''🎵 *$hymnDisplayTitle*
+🏛️ _Himnario Oficial IUMP 2026_
+
+📖 Abre y canta esta alabanza en la App o en la Web interactiva con acordes y audio:
+$smartUrl
+
+✨ ¡A Dios sea la Gloria!''';
+
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
       useSafeArea: true,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final theme = Theme.of(ctx);
+
         return Container(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).padding.bottom),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + MediaQuery.of(ctx).padding.bottom),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0F172A) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(
+              color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06),
+              width: 1,
+            ),
           ),
           child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF4F46E5), size: 26),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Compartir Canto en PDF',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                  // Barra de agarre
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Encabezado
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.colorScheme.primary,
+                              theme.colorScheme.primary.withValues(alpha: 0.7),
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.share_rounded, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Compartir Canto',
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 19,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              hymnDisplayTitle,
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                color: isDark ? Colors.white60 : Colors.black54,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── SECCIÓN 1: ENLACE INTELIGENTE ──
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                          : const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.link_rounded, color: theme.colorScheme.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Enlace Inteligente (App & Web)',
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Si el destinatario tiene la App, se abrirá directamente en su teléfono. Si no la tiene, se abrirá al instante en la versión web interactiva con acordes y audio.',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12.5,
+                            height: 1.35,
+                            color: isDark ? Colors.white70 : const Color(0xFF374151),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            // Botón principal: Compartir directo
+                            Expanded(
+                              flex: 3,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF25D366),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                icon: const Icon(Icons.send_rounded, size: 18),
+                                label: Text(
+                                  'Enviar Enlace',
+                                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                onPressed: () async {
+                                  final box = context.findRenderObject() as RenderBox?;
+                                  final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+                                  if (ctx.mounted) ctx.pop();
+
+                                  if (kIsWeb) {
+                                    await Clipboard.setData(ClipboardData(text: smartUrl));
+                                    final whatsappUrl = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(shareMessage)}');
+                                    // ignore: deprecated_member_use
+                                    if (await canLaunchUrl(whatsappUrl)) {
+                                      await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+                                    }
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('¡Enlace copiado y abriendo WhatsApp!'),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    // ignore: deprecated_member_use
+                                    await Share.share(
+                                      shareMessage,
+                                      subject: hymnDisplayTitle,
+                                      sharePositionOrigin: rect,
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Botón secundario: Copiar Enlace
+                            Expanded(
+                              flex: 2,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  side: BorderSide(
+                                    color: isDark ? Colors.white24 : Colors.black26,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.copy_rounded, size: 16),
+                                label: Text(
+                                  'Copiar',
+                                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: smartUrl));
+                                  if (ctx.mounted) ctx.pop();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.check_circle_rounded, color: Colors.greenAccent),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text('¡Enlace copiado al portapapeles!\n$smartUrl'),
+                                            ),
+                                          ],
+                                        ),
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Separador ornamental
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: isDark ? Colors.white12 : Colors.black12)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'O FORMATO IMPRIMIBLE (PDF)',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: isDark ? Colors.white12 : Colors.black12)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // ── SECCIÓN 2: PDF COMPLETO ──
+                  ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    tileColor: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFFEEF2FF),
+                      child: Icon(Icons.music_note_rounded, color: Color(0xFF4F46E5)),
+                    ),
+                    title: Text('PDF Completo (Letra y Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
+                    subtitle: Text(
+                      _transposeOffset != 0
+                          ? 'Incluye acordes transponidos ($_transposeOffset semitono/s)'
+                          : 'Tonalidad, métrica y cifrado completo',
+                      style: GoogleFonts.outfit(fontSize: 11.5),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () async {
+                      if (ctx.mounted) ctx.pop();
+                      await HymnPdfService.shareHymnPdf(
+                        hymn,
+                        transposeOffset: _transposeOffset,
+                        includeChords: true,
+                        notation: ref.read(notationProvider),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // ── SECCIÓN 3: PDF SOLO LETRA ──
+                  ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    tileColor: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFFF0FDF4),
+                      child: Icon(Icons.description_rounded, color: Color(0xFF16A34A)),
+                    ),
+                    title: Text('PDF Solo Letra (Sin Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
+                    subtitle: Text('Ideal para la congregación o imprimir folletos', style: GoogleFonts.outfit(fontSize: 11.5)),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () async {
+                      if (ctx.mounted) ctx.pop();
+                      await HymnPdfService.shareHymnPdf(
+                        hymn,
+                        transposeOffset: _transposeOffset,
+                        includeChords: false,
+                        notation: ref.read(notationProvider),
+                      );
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                '${hymn.title} · Membrete Oficial IUMP',
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  color: isDark ? Colors.white60 : Colors.black54,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFEEF2FF),
-                  child: Icon(Icons.music_note_rounded, color: Color(0xFF4F46E5)),
-                ),
-                title: Text('PDF Completo (Letra y Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  _transposeOffset != 0
-                      ? 'Incluye acordes transponidos ($_transposeOffset semitono/s)'
-                      : 'Incluye tonalidad, métrica y cifrado completo',
-                  style: GoogleFonts.outfit(fontSize: 12),
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  if (ctx.mounted) ctx.pop();
-                  await HymnPdfService.shareHymnPdf(
-                    hymn,
-                    transposeOffset: _transposeOffset,
-                    includeChords: true,
-                    notation: ref.read(notationProvider),
-                  );
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFF0FDF4),
-                  child: Icon(Icons.description_rounded, color: Color(0xFF16A34A)),
-                ),
-                title: Text('PDF Solo Letra (Sin Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-                subtitle: Text('Ideal para la congregación o imprimir folletos', style: GoogleFonts.outfit(fontSize: 12)),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () async {
-                  if (ctx.mounted) ctx.pop();
-                  await HymnPdfService.shareHymnPdf(
-                    hymn,
-                    transposeOffset: _transposeOffset,
-                    includeChords: false,
-                    notation: ref.read(notationProvider),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              ],
             ),
           ),
         );

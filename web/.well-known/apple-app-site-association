@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "org.iump.himnario2026",
+        "paths": ["/hymn/*", "/canto/*"]
+      }
+    ]
+  }
+}
+
