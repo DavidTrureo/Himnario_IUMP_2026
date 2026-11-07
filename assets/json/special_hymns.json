@@ -2,18 +2,22 @@
     {
         "id": 2,
         "title": "A LA CASA DE JAIRO",
-        "lyrics": "1. A la casa de jairo iba Jesús,\nY una gran multitud iba tras Él;\nY una pobre mujer, llena de fe,\nNo miró la multitud, fue y le tocó.\n\nCORO: has Tú, cual la mujer, que fue y tocó\nEl borde del vestido de Jesús;\nVirtud salió de Él y ella sanó,\nY si le tocas Tú, sanas también.\n\n2. Aquel pueblo tan inmenso y numeroso\nUna parte creía en el Señor,\nPero el resto, enemigos injuriosos\nHoy dia se encuentran aún peor\n\n3. Yo fui quien te tocó, mi buen Jesús,\nMi mal ningún doctor pudo sanar\nMás tu fama llegó a mi y vine a tí\nY ya sanada estoy, ¡gracias Señor!"
+        "lyrics": "1.\nA la casa de Jairo iba Jesús,\nY una gran multitud iba tras Él;\nY una pobre mujer, llena de fe,\nNo miró la multitud, fue y le tocó.\n\nCORO:\nHaz tú, cual la mujer, que fue y tocó\nEl borde del vestido de Jesús;\nVirtud salió de Él y ella sanó,\nY si le tocas tú, sanas también.\n\n2.\nAquel pueblo tan inmenso y numeroso,\nUna parte creía en el Señor;\nPero el resto, enemigos injuriosos,\nHoy día los encuentras aún peor.\n\n3.\nYo fui quien te tocó, mi buen Jesús;\nMi mal ningún doctor pudo sanar.\nMás tu fama llegó a mí y vine a ti,\nY ya sanada soy, ¡gracias, Señor!"
     },
     {
         "id": 3,
         "title": "A QUIEN IRÉ",
-        "lyrics": "¿A quién iré, en necesidad,\nA quién iré, en busca de paz\nY quién podrá mi vida saciar de verdad?\n\n¿Quién más tendrá de mi compasión\nY entenderá mi corazón\nQuién cambiará mi eternidad\nSino Tú, Jesús?\n\nCORO:\nCristo, ¿adónde mas podría ir?,\nCristo, ¿que otro lugar puede existir?,\n\nSolo Tú tienes palabras de amor,\nCamino al Padre y verdad eres Tú.\nCristo, ¿adónde mas podría ir?"
+        "lyrics": "¿A quién iré, en necesidad,\nA quién iré, en busca de paz\nY quién podrá mi vida saciar de verdad?\n\n¿Quién más tendrá de mi compasión\nY entenderá mi corazón\nQuién cambiará mi eternidad\nSino Tú, Jesús?\n\nCORO:\nCristo, ¿adónde mas podría ir?,\nCristo, ¿que otro lugar puede existir?,\n\nSolo Tú tienes palabras de amor,\nCamino al Padre y verdad eres Tú.\nCristo, ¿adónde mas podría ir?",
+        "audioUrl": "https://www.youtube.com/watch?v=fk0bVEiZniU&list=RDfk0bVEiZniU&start_radio=1"
     },
     {
         "id": 4,
         "title": "A TI, OH DIOS",
         "lyrics": "1.\nA Ti, Oh Dios, yo canto\nA Ti Señor, yo alabo.\nEn Tí he puesto mi confianza,\nA Ti doy la honra y loor.\n\nSeñor, en Tí espero,\nSeñor, yo a Tí te quiero,\nSeñor mi único refugio,\nBajo tu mano mi alma está...\n\nCORO:\nSeñor, mi único amigo,\nSeñor Tú eres mi existir.\nSin Tí mi vida sería vana.\nSeñor, mi único Salvador.\n\n2.\nSeñor, tu amor es grande,\nPrefiero morir antes de negar tu amor,\nSeñor, mi fuente de agua viva\nQue sacia mi sed de amor.\n\nSeñor, tu eres mi fuerza,\nMi tesoro escondido en mi corazón\nPor siempre mi único amigo\nTú eres todo para mi vida, Señor.\n\n3.\nUn año más que estoy contigo\nY he sentido tu amor hacia mí.\nPasarán los días y los años\nY tu a mi lado por siempre estarás...",
-        "tone": "DO  /  3 TIEMPOS (4/4)"
+        "tone": "DO  /  3 TIEMPOS (4/4)",
+        "toneNote": "DO",
+        "beats": "3",
+        "timeSignature": "4/4"
     },
     {
         "id": 6,
@@ -38,8 +42,8 @@
     },
     {
         "id": 11,
-        "title": "ATRAEME HACIA TI",
-        "lyrics": "1. Atraeme hacia Ti\nNo me dejes ir\nMe rindo nuevamente a Ti\nA oir que tu amigo soy\n\n2. Mi anhelo eres Tú, nadie más será\nNada puede remplazar\nEl tierno abrazo que me dás\n\n3. Guíame Señor… vuélveme hacia Ti\n\nCoro:\nTú eres Señor, todo lo que he querido\nHazme saber que estás cerca de mi"
+        "title": "ATRÁEME HACIA TI",
+        "lyrics": "Atráeme hacia Ti\nNo me dejes ir.\nMe rindo nuevamente a Ti\nPara oír que Tu amigo soy.\n\nMi anhelo eres Tú, nadie más será.\nNada puede reemplazar\nEl tierno abrazo que me das.\nGuíame, Señor... Vuélveme hacia Ti.\n\nCORO:\nTú eres, Señor, todo lo que he querido.\nHazme saber que estás cerca de mí."
     },
     {
         "id": 12,
@@ -194,7 +198,11 @@
     {
         "id": 50,
         "title": "EN LAS OLAS FURIOSAS",
-        "lyrics": "1.\nEn las olas furiosas del mar me encontré\nSolitario perdido sin luz y sin fe,\nMás de pronto al mirar un gran barco pasar\nAngustiado sin fuerzas ansioso exclamé:\n\n¡Aquí estoy, aquí estoy!\n¡Quién me quiere salvar, aquí\nEstoy!\n\n2.\nEra el barco de Dios que pasaba veloz\nConduciendo creyente al reino de Dios\nMi mensaje de afán escuchó el capitán\nPues con todas mis fuerzas ansioso\nExclamé:\n\n¡Aquí estoy, aquí estoy!\n¡Quién me quiere salvar, aquí\nEstoy!\n\n3.\nBote al agua se oyó que el Señor ordenó\nY con grande bondad a cubierta me alzó\nY ahora feliz le bendigo yo aquí\nPues el gran Salvador mi gemido escuchó.\n\n¡Gloria a Dios, gloria a Dios!\n¡Mi alma puede cantar, gloria a\nDios!\n\n4.\nAlma triste que vas por las sendas del mal,\nNaufragando en las olas furiosas del mar\nMi Jesús es capaz de poderte salvar\nPues a mi en su tierno amor me salvó.\n\n¡Me salvó, me salvó!\n¡Muy gozoso diré, me salvó!"
+        "lyrics": "1.\nEn las olas furiosas del mar me encontré\nSolitario perdido sin luz y sin fe,\nMás de pronto al mirar un gran barco pasar\nAngustiado sin fuerzas ansioso exclamé:\n\n¡Aquí estoy, aquí estoy!\n¡Quién me quiere salvar, aquí\nEstoy!\n\n2.\nEra el barco de Dios que pasaba veloz\nConduciendo creyente al reino de Dios\nMi mensaje de afán escuchó el capitán\nPues con todas mis fuerzas ansioso\nExclamé:\n\n¡Aquí estoy, aquí estoy!\n¡Quién me quiere salvar, aquí\nEstoy!\n\n3.\nBote al agua se oyó que el Señor ordenó\nY con grande bondad a cubierta me alzó\nY ahora feliz le bendigo yo aquí\nPues el gran Salvador mi gemido escuchó.\n\n¡Gloria a Dios, gloria a Dios!\n¡Mi alma puede cantar, gloria a\nDios!\n\n4.\nAlma triste que vas por las sendas del mal,\nNaufragando en las olas furiosas del mar\nMi Jesús es capaz de poderte salvar\nPues a mi en su tierno amor me salvó.\n\n¡Me salvó, me salvó!\n¡Muy gozoso diré, me salvó!",
+        "tone": "SOL  /  3 TIEMPOS (3/4)",
+        "toneNote": "SOL",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 51,
@@ -210,7 +218,8 @@
         "id": 53,
         "title": "LA DUDA",
         "lyrics": "1. Esa duda, que invade mi mente\nDel poder de mi Jesús,\nEsa duda, que invade mi ser\nQuisiera quitarla y llenarme de fe\n\nCORO: si Cristo vive en mi vida\n¿Cómo dudar?,\nSi ha cambiado mi ser\n¿Cómo dudar?,\nSi en el dolor me ha respondido\n¿Cómo es posible dudar?\n\n2. Yo he visto, con estos ojos\nLos prodigios de mi Jesús,\nY si ahora me falta la fe,\nLe clamo con ansias me entrega poder\n\n3. Si Tú tienes, hoy esa duda\nQue confunde tu corazón\n¡Clama a Cristo, tiene poder!\nLevanta a los muertos, los ciegos ya ven",
-        "tone": "LAM | 3 TIEMPOS"
+        "tone": "LAM | 3 TIEMPOS",
+        "audioUrl": "https://www.youtube.com/watch?v=b2ce2cltTbQ&list=RDb2ce2cltTbQ&start_radio=1"
     },
     {
         "id": 54,
@@ -275,7 +284,7 @@
     {
         "id": 68,
         "title": "JERUSALÉN",
-        "lyrics": "1. Bajo el cielo azul de Israel\nBrillan, brillan las estrellas\nY la noche tan serena\nBrilla la luna en el mar\nDe lo alto se divis\nA la gran Jerusalén\nLa ciudad de los profetas\nY de los reyes de Israel.\n\nCORO: Jerusalén… Jerusalén,\nJerusalén\nAy de tí Jerusalén.\n\n2. Lo más grande de tu historia\nVer al santo de Israel\nEl Mesías prometido\nQue tu Dios te levantó\nPero tú indiferente\nRechazaste su amor\nVida eterna prometida\nA su pueblo se humilló.\n\n3. Ya no brillan las estrellas\nHasta el sol se oscureció\nEn la hora de su muerte\nPara el santo de Israel\nSube a cuesta el calvario\nResignado el Cristo va\nY sus sienes van sangrando\nA su cruz se abraza más.\n\n4. Yo te ruego Padre mío\nDesde el árbol de la cruz\nQue tú guardes a los míos\nDe este mundo de maldad\nHijo mío no te olvides\nQue mi sangre derramé\nPor el precio de tu alma\nYo mi vida entregué."
+        "lyrics": "1.\nBajo el cielo azul de Israel\nBrillan, brillan las estrellas\nY la noche tan serena\nBrilla la luna en el mar\nDe lo alto se divisa\nA la gran Jerusalén\nLa ciudad de los profetas\nY de los Reyes de Israel.\n\nCORO:\nJerusalén… Jerusalén,\nJerusalén\nAy de tí Jerusalén.\n\n2.\nLo más grande de tu historia\nVer al Santo de Israel\nEl Mesías prometido\nQue tu Dios te levantó\nPero tú indiferente\nRechazaste su amor\nVida eterna prometida\nA su pueblo se humilló.\n\n3.\nYa no brillan las estrellas\nHasta el sol se oscureció\nEn la hora de su muerte\nPara el Santo de Israel\nSube a cuesta el Calvario\nResignado el Cristo va\nY sus sienes van sangrando\nA su cruz se abraza más.\n\n4.\nYo te ruego Padre mío\nDesde el árbol de la cruz\nQue tú guardes a los míos\nDe este mundo de maldad\nHijo mío no te olvides\nQue mi sangre derramé\nPor el precio de tu alma\nYo mi vida entregué."
     },
     {
         "id": 69,
@@ -290,7 +299,8 @@
     {
         "id": 71,
         "title": "JESUS, ES MI PASTOR",
-        "lyrics": "1. Ahora Jesús es mi Pastor,\nSeguro estoy pues El me guarda\nY por delicados pastos me guiará\nConfortará mi alma.\n\nCuando en valle oscuro yo me encuentro\nY desesperado por salir,\nEl siempre está tomándome la mano\nLlevándome a la luz...\n\nCORO:\nEs el Señor\nMi seguro y fiel ayudador\nNada me faltará,\nY por su gracia vencedor seré,\nPues, El es mi Pastor\n\n2. Aderezas la mesa para mí,\nCon aceite unges mi cabeza\nY con tu presencia me impartes valor\nPara poder seguir.\n\nTu misericordia y tu verdad\nMe seguirán todos los días\nY viviré confiado en tu palabra\nConfiando cada día..."
+        "lyrics": "1.\nAhora Jesús es mi Pastor,\nSeguro estoy pues El me guarda\nY por delicados pastos me guiará\nConfortará mi alma.\n\nCuando en valle oscuro yo me encuentro\nY desesperado por salir,\nEl siempre está tomándome la mano\nLlevándome a la luz...\n\nCORO:\n// Es el Señor\nMi seguro y fiel ayudador\nNada me faltará,\nY por su gracia vencedor seré,\nPues, El es mi Pastor //\n\n2.\nAderezas la mesa para mí,\nCon aceite unges mi cabeza\nY con tu presencia me impartes valor\nPara poder seguir.\n\nTu misericordia y tu verdad\nMe seguirán todos los días\nY viviré confiado en tu palabra\nConfiando cada día...\n\nFINAL:\n/// Nada me faltará ///",
+        "audioUrl": "https://youtu.be/iOkD5lmE8As?si=02WYpZx_8BLutsKo"
     },
     {
         "id": 72,
@@ -345,7 +355,8 @@
     {
         "id": 83,
         "title": "ME HACES FELIZ",
-        "lyrics": "1. Bendeciré al Señor por siempre\ny en Él siempre confiaré.\n\nMe ha librado de todo temor,\nmis pies en una roca afirmó,\n\nNo me moverán, del Señor diré...\n\nCORO:\nMi escudo eres,\nmi fuerza, mi porción,\nmi libertador,\nmi refugio, torre fuerte,\nmi ayuda en tiempo de necesidad\n\n2. Solo a ti tengo en el cielo,\ny a nadie deseo más que a Tí.\n\nTú me haces feliz, del Señor diré...\n\nPuente:\nEscudo...\nmi ayuda en tiempo  de...\nRefugio...\ntorre fuerte...\nFuerza..."
+        "lyrics": "1.\nBendeciré al Señor por siempre\nY en Él siempre confiaré.\nMe ha librado de todo temor;\nMis pies en una roca afirmó.\nNo me moverán, del Señor diré...\n\nCORO:\nMi escudo eres,\nMi fuerza, mi porción,\nMi libertador,\nMi refugio, torre fuerte,\nMi ayuda en tiempo de necesidad\n\n2.\nSolo a Ti tengo en el cielo,\nY a nadie deseo más que a Ti.\nTú me haces feliz, del Señor diré...\n\nPUENTE:\nEscudo...\nMi ayuda en tiempo de...\nRefugio...\nTorre fuerte...\nFuerza...",
+        "audioUrl": "https://youtu.be/3zA7FmX8mpw?si=IINIgxeOgozdVDq3"
     },
     {
         "id": 84,
@@ -361,7 +372,10 @@
         "id": 86,
         "title": "MIRE A JESUS",
         "lyrics": "1.\nMire a Jesus\nY contemplé yo su mirada,\nMiré su rostro entristecido\nQue me miraba.\n\nUna corona de espinas en su frente,\nY ví sus manos enclavadas\nEn un madero...\n\nCORO:\nEl ya pagó la deuda que yo aún tenía\nY El sufriendo en dura cruz\nPor mis pecados.\n\nA mi me resta serle fiel,\nTambién amarle,\nAl Rey de gloria,\nServiré hasta la muerte\n\n2.\nLeeré en sus ojos:\n\"Hijo mio, anda y cuenta\nQue grandes cosas ha hecho Dios,\nEl Rey de gloria\".\n\nMe ha perdonado y me ha lavado\nEn su sangre.\nY todo eso en la cruz\nLo ha pagado...",
-        "tone": "SOL  /  2 TIEMPOS (2/4)"
+        "tone": "SOL  /  2 TIEMPOS (2/4)",
+        "toneNote": "SOL",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 89,
@@ -511,7 +525,11 @@
     {
         "id": 129,
         "title": "TE ALABARÉ",
-        "lyrics": "1. Te alabaré oh Dios por la mañana\nTe alabaré oh Dios al medio día\nTe alabaré cuando al llegar la tarde\nA cada instante y minuto de mi vida.\n\nCoro:\nPorque tú eres el sol de la\nmañana\nPorque tú eres calor del\nmedio día\nPorque tú eres el sol que ya\nse vas\nTú eres mi Dios, Señor, Tú\neres mi amor.\n\n2. Te alabaré oh Dios cuando esté alegre\nTe alabaré oh Dios cuando esté triste\nTe alabaré con mi alma y con mi mente\nTe alabaré, oh Dios, te alabaré."
+        "lyrics": "1.\nTe alabaré, ¡Oh, Dios!, por la mañana\nTe alabaré, ¡Oh, Dios!, al mediodía\nTe alabaré cuando al llegar la tarde\nA cada instante y minuto de mi vida.\n\nCORO:\nPorque Tú eres el sol de la mañana\nPorque Tú eres calor del mediodía\nPorque Tú eres el sol que ya se va\nTú eres mi Dios, Señor,\nTú eres mi amor.\n\n2.\nTe alabaré, ¡Oh, Dios!, cuando esté alegre\nTe alabaré, ¡Oh, Dios!, cuando esté triste\nTe alabaré con mi alma y con mi mente\nTe alabaré, ¡Oh, Dios!, te alabaré.",
+        "tone": "RE  /  3 TIEMPOS (3/4)",
+        "toneNote": "RE",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 130,
@@ -680,13 +698,14 @@
     {
         "id": 175,
         "title": "JAMÁS ME DEJA",
-        "lyrics": "1\nNo hay fuerza que pueda igualar\nAl poder de Jesús\nNo hay baya que pueda vencer\nLo que quiera Él logra\nNo hay nada igualable a su amor\nEl no tiene comparación\nMe ha dicho: \"No te dejare, ni te desampararé…\"\n¡¡Lo creo, si lo creo!!\n\nCoro:\nPorque el jamás, jamás me deja\nY porque el nunca me abandona\nSi el día esta nublado,\nSi arrecia la tormenta,\nYo canto al rey de paz de amor,\nPorque el jamás, jamás me deja…\n\n2\nSi en lucha o peligro de muerte\nMe he de encontrar\nLa nube de Dios me protege\nMe cubre del mal\nPues El es mi ayudador\nMe guía por sendas de paz\nMe ha dicho: \"No te dejare, ni te desampararé…\"\n¡¡Lo creo, si lo creo!!\n\nFinal:\nAmén"
+        "lyrics": "1.\nNo hay fuerza que pueda igualar\nAl poder de Jesús.\nNo hay valla que pueda vencer;\nLo que quiera Él logra.\nNo hay nada igualable a su amor;\nÉl no tiene comparación.\nMe ha dicho: «No te dejaré, ni te desampararé…»\n¡Lo creo, sí lo creo!\n\nCORO:\nPorque Él jamás, jamás me deja,\nY porque Él nunca me abandona.\nSi el día está nublado,\nSi arrecia la tormenta,\nYo canto al Rey de paz y de amor,\nPorque Él jamás, jamás me deja.\n\n2.\nSi en lucha o peligro de muerte\nMe he de encontrar,\nLa nube de Dios me protege,\nMe cubre del mal.\nPues Él es mi ayudador;\nMe guía por sendas de paz.\nMe ha dicho: «No te dejaré, ni te desampararé…»\n¡Lo creo, sí lo creo!\n\nFINAL:\nAmén."
     },
     {
         "id": 188,
         "title": "AL FIN SEÑOR MÍO",
         "lyrics": "1.\nAl fin Señor mío, te puedo encontrar,\nEs tanto mi llanto que no puedo más.\nYa Lázaro ha muerto, ¡Que fatalidad!...\nSu voz se quebró y Marta se echó\nDe nuevo a llorar.\n\nCORO:\nLa voz de Jesús con calma se oyó,\nSi en Dios puedes creer, su gloria verás;\nCuando habla el Maestro, retorna la paz.\nSu voz al llamar, al muerto volvió\nFeliz al hogar\n\n2.\nLa mano de Cristo un día me halló\nY no solo llanto por mi derramo,\nTambién esa sangre que me libertó\nDe tumba fatal, de negro pecar,\nLa muerte huyó.\n\n3.\nHoy Cristo te llama, \"Sal fuera de aquí\"\nY llora y derrama su sangre por ti.\nDe Cristo depende tu felicidad;\nLa muerte huirá, entonces así\nTambién cantarás",
-        "tone": "RE"
+        "tone": "RE",
+        "toneNote": "RE"
     },
     {
         "id": 189,
@@ -730,22 +749,10 @@
         "tone": "DM"
     },
     {
-        "id": 196,
-        "title": "APRENDIZAJE DE NOTAS",
-        "lyrics": "c_____do#D_____ree______miF______FA#F____sostenidoG_____sol#G____sostenidoA_____la #A____sostenido B_____siprimera cuerda=esegunda cuerda=Dtercera cuerda=G___________________C-440segundo aprendizaje: do remifasollasi.             do(cuerdas de mandolina)sol:4re:3 la:2mi:1",
-        "tone": "C#"
-    },
-    {
         "id": 197,
         "title": "TE LEVANTARÉ",
         "lyrics": "Si me preguntas porque alabo el nombre de Jesús tengo que contarte la verdad de mí existir cuando mis amigos se marcharon toda diversión cuando oscuramente veía mi porvenirsin esperanzas caminaba en un sendero gristodo aquel infierno quería adueñarme más de mi una gota de sangre y de misericordia entro en mi ser me dijo Jesús yo te haré vencer te levantaré CORO (el primero 1 vez, después de la 2da estrofa, 2 veces)//Dios cortó cadenas de tormento de dolor de sufrimiento en aquel madero ensangrentado se llevó las penas de mi triste y cruel pasado y me dió la libertad por eso le alabo...(1,2,3,4,5,6)Hoy mi risa mi canto mi lloro mis manos mi todo tienen un nuevo nombre Jesús....levantaré mi voz para que puedan escuchar que eres tu Jesús señor de señores como no alabarle//Si me preguntas porque alabo el nombre de JesúsTengo que contarte la verdad de mi existirEl hombre que canta no valía un peso, que puedo decirCristo me compró, me hizo impagableComo no alabarle...",
         "tone": "DM"
-    },
-    {
-        "id": 198,
-        "title": "JESÚS MI SALVASION",
-        "lyrics": "el señor es mi luz y mi salvación ¿de quién temeré? la fortaleza de mi vida roca de salvación alumbro su justicia sobre mí sobre roca puso mis pies mi cabeza levantó, mis enemigos ahuyentó alabanzas a su nombre cantaré (coro)//aunque ejércitos acampen contra mí no temera mi corazón estarás ahí aunque guerra se levanten aunque todos me rodearenconfiare en ti sí confiare en ti sí  estaré confiando en ti//escucha señor la voz de mi clamor en ti confiaré tu rostro buscaré mi ayuda has sido Dios de mi salvación alumbro su justicia sobre mí sobre roca puso mis pies mi cabeza levantó mis enemigos ahuyentó alabanzas a su nombre cantaré.",
-        "tone": "C"
     },
     {
         "id": 199,
@@ -768,8 +775,9 @@
     {
         "id": 203,
         "title": "UNO MÁS GRANDE QUE EL TEMPLO",
-        "lyrics": "(empezamos con bombo)Uno más grande que el templo está aquíUno más grande que el templo está aquíRey de reyes, Señor de señores; mi DiosUno más grande que el templo está aquí¿Quién es el Rey de Gloria que está aquí?¿Quién es el Rey de Gloria que está aquí?Jehová fuerte y valiente, el Poderoso en batallaEl Admirable y Bendito Señor Jesús¿Quién es el Rey de Gloria que está aquí?¿Quién es el Rey de Gloria que está aquí?Jehová fuerte y valiente, el Poderoso en batallaEl Admirable y Bendito Señor JesúsSimeón lo tuvo en sus brazos y se gozóIsaías cayó como muerto cuando le vio¡Toda la tierra está llena de su poder y su gloria!Uno más grande que el templo está aquí¿Quién es el Rey de Gloria que está aquí?¿Quién es el Rey de Gloria que está aquí?Jehová fuerte y valiente, el Poderoso en batallaEl Admirable y Bendito Señor Jesús¿Quién es el Rey de Gloria que está aquí?¿Quién es el Rey de Gloria que está aquí?Jehová fuerte y valiente, el Poderoso en batallaEl Admirable y Bendito Señor Jesús¿Cuántos adoran al templo y no al Dios del templo?¿Cuántos no saben que Él vive y está despierto?¡Ábranse puertas eternas que entrará el Rey de Gloria!Uno más grande que el templo está aquí¿Quién es el Rey de Gloria que está aquí?¿Quién es el Rey de Gloria que está aquí?Jehová fuerte y valiente, el Poderoso en batallaEl Admirable y Bendito Señor Jesús¿Quién es el Rey de Gloria que está aquí?¿Quién es el Rey de Gloria que está aquí?Jehová fuerte y valiente, el Poderoso en batallaEl Admirable y Bendito Señor JesúsEl Dios que abrió el mar rojoEl Dios que levantó a LázaroEl Dios quecalmó la tempestadEstá aquíEl Dios que sanó a los ciegosEl Dios quelevantó a los muertosEl Dios queha resucitado,Está aquíSi tan solo tú crees verás el poder de DiosQue en esta noche se esta moviendo en este lugarEsto no es para todos hermanosEsto es para aquellos que creen en ÉlY si esta noche tú crees veras, el poder de DiosEstá aquí,su gloria está aquíSanando tu corazón,Sanando tu cuerpoEstá aquí sanando y libertandoEstá aquí restaurando y levantandoHoy abre tu corazón, tu corazón",
-        "tone": "C"
+        "lyrics": "1.\nUno más grande que el templo está aquí\nUno más grande que el templo está aquí\nRey de Reyes, Señor de Señores; Mi Dios\nUno más grande que el templo está aquí.\n\nCORO:\n// ¿Quién es el Rey de Gloria que está aquí?\n¿Quién es el Rey de Gloria que está aquí?\nJehová, el fuerte y valiente, el Poderoso en batalla,\nEl Admirable y Bendito Señor Jesús. //\n\n2.\nSimeón lo tuvo en sus brazos y se gozó.\nIsaías cayó como muerto cuando le vio.\n¡Toda la tierra está llena de su poder y su gloria!\nUno más grande que el templo está aquí.\n\n3.\n¿Cuántos adoran al templo y no al Dios del templo?\n¿Cuántos no saben que Él vive y está despierto?\n¡Ábranse puertas eternas que entrará el Rey de Gloria!\nUno más grande que el templo está aquí.\n\nFINAL:\n¿Quién es el Rey?\n¿Quién es el Rey?\n¿Quién es el Rey de Gloria?\n¡Jehová!",
+        "tone": "G",
+        "toneNote": "G"
     },
     {
         "id": 204,
@@ -976,12 +984,6 @@
         "tone": "A"
     },
     {
-        "id": 243,
-        "title": "MEDLEY SOL MAYOR",
-        "lyrics": "SOL                   DO  VI AL SEÑOR SENTADO SOBRE UN TRONO          REALTO Y SUBLIMESOL Y SUS FALDAS LLENABAN EL TEMPLO CON       DO              RESU GLORIA, ALTO Y SUBLIMESOL                            DOPOR ENCIMA DE ÉL HABÍAN SERAFINES,           REALTO Y SUBLIMESOL                               Y SUS ALAS CUBRÍAN SU ROSTRO Y A SUS        DO                REPIES CUBRÍAN, ALTO Y SUBLIMEDO                      REEL UNO AL OTRO DABAN VOCES QUE SI7               MIDECÍAN, ALTO Y SUBLIMEDO                      RETODA LA TIERRA ESTA LLENA DE SUDO   SOLGLORIADO                 RE    SI7     SANTO, SANTO, SANTO, JEHOVÁ DE LOS   MImEJÉRCITOSDO                RE         TODA LA TIERRA ESTÁ LLENA DE SUDO    SOL GLORIASOL                            RE AYER LE DIJE ADIÓS A MI VIDA PASADAMIm             AYER LE DIJE ADIÓS AL PECADO QUE MI         SImVIDA AGOBIADA                 DO           SOLY ES QUE HOY ENCONTRÉ UN SALVADOR                        RE    JESÚS LLEGO A MI Y ME LLENO DE SU   SOL AMORCORO:SOL                RE        DOJESÚS SECOS MIS LÁGRIMAS ME DIO LO        SOLQUE ANHELABASOL          RE             DOQUITO LA SOLEDAD Y AHORA ES EL            SOLQUIEN ME ACOMPAÑA SOL           REHIZO BRILLAR SU LUZ     SI7           MI RE DO Y HUYÓ DE MI LA OSCURIDAD Y             SOLAHORA SOY FELIZ                 RE          SOLCANTANDO DE SU AMOR Y DE SU PAZAYER LE DIJE ADIÓS AL AMOR PASAJEROY DI LA BIENVENIDA AL AMOR VERDADEROY ES QUE HOY ENCONTRÉ UN AMIGO FIELJESÚS LLEGO A MI Y ME LLENO DE SU PODERHAY UNA TUMBA VACIASOL  HAY UNA TUMBA VACÍA                       REY UNA CRUZ QUE NADA TIENE                         CUENTAN QUE A ALGUIEN ALLÍ MATARON                     SOLY AL TERCER DÍA RESUCITÓESTO YA HACE MUCHOS AÑOS                       DOCUENTAN QUE SIGUE VIVIENDO                           SOL - RE//CUENTAN QUE ANDA RECORRIENDO// DO        RE     SOLBUSCANDO DONDE POSARCORO:SOL       RE                    SOLÉL ESTÁ AQUÍ Y A TU LADO VA PASANDOSOL       RE                    SOLÉL ESTÁ AQUÍ Y TU VIDA ESTÁ TOCANDOSOL         ÁBRELE TU CORAZÓN                    DONO LE DEJES QUE SE VAYA                     SOL - RE//NO LE DEJES QUE SE VAYA//DO RE SOLÉL TE QUIERE BENDECIRCUENTAN QUE A ALGUIEN ALLÍ MATARONÉL NO TENÍA DELITO ALGUNOPOR HABLAR DE VIDA ETERNALO CONDENAN A MORIREN LA CRUZ Y EN LA TUMBALO RESGUARDAN LOS SOLDADOS//QUE QUEDARON ASOMBRADOS//PUES CRISTO RESUCITÓVIENTO RECIOHOY YO TE ALABO, ERES LO ÚNICO EN MI VIDAMI CORAZÓN TE NECESITA OH DIOS CADA DÍAYO ANHELO MÁS DE TÍ, DE TU PRESENCIADOBLE PORCIÓN DE TU ESPÍRITU PARA MI VIDACORO:DESCENDERÁ SOBRE MI VIDA BENDICIÓNLLUVIA DEL CIELO HOY CAERÁ EN ESTE LUGARCREÉLO HOY, PUERTAS DEL CIELO SE ABRIRÁNY UN VIENTO RECIO SE HARÁ SENTIR SOBRE MÍ//TE AGRADEZCO POR LO QUE AHORA ESTÁS HACIENDOHAY UN CALOR QUE ME RECORRE LO ESTOY SINTIENDOSU SANTO ESPÍRITU SE ESTÁ POSANDO SOBRE MI VIDAOH ALELUYA, OH GLORIA A DIOS QUE ALEGRÍAANGUSTIADA ESTA MI ALMASOL                REANGUSTIADA ESTÁ MI ALMA, SÉ QUE TE HE     MI FALLADO,       DO           RETUS OJOS ME HAN MIRADO, HAZ VISTO MI   SOL PECADO. SOL          RE   TÓCAME OTRA VEZ, QUIERO SENTIR TU  MI MANO  SOL         RE                MImTÓCAME OTRA VEZ. NECESITO A AMADO...CORO:           SOLES QUE PREFIERO, MIL VECES CAER EN       RE TUS MANOS. TUS MANOS DE        MIm   DO            SOLMISERICORDIA, TUS MANOS DE AMOR.ES QUE EL HOMBRE NO TIENE         RE                  MIMISERICORDIA. JAMÁS ME AYUDARÍA, COMO   DO RE SOLLO HACES TÚ.../PORQUE MEJOR ES TU MISERICORDIA, QUE LA VIDA NO SOPORTARÍA NI UN SEGUNDO EL SABER QUE ME HAS DEJADO TÓCAME OTRA VEZ, QUIERO SENTIR TU MANC TÓCAME OTRA VEZ. NECESITO A MI AMADO",
-        "tone": "G"
-    },
-    {
         "id": 244,
         "title": "PROCLAMARE VICTORIA",
         "lyrics": "PROCLAMARE VICTORIA -------------------INTRO:SOL,RE,MIm,DO,SOL,LA,RE,SOL,RE,MIm,SI7,DO,SOL,FA,LAm,RE,SOL SOL.                   SI ESTAS CANSADO DE CAMINAR Y NO PUEDES MAS SI EL ENEMIGO AINTENTADO ARREBATARTE LA FELICIDAD MUCHO MÁS GRANDE ES MI DIOSQUE EN CADA PRUEBA ME SACA VENCEDORY PROCLAMARE CON MI VOZ CORO: PROCLAMARE VICTORIA EN ESTE LUGAR LOS ENFERMOS CRISTO LOS SANARA(C) DE ESTE LUGAR VACÍO NO TE IRAS BENDECIDO TE IRAS(C) EL ENEMIGO ESTARÁ BAJO NUESTROS PIES POR QUE DIOS ES MAS GRANDE Y TIENE PODER HOY LA VICTORIA ME LLEVARE A MI HOGAR. SI HAS LLEGADO HASTA AQUÍ DERROTADO HOY TE IRAS DE ESTE LUGAR COMO UN GIGANTE PORQUE DIOS TE RENOVARAEL LAS FUERZAS TE DARÁ(C) Y TE LEVANTARA COMO LAS ÁGUILAS",
@@ -1038,8 +1040,9 @@
     {
         "id": 257,
         "title": "CREELE A DIOS",
-        "lyrics": "Llevas en tu alma una cargaVas escondiendo el dolorPero tus ojos reflejan,Qué sufre tu corazónMucho tiempo ha pasadoQué no sientes ha SeñorY la amargura ha cerradoTu alma en una prisiónCoro//Hoy alabale, llénate fe,Fortalecete y se valienteNo mires atrás, no te importe más ya la genteTu creele creele a Dios//Toda en la  vida te cambiaCuando alabas a DiosNaces de nuevo y sientesQue todo ya se olvidoBastate solo en su graciaY encontraras el valorPara volver a empezarY ser más que vencedor",
-        "tone": "G"
+        "lyrics": "1.\nLlevas en el alma una carga,\nVas escondiendo el dolor;\nPero tus ojos reflejan\nQue sufre tu corazón.\nMucho tiempo ha pasado\nQue no sientes al Señor,\nY la amargura ha encerrado\nTu alma en una prisión.\n\nCORO:\n// Hoy, alábale, llénate de fe,\nFortalécete y sé valiente.\nNo mires atrás,\nNo te importe más ya la gente.\nTú, créele, créele a Dios. //\n\n2.\nToda en la vida te cambia\nCuando alabas a Dios.\nNaces de nuevo y sientes\nQue todo ya se olvidó.\nBástate solo en su gracia\nY encontrarás el valor\nPara volver a empezar\nY ser más que vencedor.",
+        "tone": "G",
+        "toneNote": "G"
     },
     {
         "id": 259,
@@ -1063,7 +1066,8 @@
         "id": 263,
         "title": "HAS PENSADO UN MOMENTO",
         "lyrics": "1. Has pensado un momento\nQue Dios tan grande tenemos,\nNo existen barreras\nQue lo puedan detener,\nNo tiene principio, no tiene fin,\n¿Acaso, alguien puede\nDetenerle un momento,\nCuando te dice: \"yo te bendeciré\"?...\n\nCORO:\nPorqué estás tan triste,\nPorqué estás llorando,\n//Porqué teniendo\nA un Dios tan grande\nPorqué sangra la herida\nDe tu corazón//\n\n2. Oh, Señor lleva mi carga\nCura Señor las heridas\nQue llevo aqui dentro\nEn mi corazón\nSon tantas las penas\nNo puedo resistir\nTe entrego mi carga\nPues, mi fe he puesto en Ti\nCuando me dices: \"yo te bendeciré\"",
-        "tone": "G"
+        "tone": "G",
+        "audioUrl": "https://www.youtube.com/watch?v=VHk-Up_yj0E&list=RDVHk-Up_yj0E&start_radio=1"
     },
     {
         "id": 264,
@@ -1159,24 +1163,31 @@
         "id": 296,
         "title": "YO HE CREÍDO",
         "lyrics": "1.\nYo he creído con toda mi alma\nEn un Dios poderoso\nYo he confiado en aquel que salvó\nMi alma en la cruz\nA pesar que la prueba amenaza\nCuáL brava tormenta\nMe doy cuenta que en la barca\nEstá Jesús a mi lado.\n\nCORO:\nContigo yo tengo Señor\nLa paz que anhelaba\nContigo yo tengo el consuelo a mi alma\nY la felicidad\nContigo yo tengo el futuro en mis manos\nPues si nada tuviera yo sé que mañana\nMe bendecirás\n\n2.\nYo he visto con mucha tristeza\nA aquel que dudaba\nPesimista sin esperanza que vive sin fe\nY la Biblia me muestra la fe\nDe grandiosos profetas\nQue levantan y alientan mi ser y puedo creer.\n\n3.Cuántas veces faltando a la mesa\nA Dios yo clamé\nCerradas estaban las puertas\nJehová las abrió\nSiempre mi Dios respondiste\nMi humilde plegaria\nTus promesas se cumplen en mi\nY te doy las gracias.",
-        "tone": "Am"
+        "tone": "Am",
+        "toneNote": "Am"
     },
     {
         "id": 297,
         "title": "SUEÑO CON LA TIERRA PROMETIDA",
         "lyrics": "1.\n¡Cómo va a estar mi corazón\nCon tanta emoción\nCuando la trompeta suene!\nSé que va a ser algo tan bonito\nCuando allá, en el infinito,\nCon Jesús me iré a encontrar.\n\nLa iglesia va a subir de blanco\nY cantando: «¡Santo, Santo!»,\nEse día llegará,\nY al entrar al paraíso\nDe este cuerpo no preciso,\nPues con otro voy a entrar.\n\nCORO:\nSueño con esa ciudad\nDonde no habrá dolor,\nSolo reina puro amor y felicidad.\nSé que no será un sueño, no;\nCristo estará allí,\nY el sueño que yo vi será realidad.\n\nPor calles de oro yo quiero andar,\nLas cosas pasadas no vuelven jamás,\nY junto a la iglesia mi alma desea\nA Dios adorar.\n\n2.\nSueño con la Tierra Prometida,\nDel árbol de la vida\nDel cual voy a comer.\nSé que al fin diré: «Valió la pena»,\nAl ver esa linda cena;\nMi Jesús allí estará.\n\nEl divino Cordero bendito\nVa a decirme: «Bienvenido»,\nY a mi nombre va a llamar,\nY en las bodas del Cordero,\nAunque no sea primero,\nYo también voy a llegar.",
-        "tone": "LA  /  3 TIEMPOS (3/4)"
+        "tone": "LA  /  3 TIEMPOS (3/4)",
+        "toneNote": "LA",
+        "beats": "3",
+        "timeSignature": "3/4",
+        "audioUrl": "https://firebasestorage.googleapis.com/v0/b/himnario-vito-2026.firebasestorage.app/o/audios%2Fcanto_especiales_297.mp3?alt=media&token=450065c0-2d46-455b-8826-18ec4c434aa7"
     },
     {
         "id": 301,
         "title": "TEMPLOS Y MORADAS",
-        "lyrics": "1.\nEsta golpeando,\nAbre la puerta de tu corazón,\nEsta tocando,\nSi quieres, puedes tu abrir.\nÉl, con ternura\nTe dice: \"yo, estoy a la puerta\"\nY si le abrimos\nCenaremos con Él\n\nY es que no sientes,\nQue esta en el aire su presencia,\nComo el estruendo\nDe muchas aguas turbulentas\n\nSOLISTA:\nPero al entrar en mi,\nSolo me invade el gozo\nSe humedecen mis ojos,\nY comienzo a llorar... llorar\n\nCORO:\nSomos templos y moradas,\nApartados en santidad para Él\nEsperando su venida,\nQue añoramos día a día,\nPara estar con Él.\n\nPorque nada de este mundo,\nSe compara con lo hermoso\nDe servirle a Él,\nDe alabarle, de cantarle\nA mi Rey.\n\n2.\nEsta en el aire,\nUna presencia muy hermosa,\nEs poderosa,\nQue no me puedo resistir.\nCorre por mi interior\nComo lo dice la escritura\nY al estallar\nSolo le puedo alabar\nCon esta entonación,\nQue nace dentro de mi alma\nPara mi Dios,\nQue solo pudo darme calma\n\nSOLISTA:\nY más allá\nDe las estrellas seguiremos\nAlabando por siempre,\nAl cordero de Dios,\nDe Dios\n\nCORO FINAL:\nSomos templos y moradas,\nApartados en santidad para Él\nEsperando su venida,\nQue añoramos día a día,\nPara estar con Él.\n\nPorque nada de este mundo,\nSe compara con lo hermoso\nDe servirle a Él,\nDe alabarle, de cantarle\nSolo a Él...\n¡Solo a Él!"
+        "lyrics": "1.\nEsta golpeando,\nAbre la puerta de tu corazón,\nEsta tocando,\nSi quieres, puedes tu abrir.\nÉl, con ternura\nTe dice: \"yo, estoy a la puerta\"\nY si le abrimos\nCenaremos con Él\n\nY es que no sientes,\nQue esta en el aire su presencia,\nComo el estruendo\nDe muchas aguas turbulentas\n\nSOLISTA:\nPero al entrar en mi,\nSolo me invade el gozo\nSe humedecen mis ojos,\nY comienzo a llorar... llorar\n\nCORO:\nSomos templos y moradas,\nApartados en santidad para Él\nEsperando su venida,\nQue añoramos día a día,\nPara estar con Él.\n\nPorque nada de este mundo,\nSe compara con lo hermoso\nDe servirle a Él,\nDe alabarle, de cantarle\nA mi Rey.\n\n2.\nEsta en el aire,\nUna presencia muy hermosa,\nEs poderosa,\nQue no me puedo resistir.\nCorre por mi interior\nComo lo dice la escritura\nY al estallar\nSolo le puedo alabar\nCon esta entonación,\nQue nace dentro de mi alma\nPara mi Dios,\nQue solo pudo darme calma\n\nSOLISTA:\nY más allá\nDe las estrellas seguiremos\nAlabando por siempre,\nAl cordero de Dios,\nDe Dios\n\nCORO FINAL:\nSomos templos y moradas,\nApartados en santidad para Él\nEsperando su venida,\nQue añoramos día a día,\nPara estar con Él.\n\nPorque nada de este mundo,\nSe compara con lo hermoso\nDe servirle a Él,\nDe alabarle, de cantarle\nSolo a Él...\n¡Solo a Él!",
+        "audioUrl": "https://www.youtube.com/watch?v=6pAO3fAbXnM&list=RDqs1WmWFO7Bk&index=4"
     },
     {
         "id": 302,
         "title": "APOCÁLIPSIS",
         "lyrics": "1.\nApocalipsis de las revelaciones\nÚltimo libro que San Juan escribió\nQue fue llevado a la isla de Patmos\nA que escribiera lo que Dios le reveló.\n\nCORO:\nSeñor Jesús recoge tu rebaño\nPorque la noche ya se empieza a acercar\nY las ovejas están desorientadas\nY los pastores no las pueden juntar.\n\n2.\nApocalipsis libro de profecías\nLo que está escrito todo se cumplirá\nSe está leyendo en las últimas hojas\nEl que no escucha esto se lamentará.\n\n3.\nLos terremotos y plagas de este mundo\nSon profecías que Cristo nos dejó\nLa apostasía ya está dentro de la iglesia\nJesús nos habla, su palabra se cumplió.",
-        "tone": "C"
+        "tone": "C",
+        "toneNote": "C"
     },
     {
         "id": 304,
@@ -1283,8 +1294,9 @@
     {
         "id": 329,
         "title": "PORQUE DE TAL MANERA",
-        "lyrics": "PORQUE DE TAL MANERA DIOS AL MUNDO AMÓQUE DIO A SU HIJO POR AMOR AL PECADORPARA QUE AQUEL QUE EN ÉL CREYESE FUESE SALVOSÓLO POR GRACIA Y POR EL GRANDE AMOR DE DIOS.COROY COMO CRISTO ME AMÓ A MI YO DEBO AMARLEY COMO CRISTO TE AMO A TI YO DEBO AMARTE,EN SU PALABRA ESTE MANDAMIENTO ESTÁ:\"AMA A TU DIOS AMA A TU PRÓJIMO Y SALVO SERÁS\"IISI TUVIERA FE QUE TRASLADARA LAS MONTAÑASY SI YO HABLARE EN OTRAS LENGUAS SIN AMORLA BIBLIA DICE QUE SI NO AMO, SOY COMO NADAAUNQUE TUVIERA TODOS LOS DONES, DICE EL SEÑOR.12COROSI PROFETIZO Y NO TENGO AMOR, DE NADA VALE;SI AMO EL DINERO Y NO AMO A DIOS, YO NO SOY NADIEOH, DIOS TE PIDO QUE ME DES MÁS DE TU AMORPARA UN DÍA, ALLÁ EN LA GLORIA VERTE SEÑOR.",
-        "tone": "C"
+        "lyrics": "1.\nPorque de tal manera Dios al mundo amó,\nQue dio a su Hijo por amor al pecador,\nPara que aquel que en Él creyese fuese salvó,\nSolo por gracia y por el grande amor de Dios.\n\nCORO:\nY como Cristo me amó a mí, yo debo amarle.\nY como Cristo te amó a ti, yo debo amarte.\nEn su palabra este mandamiento está:\n\"Ama a tu Dios, ama a tu prójimo y salvó serás\".\n\n2.\nSi tuviera fe que trasladara las montañas\nY si yo hablase en otras lenguas sin amor,\nLa Biblia dice que si no amo, soy como nada,\nAunque tuviera todos los dones, dice el Señor.\n\nCORO:\nSi profetizo y no tengo amor, de nada vale;\nSi amo el dinero y no amo a Dios, yo no soy nadie.\nOh, Dios, te pido que me des más de Tu amor\nPara un día, allá en la gloria verte, Señor.",
+        "tone": "LA",
+        "toneNote": "LA"
     },
     {
         "id": 330,
@@ -1433,8 +1445,9 @@
     {
         "id": 359,
         "title": "NECESITAMOS FE",
-        "lyrics": "1          FE.                            FE LA CERTEZA DE LO QUE SE ESPERA                        LA CONVICCIÓN DE LO QUE NO SE VE                      UNA PALABRA SOLO DE DOS LETRAS                   MUY PEQUEÑA PERO LLENA DE PODER                              SIN FE NO PUEDE AGRADAR A DIOS                        TIENES QUE TENERLA EN EL CORAZÓN                            TAMBIÉN EL JUSTO VIVIRÁ POR ELLA                               LA FE DA CONFIANZA DA LA DIRECCIÓN         DA LA DIRECCIÓN         CORO       NECESITAMOS FE      PARA DECIRLE AL PROBLEMA:                         TE MARCHAS DE AQUÍ PARA SIEMPRE     PARA DECIRLE A LA ENFERMEDAD:                       NO ME PERTENECES                                   FE QUE DEMUESTRE EL INMENSO PODER QUE TIENE NUESTRO DIOSNECESITAMOS FE                           PARA QUE LO QUE PAREZCA IMPOSIBLE PUEDA REALIZARSE                        LO QUE LA CIENCIA NO PUDO LOGRAR JESUCRISTO LO HACE                               TODAS LAS COSAS PUEDEN SER POSIBLE SI PUEDES CREER              2                    FE TUVO MOISÉS CUANDO ABRIÓ EL MAR ROJO                   TUVO DANIEL CUANDO ESTUVO EN EL FOZO                                  POR FE DAVID TAMBIÉN VENCIÓ AL GIGANTE                                      NO FUE POR SUS FUERZAS LA FE LO HIZO TODO            LA FE EN DIOS HACE TODO",
-        "tone": "A"
+        "lyrics": "1.\nFe es la certeza de lo que se espera,\nLa convicción de lo que no se ve,\nUna palabra solo de dos letras,\nMuy pequeña, pero llena de poder.\nSin fe no se puede agradar a Dios;\nTienes que tenerla en el corazón.\nTambién el justo vivirá por ella;\nLa fe da confianza, da la dirección.\nDa la dirección.\n\nCORO:\nNecesitamos fe\nPara decirle al problema:\n«¡Te marchas de aquí para siempre!»\nPara decirle a esa enfermedad:\n«¡No me perteneces!»\nFe que demuestre el inmenso poder\nQue tiene nuestro Dios.\n\nNecesitamos fe\nPara que lo que parezca imposible\nPueda realizarse,\nLo que la ciencia no pudo lograr,\nJesucristo lo hace.\nTodas las cosas pueden ser posibles\nSi puedes creer.\n\n2.\nFe tuvo Moisés cuando abrió el Mar Rojo.\nTuvo Daniel cuando estuvo en el foso.\nPor fe, David también venció al gigante.\nNo fue por sus fuerzas; la fe lo hizo todo.\nLa fe en Dios hace todo.",
+        "tone": "A",
+        "toneNote": "A"
     },
     {
         "id": 360,
@@ -1445,7 +1458,8 @@
         "id": 363,
         "title": "ROMPE LAS CADENAS",
         "lyrics": "1.\nOh mi Señor yo tengo muchas faltas\nTú lo sabes pues no sé lo que me pasa\nPerdóname si es que dudo al confesarte\nY rompe las cadenas que me atan\n\nCORO:\n//Rompe las cadenas que me atan\nLibertame dándome así tu dulce calma\nRompe las cadenas que me atan\nEdifica tus altares en mi alma//\n\n2.\nDiversos pensamientos siempre tratan\nDe trastornar mi mente cuando pasan\nRepréndelo Señor con tu templanza\nY rompe las cadenas que me atan\n\n3.\nRevisteme de paz y de confianza\nDe amor, de fe y de esperanza\nArranca la tristeza de mi alma\nY rompe las cadenas que me atan",
-        "tone": "D"
+        "tone": "D",
+        "toneNote": "D"
     },
     {
         "id": 365,
@@ -1457,7 +1471,8 @@
         "id": 366,
         "title": "JUDAS",
         "lyrics": "1.\nEra uno de los doce que siguió\nA Jesús el Nazareno a predicar\nEra el hombre de confianza, el tesorero\nQue comía con Jesús el mismo pan\nPero un día la traición llenó su alma\nY el amor hacia el dinero lo cegó\nY por 30 monedas miserables\nAl Maestro con un beso lo entregó.\n\nCORO:\nJudas no tiene precio tu maldad\nCiego que no conoces el amor y la verdad\nLlanto te costará tu proceder\nPor esa ingratitud de no haber sido fiel\nA quien tanto te amo.\n\n2.\nEs la imágen de Jesús que está en tu hermano\nEl amor y la confianza del Señor\nTrataré de no venderlo y traicionarlo\nPues es templo del Espíritu de Dios\nY si diera mis riquezas y mis haciendas o\nMuriera yo en la hoguera del dolor\nEsas cosas no me sirven para nada,\nNo soy nada si en mi vida no hay amor.",
-        "tone": "Am"
+        "tone": "Am",
+        "toneNote": "Am"
     },
     {
         "id": 367,
@@ -1490,12 +1505,6 @@
         "tone": "DM"
     },
     {
-        "id": 373,
-        "title": "3. HOY ESTAMOS EN TU TEMPLO",
-        "lyrics": "Hoy estamos en tu templo, la iglesia reunida a cantara expresar en nuestro canto la alegría, la esperanza y la fea decirte que te amamos por habernos rescatado tu del malsufriste tú por mí; moriste tú por mí, jamás lo olvidarécoro:Prometiste regresarte esperamos hoy señoren las nubes volverátodo ojo le veráy alabará su nombreCuando suene la trompeta y en el cielo aparezca el señory los muertos resuciten, elevándose en las nubes a encontrarlos que viven se transformen, a la imagen tan gloriosa de Jesúsque dicha será estar al lado del que amé porque el me amo a mi.",
-        "tone": "G"
-    },
-    {
         "id": 374,
         "title": "ERES LA LUZ DE MIS OJOS",
         "lyrics": "1. Eres la luz de mis ojos\nQue alumbras mi camino\nFortaleza de mi vida\nY paz para mi alma\nEres tu mi gran amigo\nQue siempre estás conmigo\nTendiendome tu mano\nDispuesto para amar\n\nCORO: //y si un día me falta tu amor\nNo sé que haría\nProbablemente me perdería\nEn este mundo de maldad//\n\n2. Eres tu como el viento\nCuando acaricias mi ser\nComo ríos de agua viva\nQue calmas tu mi ser\nEres mi única esperanza\nTambién para este mundo\nY yo creo en tus promesas\nVida eterna me darás",
@@ -1505,7 +1514,8 @@
         "id": 375,
         "title": "LÁZARO",
         "lyrics": "1.\nJesús tenía un buen amigo al que el amo\nÉl era Lázaro al que la muerte llegó\nPero el Señor pronto recibió\nQue su amigo había dejado de existir\n\nCORO:\nPero el Señor te dice hoy deja de sufrir,\nDeja de llorar, vida yo te doy,\n//Resucita ya//\nY ven a mí.\n\n2.\nQuizás hermano tengas en tu corazón\nLa piedra que impedía a Marta de creer\nPero el Señor te dice así:\nOh quita la piedra hermano de tu corazón",
-        "tone": "Am"
+        "tone": "Am",
+        "toneNote": "Am"
     },
     {
         "id": 376,
@@ -1540,8 +1550,10 @@
     {
         "id": 382,
         "title": "ABBA PADRE",
-        "lyrics": "1.\nDame más que en tus alas\nQuiero elevarme\nY llegar arrodillado\nAleluya!\nPorque el cielo se me abre\nCuando digo: \"abba Padre\"\nAferrado a tus plantas\nQuiero estar...\n\nCORO:\nSoy tierra reseca Oh Dios\nNo puedo respirar\nSi Tú no estas aqui\nEl dia se vuelve gris\nY luego oscuridad\nSi Tú no estas en mi...\n\nNecesito tu amor\nPara elevarme\nQue mi vida esta\nFeliz mi vida esta\nMuy junto a Ti\n\n2.\nMi Señor Tú me haces falta\nDía tras día\nTu cariño y fuego Santo\nMe consume...\nCon tu sangre poderosa\nMi Jesús no hay derrota\nAleluya el cielo se abre\nAl orar\n\n3.\nAlzare mis ojos donde\nSi no hay socorro\nMi socorro esta en mi Cristo\nAleluya!\nMas que Padre y que madre\nNecesito de su sangre\nMi castillo, mi esperanza\nEs Jesús",
-        "tone": "E"
+        "lyrics": "1.\nDame más, que en Tus alas\nQuiero elevarme\nY llegar arrodillado.\n¡Aleluya!\nPorque el cielo se me abre\nCuando digo: \"¡Abba, Padre!\"\nAferrado a Tus plantas\nQuiero estar.\n\nCORO:\nSoy tierra reseca, ¡Oh, Dios!\nNo puedo respirar\nSi Tú no estás aquí.\nEl día se vuelve gris\nY luego oscuridad\nSi Tú no estás en mí.\n\nNecesito Tu amor\nPara elevarme.\nQue mi vida está,\nFeliz mi vida está\nMuy junto a Ti.\n\n2.\nMi Señor, Tú me haces falta\nDía tras día.\nTu cariño y fuego Santo\nMe consume.\nCon Tu sangre poderosa,\nMi Jesús, no hay derrota.\n¡Aleluya! El cielo se abre\nAl orar.\n\n3.\nAlzaré mis ojos, ¿dónde\nSi no hay socorro?\nMi socorro está en mi Cristo.\n¡Aleluya!\nMás que Padre y que madre\nNecesito de su sangre.\nMi castillo, mi esperanza\nEs Jesús.",
+        "tone": "E",
+        "toneNote": "E",
+        "audioUrl": "https://youtu.be/Y6rbxDRhaIs?si=2bS9jpYbQ_xdQFN3"
     },
     {
         "id": 384,
@@ -1595,19 +1607,20 @@
         "id": 402,
         "title": "AMOR TAN GRANDE",
         "lyrics": "1.\nAmor tan grande,\nProfundo y sublime,\nEs el amor de mi creador.\nNo hay nada en el mundo\nQue pueda igualarse\nAl tierno amor, de mi Señor\n\nCORO:\nDios de amor, Dios de amor,\nSólo eres Tú, el Dios de amor;\nNo hay otro Dios, fuera de Ti,\nFuera de Ti, para mí no hay amor\n\n2.\nÉl, sólo nos ama,\nNos comprende y nos guarda\nDe todos los males\nQue existen aquí,\nPor eso le adoro\nCon toda mi alma,\nPorque Él me ha dado\nDe su dulce calma",
-        "tone": "DO  /  6/8"
-    },
-    {
-        "id": 403,
-        "title": "ABRE HOY TU CORAZÓN",
-        "lyrics": "IABRE HOY TU CORAZÓNDEJA A DIOS HABLAR CONTIGOPORQUE DICES SE TERMINOHASTA AQUÍ LLEGO YOEL ENEMIGO ME HA VENCIDOPON AHORA TODA TU FEEN JESÚS DE NAZARETHY ENTRÉGALE ESA LUCHAVEN AHORA Y ESCUCHANUESTRO DIOS ESTA AQUÍCORO:PASA ESTA PRUEBA CANTANDO AL SEÑOREN MEDIO DE LA ANGUSTIA EXALTA A TU DIOSPASA POR EL HORNO Y EL CRISOLEL FUEGO NO TE QUEMARAEL ES ÉL DIOS QUE TE CUIDA Y TE GUARDADERRIBA ENEMIGOS GUARDA TU ALMASI EN LA CUEVA DEL LEÓN TU ESTASEL ES EL LEÓN DE LA TRIBU DE JUDAIIYA NO DUDES MAS DE ÉLEL SEÑOR ESTA CONTIGOSI TU CARGA EL LLEVOENTREGA A EL TU CORAZÓNQUE LA VICTORIA ESTA CONTIGOPON AHORA TODA TU FEEN JESÚS DE NAZARETHY ENTRÉGALE ESA LUCHAVEN AHORA Y ESCUCHANUESTRO DIOS ESTA AQUÍ",
-        "tone": "A"
+        "tone": "DO  /  6/8",
+        "toneNote": "DO",
+        "timeSignature": "6/8",
+        "audioUrl": "https://www.youtube.com/watch?v=QsP7ps5ShQ0&list=RDu8xsRgicb58&index=3"
     },
     {
         "id": 405,
         "title": "SIENTO, SEÑOR",
         "lyrics": "1.\nSiento, Señor, que Tú estás conmigo,\nTe quiero cantar, pues Tú eres mi amigo;\nToma, Señor, toda mi vida,\nToma, Señor, todo mi ser.\n\nCORO:\n¡Más, más, más quiero sentirte!\nQuiero saltar y gritar lleno de tu amor,\nPues Tú llenaste mi vida,\nQue estaba tan triste;\nHoy siento gozo en mi alma\nY soy muy feliz.\n\n2.\nGracias, Señor, por el nuevo día,\nGracias, Señor, por darme tu amor;\nSiento, Señor, tu mano en mi vida,\nSiento, Señor, tu gracia en mi ser.",
-        "tone": "REm  /  4 TIEMPOS (12/8)"
+        "tone": "REm  /  4 TIEMPOS (12/8)",
+        "toneNote": "REm",
+        "beats": "4",
+        "timeSignature": "12/8",
+        "audioUrl": "https://firebasestorage.googleapis.com/v0/b/himnario-vito-2026.firebasestorage.app/o/audios%2Fcanto_especiales_405.m4a?alt=media&token=b2caebb7-f72f-46d2-ae7a-e013b746ce29"
     },
     {
         "id": 406,
@@ -1895,13 +1908,15 @@
         "id": 465,
         "title": "CUIDADANO DE LOS CIELOS",
         "lyrics": "1.\nOh Dios bendito, yo ya camino\nPor tus consejos, aunque soy un niño;\nSoy en el mundo un peregrino;\nYa ciudadano de los cielos soy.\n\nCORO:\nEres mi Ayuda, mi esperanza\nEres mi Apoyo y también mi Fuerza\nEres mi Vida y mi Confianza\n\n2.\nVivo alegre, en paz te sigo\nY nada temo, pues estoy contigo;\nEn este mundo en Ti me abrigo;\nYa ciudadano de los cielos soy.\n\n3.\nOh Dios bendito, yo ya camino\nPor tus consejos, aunque soy un niño;\nSoy en el mundo un peregrino;\nYa ciudadano de los cielos soy.\n\nFINAL:\nEres mi Ayuda, mi esperanza\nEres mi Apoyo y también mi Fuerza\nEres mi Vida y mi Confianza\nYa Ciudadano de los cielos soy",
-        "tone": "B"
+        "tone": "B",
+        "toneNote": "B"
     },
     {
         "id": 467,
         "title": "AGNUS DEI+SANTO POR SIEMPRE",
         "lyrics": "Aleluya, Aleluya\nNuestro Dios poderoso es Rey\nAleluya, Aleluya\nNuestro Dios poderoso es Rey\nAleluya,\nSanto, Santo\nEl Señor Dios poderoso\nDigno eres Tú, Digno eres Tú\nAmén\n\nTu nombre, es más alto\nTu nombre, es más grande\nTu nombre, sobre todo es\nDominios y tronos\nPoderes y reinos\nTu nombre, sobre todo es\n\nCantan ángeles\nSanto\nClama la creación\nSanto\nExaltado Dios\nSanto\nSanto por siempre\nTu gente cantará\nSantoRey de Reyes es\nSanto\nY por siempre serás\nSanto\nSanto por siempre\nY por siempre serás\nSanto\nSanto por siempre",
-        "tone": "G"
+        "tone": "G",
+        "toneNote": "G"
     },
     {
         "id": 468,
@@ -2014,8 +2029,10 @@
     {
         "id": 492,
         "title": "VASIJA QUEBRANTADA",
-        "lyrics": "Alfarero estás aquí\nHoy con mucha pena vengo a Ti\nSé que hace mucho no te hablo\nPero estás heridas ya no aguanto\nPoco a poco me aparté\nY de la rueda yo me alejé\nLa soledad ha sido mi cobija\nMe hacen tanta falta tus caricias\n\nCORO:\n//Soy una vasija quebrantada\nSoy un instrumento procesado\nY aunque no entienda lo que pasa\nCristo le da forma a este barro.//\n\nPUENTE:\n//Soy lo que Dios quería ver\nLos golpes me hicieron entender\nQue para ser inquebrantable\nPrimero Dios tiene que quebrarme//",
-        "tone": "D"
+        "lyrics": "Alfarero, estás aquí;\nHoy con mucha pena vengo a Ti.\nSé que hace mucho no te hablo,\nPero estas heridas ya no aguanto.\nPoco a poco me aparté,\nY de la rueda yo me alejé.\nLa soledad ha sido mi cobija;\nMe hacen tanta falta Tus caricias.\n\nCORO:\n// Soy una vasija quebrantada,\nSoy un instrumento procesado;\nY aunque no entienda lo que pasa,\nCristo le da forma a este barro. //\n\nPUENTE:\n// Soy lo que Dios quería ver;\nLos golpes me hicieron entender:\nQue para ser inquebrantable,\nPrimero Dios tiene que quebrarme. //",
+        "tone": "D",
+        "toneNote": "D",
+        "audioUrl": "https://youtu.be/itQ3cWO6MFY?si=uHjcw1crIlFKCQOO"
     },
     {
         "id": 493,
@@ -2444,12 +2461,6 @@
         "tone": "G"
     },
     {
-        "id": 583,
-        "title": "SALMOS 121 (ESPECIAL)",
-        "lyrics": "_Alzare mis ojos a los montesDe donde vendrá mi socorroMi socorro viene de Jehová mi DiosQue hizo los cielos y la tierra_No dará tu pie al resbaladeroNi se dormirá el que te guardaNo se adormecerá ni dormiráEl que guarda tu vida.Coro:_En tu caminar y en tu descansar Cuando solo te encuentres sin fuerzas para Continuar_Recuerda que en ti, Su Espíritu estaLLeno eres de amor, de Poder y de Capacidad_En el nombre de Jesús, avanza sin dudarQue Él nunca solo te ha dejado ni te dejara_Su paz te llenara, de gozo cantarasCuando creas que todos tus pecadosÉl los perdonó_Alma mia descansa en JehováSegunda estrofa:_El sol no te cansara de diaNi, la luna de nocheJehová te guardara de todo malÉl guardara tu alma._Jehová guardara tu salida Jehová guardara tu entrada,Desde ahora y para siempreDesde ahora y para siempre.",
-        "tone": "A"
-    },
-    {
         "id": 584,
         "title": "DEJASTE JESÚS (ESPECIAL)",
         "lyrics": "_Perdido estaba en mi errorVagando en la oscuridadYo buscaba un poco de amorUn poco de paz_Más lejos de ti no lo hallé Aunque mucho lo busqué Solo angustia, tristeza y dolorFue lo que encontré PRECORO:_Pero un día Jesús, con su amor me abrazoMis pecados Él los perdonó Y nueva vida me dió.CORO:_Dejaste Jesús, tu trono de gloria por mí Viniste a morir como un manso cordero en la cruzNos diste nuevas de salvación,Mi pecado tan cruel, sobre ti fue cargado JesúsMas tu muerte en la cruz, me dió la salvaciónGracias bendito Jesús._Hoy te canto a ti, porque libre me hiciste SeñorTu presencia hoy yo siento llenando mi serComo no te he de alabar,Mi vida mi ser a ti te pertenece JesúsMientra viva yo te quiero amar con el corazónY esperar que tú vuelvas por mi.",
@@ -2656,8 +2667,11 @@
     {
         "id": 622,
         "title": "MI NUEVO AMOR",
-        "lyrics": "ISIENTO QUE TENGO GANASDE VOLAR AL FIRMAMENTOGRITARLE AL MUNDO ENTEROLO QUE ESTOY SINTIENDOQUE YA ENCONTRÉ MI DULCE AMORJESÚS ES MI FELICIDADY AUNQUE MURIÓ EN AQUELLA CRUZVOLVIÓ A VIVIR Y AL FIN SABRÁNQUE AHORA...CORO:YO TENGO UN NUEVO AMORJAMÁS IMAGINÉ PODER HALLARA QUIEN LE DIÓ A MI VIDAUNA RAZÓN PARA AMARJESÚS MI AMOR Y MAS QUE AMORSIEMPRE SERÁ YO TENGO UN NUEVO AMOREL CORAZÓN ME LATE SIN PARARHAY UNO QUE ME DIJOTE AMO DE VERDADJESÚS MI AMOR(c) Y MAS QUE AMORMI DULCE PAZIIAMO SU VOZ DULCISIMAEN RESPUESTA CUANDO LLAMOSUS OJOS TIERNOSY HASTA EL TOQUE DE SUS MANOSPOR SIEMPRE SUYA QUIERO SERJESÚS ES TODA MI VERDADY NUNCA YO ME CANSARÉ DE REPETIR HASTA EL FINALQUE AHORA...CORO:YO TENGO UN NUEVO AMORJAMÁS IMAGINÉ PODER HALLARA QUIEN LE DIÓ A MI VIDAUNA RAZÓN PARA AMARJESÚS MI AMOR Y MAS QUE AMORSIEMPRE SERÁ YO TENGO UN NUEVO AMOREL CORAZÓN ME LATE SIN PARARHAY UNO QUE ME DIJOTE AMO DE VERDADJESÚS MI AMOR(c) Y MAS QUE AMORMI DULCE PAZAMO SU VOZ DULCISIMAEN RESPUESTA CUANDO LLAMOSUS OJOS TIERNOSY HASTA EL TOQUE DE SUS MANOSPOR SIEMPRE SUYA QUIERO SERJESÚS ES TODA MI VERDADY NUNCA YO ME CANSARÉ DE REPETIR HASTA EL FINALQUE AHORA...CORO:YO TENGO UN NUEVO AMORJAMÁS IMAGINÉ PODER HALLARA QUIEN LE DIÓ A MI VIDAUNA RAZÓN PARA AMARJESÚS MI AMOR Y MAS QUE AMORSIEMPRE SERÁ YO TENGO UN NUEVO AMOREL CORAZÓN ME LATE SIN PARARHAY UNO QUE ME DIJOTE AMO DE VERDADJESÚS MI AMOR(c) Y MAS QUE AMORMI DULCE PAZFINAL: //JESÚS MI AMOR Y MAS QUE AMOR,MI DULCE PAZ//",
-        "tone": "A"
+        "lyrics": "1.\nSiento que tengo ganas\nDe volar al firmamento,\nGritarle al mundo entero\nLo que estoy sintiendo:\nQue ya encontré mi dulce amor.\nJesús es mi felicidad,\nY aunque murió en aquella cruz,\nVolvió a vivir y al fin sabrán\nQue ahora...\n\nCORO:\nYo tengo un nuevo amor.\nJamás imaginé poder hallar\nA quien le dio a mi vida\nUna razón para amar.\nJesús, mi amor y más que amor,\nSiempre será.\n\nYo tengo un nuevo amor.\nEl corazón me late sin parar.\nHay Uno que me dijo:\n«Te amo de verdad».\nJesús, mi amor\nY más que amor,\nMi dulce paz.\n\n2.\nAmo su voz dulcísima\nEn respuesta cuando llamo,\nSus ojos tiernos\nY hasta el toque de sus manos.\nPor siempre suyo quiero ser.\nJesús es toda mi verdad,\nY nunca yo me cansaré\nDe repetir hasta el final\nQue ahora...",
+        "tone": "A  /  4 TIEMPOS (4/4)",
+        "toneNote": "A",
+        "beats": "4",
+        "timeSignature": "4/4"
     },
     {
         "id": 623,
@@ -3038,12 +3052,6 @@
         "tone": "D"
     },
     {
-        "id": 701,
-        "title": "SALMOS 121",
-        "lyrics": "SALMOS 121. INTRO CHARANGO: Em TODOS: G B7 Em CON QUENA: //G B7 Em... C Bm // Bm…. ---------------------------- G B7 Em //Alzare mis ojos a los montes C Bm Bm… de donde vendrá mi socorro// coro Em Bm Em //Mi socorro viene de Jehová Bm Em C Bm .Bm… que hizo los Cielos y la tierra// ---------------------------------------- PUENTE ZAMPOÑA: //G Bm Em.. C Bm// Bm. PUENTE QUENA: //G Bm Em.. C Bm// Bm.. --------------------------------------- G. B7 Em //No dará tu pie al resbaladero C Bm Bm… ni se dormirá el que te guarda// coro Em Bm Em //Mi socorro viene de Jehová Bm Em C Bm. Bm… que hizo los Cielos y la tierra// ------------------------------------- PUENTE QUENA: //G Bm Em.. C Bm// Bm.",
-        "tone": "EM"
-    },
-    {
         "id": 702,
         "title": "SUENA LA TROMPETA",
         "lyrics": "//suena la trompeta y la iglesia va de viaje cristo manda a su pueblo a prepararse ////cristo viene pronto vienes por su iglesia y el que no esté listo triste mente se quedará//",
@@ -3320,12 +3328,6 @@
         "tone": "C"
     },
     {
-        "id": 760,
-        "title": "AMARTE SOLO A TI SEÑOR",
-        "lyrics": "AMARTE SOLO A TI SEÑOR----------------------EM          SI7AMARTE SOLO A TI SEÑOR              MImAMARTE SOLO A TI SEÑOR              SI7AMARTE SOLO A TI SEÑOR            MIm  Y NO MUDAR A TRÁS         CORO   MI7.         AM     RE7//SEGUIR TU CAMINAR SEÑOR               SOL.    EMSEGUIR SIN DESMAYAR SEÑOR                   LAmPOSTRALME ANTE TU ALTARSI7SEÑOR              MImY NO MUDAR A TRÁS//   SI,MI,FA#,SOL,MI,FA#,FA#,FA#  SI,RE#,MI,FA#,RE#,MI,MI,MI  SI,MI,FA#,SOL,MI,FA#,FA#,FA#  SI,MI,RE,DO,RE,MI//SI,MI,RE,DO,SI,DO,RE,DO  LA,RE,DO,LA#,LA,LA#,DO,LA#  SOL,DO,LA#,G#,SOL,G#,LA#,G#  MI,SI,RE,DO,RE,MI//",
-        "tone": "EM"
-    },
-    {
         "id": 761,
         "title": "VIVE CRISTO VIVE",
         "lyrics": "Has oído hablar de un hombre, que crucificado fue por ti, fue de espinas coronado, su costado traspasado y todo lo hizo por amor.coro: ni la cruz pudo con el, ni la muerte le pudo vencer, vive Cristo vive, vive Cristo vive y hoy con nosotros está.y la historia no, termino allí, hoy sigue avanzando hasta el final, y el nombre de aquel, que murió en la cruz a cambiado a muchos hombres pues vivo está.",
@@ -3563,7 +3565,8 @@
         "id": 824,
         "title": "HALLÉ UN BUEN AMIGO",
         "lyrics": "1.\nHallé un buen Amigó, mi amado Salvador,\nContaré lo que Él ha hecho para mi,\nHallandome perdido, e indigno pecador,\nMe salvó y hoy me guarda para si,\nMe salva del pecado, me guarda de Satán,\nPromete estar conmigo hasta Él fin,\nÉl consuela mi tristeza, me quita todo afán,\nGrandes cosas Cristo ha hecho para mi,\n\n2.\nJesús jamás me falta, jamás me dejará,\nEs muy fuerte y poderoso protector,\nDel mundo me separo, y de la vanidad,\nPara consagrar mi vida al seño,\nSi Él mundo me persigue, si sufro tentación,\nConfiando en Cristo puedo resistir,\nLa victoria me asegura, y elevó mi canción,\nGrandes cosas Cristo ha hechó para mi,\n\n3.\nYo sé que Jesucristo, muy pronto volverá,\nY entré tanto me prepara un hogar,\nEn la casa de mi Padre, mansión de luz y paz\nDo Él creyente fiel con Él ha de morar,\nLlevándome a la gloria , ningún pesar tendré,\nContemplaré su rostro siempre allí,\nCon lo santos redemido, gozoso cantaré\nGrandes cosas Cristo ha hecho para mi",
-        "tone": "C"
+        "tone": "C",
+        "toneNote": "C"
     },
     {
         "id": 825,
@@ -3850,7 +3853,8 @@
         "id": 879,
         "title": "¡OH, VEN ESPIRÍTU DE AMOR!",
         "lyrics": "¡Oh ven, Espíritu de amor!\nPaloma celestial\nInspíranos tu Santo ardor\nDel vivo manantial.\nEleva nuestro corazón\nDel mundo tan cruel\nConcédenos el grato donde serte siempre fiel.\nPerdona nuestra tibia fe\nY líbranos  del mal enséñanos tu santa ley\nDoctrina celestial.\n¡Oh ven,  Espíritu de Dios!\nPoder consoladora proclamar\nAyúdanos tu infinito amor.",
-        "tone": "C"
+        "tone": "C",
+        "toneNote": "C"
     },
     {
         "id": 880,
@@ -3887,7 +3891,11 @@
         "id": 888,
         "title": "TE SEGUIRÉ AMANDO",
         "lyrics": "1.\nSeñor, estoy aquí\nY no quiero seguir sufriendo;\nPor mi error estoy así\nY no quiero seguir llorando.\n\nPor eso estoy ante Ti,\nTú me das fuerzas para seguir;\nEres mi amigo, mi compañero,\nEres Tú la razón de mi existir.\n\nCORO:\n// Y aunque yo lo pierda todo,\nTe seguiré alabando,\nY en medio de la angustia yo te canto,\nY aun estando en la prueba,\nYo te seguiré amando. //\n\n2.\nSeñor, estoy ante tu altar\nY no quiero seguir huyendo;\nSolo Tú me das seguridad\nY tu amor nunca jamás\nMe ha abandonado.\n\nPor eso hoy pido de tu paz,\nEsa calma que solo Tú me puedes dar;\nYo quiero estar siempre a tu lado\nY de tu mano nunca jamás\nMe pueda soltar.",
-        "tone": "MI  /  2 TIEMPOS (6/8)"
+        "tone": "MI  /  2 TIEMPOS (6/8)",
+        "toneNote": "MI",
+        "beats": "2",
+        "timeSignature": "6/8",
+        "audioUrl": "https://firebasestorage.googleapis.com/v0/b/himnario-vito-2026.firebasestorage.app/o/audios%2Fcanto_especiales_888.m4a?alt=media&token=085384c1-4dc5-4a3d-b75e-26f9521362e8"
     },
     {
         "id": 889,
@@ -4178,11 +4186,6 @@
         "id": 963,
         "title": "MEDLEY LA MENOR",
         "lyrics": "MEDLEY LA MENOR\nTiempo 2 / Nota: LAm\n\n-UN FUEGO SANTO\n-CUANDO VENGAS A LA IGLEISA\n-CAE CAE CAE\n-JEHOVA LE DIJO A MOISÉS\n-RIOS DE AGUA VIVA\n-AVIVA TU OBRA SEÑOR\n-VI UN ANGEL\n-EL CRISTO QUE SE ADORA AQUÍ\n-ENTONCES VI LOS CIELOS"
-    },
-    {
-        "id": 965,
-        "title": "SUEÑOS",
-        "lyrics": "Sueños\nTiempo 2 / Nota: DO"
     },
     {
         "id": 966,
@@ -4822,7 +4825,8 @@
     {
         "id": 1128,
         "title": "REY MESÍAS",
-        "lyrics": "SOLISTA:\nJesús, Jesús ten misericordia de mi\nJesús Hijo de David ten misericordia de mi.\n\n1.\nTan solo una oportunidad, Dios,\nPermíteme a Ti llegar\nLa multitud te aprieta ya\nY yo sin fuerzas.\nTan solo se, que al tocar tu manto\nUn milagro harás,\nMi única esperanza tu,\n\nOh Mesías,\nDoce años esperé,\nTodo lo he perdido ya\nY nadie pudo curar mi agonía.\nY con fe me acerque\nA tu manto de poder\nY virtud salió de Ti\n¡Rey Mesías!\n\nCoro:\n//Recibe sanidad,\nRecibe salvación,\nTu fe te ha salvado,\nOí tu clamor//\n\nPUENTE:\nPoderoso eres Jehová, \nMi socorro en aflicción\nEres Tú mi ayudador,\nMi luz en el seol\nTu nombre exaltaré,\nMis manos alzaré\nAl Rey alabaré,\nMi voz no callaré"
+        "lyrics": "SOLISTA:\nJesús, Jesús ten misericordia de mi\nJesús Hijo de David ten misericordia de mi.\n\n1.\nTan solo una oportunidad, Dios,\nPermíteme a Ti llegar\nLa multitud te aprieta ya\nY yo sin fuerzas.\nTan solo se, que al tocar tu manto\nUn milagro harás,\nMi única esperanza tu,\n\nOh Mesías,\nDoce años esperé,\nTodo lo he perdido ya\nY nadie pudo curar mi agonía.\nY con fe me acerque\nA tu manto de poder\nY virtud salió de Ti\n¡Rey Mesías!\n\nCoro:\n//Recibe sanidad,\nRecibe salvación,\nTu fe te ha salvado,\nOí tu clamor//\n\nPUENTE:\nPoderoso eres Jehová, \nMi socorro en aflicción\nEres Tú mi ayudador,\nMi luz en el seol\nTu nombre exaltaré,\nMis manos alzaré\nAl Rey alabaré,\nMi voz no callaré",
+        "audioUrl": "https://www.youtube.com/watch?v=q0ER6fIkX1Y&list=RDqs1WmWFO7Bk&index=2"
     },
     {
         "id": 1130,
@@ -4968,7 +4972,12 @@
         "id": 1164,
         "title": "LA GRAN VICTORIA",
         "lyrics": "1.\nHijo, no temas,\nYo soy el que habla contigo;\nVi tus lágrimas\nY escuché tus gemidos.\nEn las madrugadas me buscas\nSin importarte el sueño;\nHijo, tus oraciones\nHan llegado a mi trono.\n\nYo he visto las luchas\nQue estás pasando\nY esa cruz tan pesada\nQue estás cargando;\nSon momentos tan difíciles\nQue piensas así:\n«Ciertamente, el Dios que sirvo\nSe olvidó de mí».\n\nCORO:\n// Hijo, Yo no te olvidé\nNi jamás te abandoné;\nSepas que cuando llorabas,\nContigo lloré.\nHijo, ¡Yo estoy aquí,\nSiempre al lado de ti!\nY hoy una gran victoria\nTengo para ti //\n\n2.\nEn las horas de angustia,\nYo estaba a tu lado\nY te cargué en mis brazos\nCuando estabas cansado;\nEn los momentos difíciles\nYo fui tu abrigo\nY tu hermano, tu Dios,\nTu Padre, tu amigo.\n\n¿Recuerdas cuando del mundo\nCon amor te llamé?\nAntes que tú me amaras,\nYo primero te amé;\nNi por un segundo siquiera\nYo jamás te olvidé;\nEntre los muchos que llamé,\n¡A ti te escogí!\n\nFINAL:\n// Y hoy una gran victoria\nTengo para ti //",
-        "tone": "MI  /  3 TIEMPOS (12/8)"
+        "tone": "MI  /  3 TIEMPOS (12/8)",
+        "toneNote": "MI",
+        "beats": "3",
+        "timeSignature": "12/8",
+        "category": "Coros Unidos",
+        "audioUrl": "https://firebasestorage.googleapis.com/v0/b/himnario-vito-2026.firebasestorage.app/o/audios%2Fcanto_especiales_1164.mp3?alt=media&token=b3221568-ee8b-4cff-ab7b-4ec69a14adbb"
     },
     {
         "id": 1166,
@@ -5143,7 +5152,7 @@
     {
         "id": 1210,
         "title": "OH JESÚS MIRAME",
-        "lyrics": "oh Jesús mirame\nTiempo 2 / Nota: MIm\n\noh Jesús mirame\ny verás que estoy llorando\ncon mi cabeza baja\ny mi boca entre abierta\nno te puedo mirar\nmi corazón tiene vergüenza pues ante tí yo peque\noh mi Dios perdóname\n\nCoro:\nperdóname señor\nsi yo he sido tan cruel\ndejándote a tí por otro amor infiel\nestoy arrepentido mira mis lágrimas oh Dios\ny con sinceridad de todo corazón\nte pido que me des de aquel primer amor\nque me diste Jesús cuando te conocí\n\noh Jesús mirame\nmis manos están temblando\nmi corazón está angustiado\ny mi alma tiene pena\nal darme cuenta de que\nyo te clave en un costado\ny con mis actos oh Dios\nte estoy asiendo llorar\n\nCoro:\n"
+        "lyrics": "oh Jesús mirame\nTiempo 2 / Nota: MIm\n\noh Jesús mirame\ny verás que estoy llorando\ncon mi cabeza baja\ny mi boca entre abierta\nno te puedo mirar\nmi corazón tiene vergüenza pues ante tí yo peque\noh mi Dios perdóname\n\nCoro:\nperdóname señor\nsi yo he sido tan cruel\ndejándote a tí por otro amor infiel\nestoy arrepentido mira mis lágrimas oh Dios\ny con sinceridad de todo corazón\nte pido que me des de aquel primer amor\nque me diste Jesús cuando te conocí\n\noh Jesús mirame\nmis manos están temblando\nmi corazón está angustiado\ny mi alma tiene pena\nal darme cuenta de que\nyo te clave en un costado\ny con mis actos oh Dios\nte estoy asiendo llorar\n\nCoro:"
     },
     {
         "id": 1212,
@@ -6086,19 +6095,9 @@
         "lyrics": "Loor a Ti Mi Dios\nTiempo 2 / Nota: DO\n\nLoor a ti mi Dios en esta noche\nPor todas las bondades de este día\nOh guardame que tus potentes alas\nSean por siempre la defensa mía\n\nDe cuantas faltas hoy he cometido\nContigo, con el prójimo y conmigo\nPerdóname mi Dios por tu Hijo Amado\nY haz que mi sueño pueda ser tranquilo\n\nEnséñame a vivir que no me espante\nLa tumba más que el lecho del reposo\nEnséñame a morir para que pueda\nEl día del juicio despertar glorioso\nY pueda reposar en ti mi vida\nMis parpados los cierre un dulce sueño\nUn sueño en que vigor puedas prestarme\nPara servirte al despertar mi dueño\n\nEnséñame a vivir que no me espante\nLa tumba más que el lecho del reposo\nEnséñame a morir para que pueda\nEl día del juicio despertar glorioso\nY pueda reposar en ti mi vida\nMis parpados los cierre un dulce sueño\nUn sueño en que vigor puedas prestarme\nPara servirte al despertar mi dueño"
     },
     {
-        "id": 1477,
-        "title": "ALLÁ QUIERO ESTAR",
-        "lyrics": "Allá quiero estar\nTiempo 2 / Nota: DO\n\nYo oigo decir que mas alla hay un hogar\n\nDonde el creyente para siempre puede morar\n\nDonde ni muerte ni pesar habra jamas\n\nPues alli con el Señor es todo solaz\n\nCoro\n\nAlla quiero estar alla quiero estar\n\nVer a mi Salvador y con El morar\n\nAlla quiero estar alla quiero estar\n\nY alabanzas a Jesus alli entonar\n\nNo dejare de proclamar que mi Jesus\n\nPor pecadores ya murio en cruenta cruz\n\nCalma dara al peregrino en la tempestad\n\nCanto por duelo le dara en su gran bondad\n\nRepetir Coro\n\nSi tengo pruebas cantare feliz aqui\n\nPorque yo se que voy a ver a Cristo alla\n\nDonde por siempre con fervor yo cantare\n\nCanto de redencion alli entonare\n\nRepetir Coro"
-    },
-    {
         "id": 1478,
         "title": "SENDAS DIOS HARÁ",
         "lyrics": "Sendas Dios hará\nTiempo 2 / Nota: DO\n\nSendas Dios hará\n\nJuan Carlos Alvarado\n\nSendas Dios hará\nDonde piensas que no hay\nÉl obra en maneras que\nNo podemos entender\nÉl me guiará\nA su lado estaré\nAmor y fuerza me dará\nUn camino hará\nDonde no lo hay.\n\nPor camino en la soledad me guiará\nY agua en el desierto encontraré\nLa tierra pasará\nSu palabra eterna es\nÉl hará algo nuevo hoy."
-    },
-    {
-        "id": 1479,
-        "title": "AMÉMONOS DE CORAZÓN",
-        "lyrics": "Amémonos de corazón\nTiempo 2 / Nota: DO\n\ncoro\nAmémonos de corazón\nNo de labios, ni de oídos\n\nPara cuando Cristo venga\nPara cuando Cristo venga\nNos encuentre preparados bis\n\n¿Cómo puedes tu orar\nEnojado con tu hermano? bis\n\nDios no escucha la oración\nDios no escucha la oración\nSi no estás reconciliado bis\n\nUn mandamiento nuevo soy\nOs améis unos a otros\n\nComo yo os he amado, como yo os he amado\nOs améis también vosotros"
     },
     {
         "id": 1480,
@@ -6894,7 +6893,9 @@
         "id": 1685,
         "title": "QUIERO ANDAR MI SEÑOR",
         "lyrics": "1.\nQuiero andar mi Señor\nPor tu senda de amor esforzándome\nMás y más por doquiera impartiendo\nAlegría y solaz pero lleno de tu bondad.\n\nCORO:\nMi sendero de amor llena hoy Señor,\nQue tu Espíritu guié mis pies\nY que siempre al andar lleno esté\nDe tu amor el camino por donde voy.\n\n2.\nTenme cerca de Ti. Oh, mi buen Salvador,\nNo permitas jamás, jamás, que yo vague sin luz,\nSin destino y sin paz, ¡mi sendero de amor llena hoy!\n\n3.\nLa jornada fugaz pronto terminará\nY no habrá mas sufrir allá ¡Aleluya,\nCantad al divino Señor! mi sendero de amor llena hoy.",
-        "tone": "DO  /  2 TIEMPOS"
+        "tone": "DO  /  2 TIEMPOS",
+        "toneNote": "DO",
+        "beats": "2"
     },
     {
         "id": 1686,
@@ -6970,7 +6971,8 @@
     {
         "id": 1709,
         "title": "ADÓNDE IRÉ",
-        "lyrics": "Siento que sin Ti, mi vida es nada\nY que sin tu amor no viviré,\nEstoy confundida a tal manera,\nQuisiera ahora mismo te pudiera ver\n\nPienso que sin Ti, la visa es vana\nY que sin tu amor no viviré,\nEstoy confundida a tal manera\nPor favor, Señor, ayúdame\n\nCORO: //¿adónde iré, Jehová, sin Ti?//\n¿A donde iré?\n¿A donde iré, Jehová, sin Ti?\nSi Tú eres el fuego que me quema\nQuiero sentirte de mil maneras\n¿A donde iré?\n¿A dónde iré, Jehová, sin Ti?"
+        "lyrics": "Siento que sin Ti, mi vida es nada\nY que sin tu amor no viviré,\nEstoy confundida a tal manera,\nQuisiera ahora mismo te pudiera ver\n\nPienso que sin Ti, la visa es vana\nY que sin tu amor no viviré,\nEstoy confundida a tal manera\nPor favor, Señor, ayúdame\n\nCORO: //¿adónde iré, Jehová, sin Ti?//\n¿A donde iré?\n¿A donde iré, Jehová, sin Ti?\nSi Tú eres el fuego que me quema\nQuiero sentirte de mil maneras\n¿A donde iré?\n¿A dónde iré, Jehová, sin Ti?",
+        "audioUrl": "https://www.youtube.com/watch?v=7K0xpbIQlxs"
     },
     {
         "id": 1710,
@@ -7201,7 +7203,8 @@
     {
         "id": 1769,
         "title": "A LA CASA DE MI PADRE",
-        "lyrics": "Hay un clamor\nDesde lo más profundo de mi ser\nMe esta llorando el corazón\nAnhelando volver a tus brazos de amor\n\nNo tardaré, tu voz me llama y no resistiré\nPorque el camino que tomé\nSeparado de Ti, se que no está bien\n\nCORO:\nPorque nací para adorarte,\nPero no quise obedecerte tu voz\nEl día que mi necedad\nFui siguiendo el destello\nDe una falsa ilusión\n\nIré a la casa de mi Padre\nY arrepentido pediré su perdón,\nPues, malgasté lo que el me dio\nComprando las mentiras de este mundo traidor\n\nY esperaré, tan solo que me hagas siervo tuyo,\nPorque he perdido el privilegio\nDe ser llamado tu Hijo,\nPadre mio acéptame"
+        "lyrics": "Hay un clamor\nDesde lo más profundo de mi ser\nMe esta llorando el corazón\nAnhelando volver a tus brazos de amor\n\nNo tardaré, tu voz me llama y no resistiré\nPorque el camino que tomé\nSeparado de Ti, se que no está bien\n\nCORO:\nPorque nací para adorarte,\nPero no quise obedecerte tu voz\nEl día que mi necedad\nFui siguiendo el destello\nDe una falsa ilusión\n\nIré a la casa de mi Padre\nY arrepentido pediré su perdón,\nPues, malgasté lo que el me dio\nComprando las mentiras de este mundo traidor\n\nY esperaré, tan solo que me hagas siervo tuyo,\nPorque he perdido el privilegio\nDe ser llamado tu Hijo,\nPadre mio acéptame",
+        "audioUrl": "https://www.youtube.com/watch?v=ys9W4RsA7Jo&list=RDys9W4RsA7Jo&start_radio=1"
     },
     {
         "id": 1770,
@@ -8898,7 +8901,11 @@
         "id": 2250,
         "title": "GRACIAS SEÑOR",
         "lyrics": "1.\nSeñor, hoy vengo ante Ti\nPorque Tú eres todo para mí,\nQuiero decirte cuanto te amo,\nQue sin Ti no puedo vivir.\n\nYo vivía en tristeza y en soledad,\nNo había esperanza para mí,\nCuando nadie me amó,\nLlegaste Tú, Señor\nPara amarme y hacerme feliz.\n\nCORO:\n// Gracias, muchas gracias\n¡Te doy, Jesús!\nPor haber salvado mi vida\nTu amor me hizo nacer\nY mi vida transformó,\nEs por eso,\nTe amo, Señor //\n\n2.\n¡Qué alegría siento en mi vida!\nPorque Cristo vive en mí,\nSu poder me hizo renacer,\nHoy soy libre y vivo para Dios.\n\nPor eso canto\nCon todo mi corazón\nY Tu nombre alabo, Señor.\nTe prometo no dejarte jamás\nY un día a la gloria llegar.",
-        "tone": "SIm  /  2 TIEMPOS (6/8)"
+        "tone": "SIm  /  2 TIEMPOS (6/8)",
+        "toneNote": "SIm",
+        "beats": "2",
+        "timeSignature": "6/8",
+        "audioUrl": "https://firebasestorage.googleapis.com/v0/b/himnario-vito-2026.firebasestorage.app/o/audios%2Fcanto_especiales_2250.m4a?alt=media&token=ca4470a7-f02f-4e78-9da9-9b32a3a2c2e7"
     },
     {
         "id": 2251,
@@ -9264,7 +9271,8 @@
     {
         "id": 2341,
         "title": "SI TÚ NO ESTAS",
-        "lyrics": "1.\nSi Tú no estas, no puedo\nNi siquiera caminar\nEres mi socorro, eres mi fortaleza,\nEres mi gran ayuda en la tempestad\n\nCORO:\n¿Como podré vivir sin Ti?\nSi Tú eres mi esperanza, eres Tú mi alegría\nTe necesito mi Señor a cada instante,\nEn cada minuto, en cada día,\n¿Como podré vivir sin Ti?\nSi Tú eres mi sustento, eres mi compañía,\nEres mi amparo, mi Señor, de noche y día,\nVivir sin Ti Señor... yo no podría\n\n2.\nSi Tú no estas no puedo\nNi siquiera respirar,\nEres mí esperanza, eres todo en mi vida,\nSeñor yo te necesito, no me dejes jamás\n\nFINAL:\nNo podría\n(Hermanas) sin Ti... (hermanos) sin Ti...\nYo no podría"
+        "lyrics": "1.\nSi Tú no estas, no puedo\nNi siquiera caminar\nEres mi socorro, eres mi fortaleza,\nEres mi gran ayuda en la tempestad\n\nCORO:\n¿Como podré vivir sin Ti?\nSi Tú eres mi esperanza, eres Tú mi alegría\nTe necesito mi Señor a cada instante,\nEn cada minuto, en cada día,\n¿Como podré vivir sin Ti?\nSi Tú eres mi sustento, eres mi compañía,\nEres mi amparo, mi Señor, de noche y día,\nVivir sin Ti Señor... yo no podría\n\n2.\nSi Tú no estas no puedo\nNi siquiera respirar,\nEres mí esperanza, eres todo en mi vida,\nSeñor yo te necesito, no me dejes jamás\n\nFINAL:\nNo podría\n(Hermanas) sin Ti... (hermanos) sin Ti...\nYo no podría",
+        "audioUrl": "https://www.youtube.com/watch?v=vJz85RSgYKM&list=RDvJz85RSgYKM&start_radio=1"
     },
     {
         "id": 2342,
@@ -9299,7 +9307,8 @@
     {
         "id": 2350,
         "title": "A SOLAS CON EL MAESTRO",
-        "lyrics": "1.\nA solas con el Maestro\nPuedo contarle lo que siento,\nMis problemas, aflicciones, mi pesar.\nTodo mi corazón lo derramo a Él,\nPero más que mis problemas,\nEn nuestra conversación,\nHe venido a decirle lo que siento por Él,\nY en una ofrenda grata le quiero decir.\n\nCORO:\nQue te amo con todas\nLas fuerzas de mi corazón,\nQue te quiero, te alabo,\nTe bendigo, te exalto, Señor.\nQue mi vida no es vida\nSi no estoy junto a Ti.\n(Junto a Ti)\nSeñor, te amo con todo mi ser.\nSuples toda necesidad que hay en mí,\nLlenas mi vida y mi alma\nDe gozo, Señor.\n\n2.\nA solas con el Maestro,\nMi corazón está dispuesto,\nAunque cante alabanzas al que reina.\nTodo mi corazón lo derramo a Él.\nAnte todos mis problemas\nSiempre le alabaré,\nAnte toda dificultad\nTu nombre exaltaré,\nY hoy preciso decirte, Señor."
+        "lyrics": "1.\nA solas con el Maestro,\nPuedo contarle lo que siento,\nMis problemas, aflicciones, mi pesar.\nTodo mi corazón lo derramo a Él,\nPero más que mis problemas,\nEn nuestra conversación,\nHe venido a decirle lo que siento por Él,\nY en una ofrenda grata le quiero decir.\n\nCORO:\nQue te amo con todas\nLas fuerzas de mi corazón,\nQue te quiero, te alabo,\nTe bendigo, te exalto, Señor.\nQue mi vida no es vida\nSi no estoy junto a Ti.\n(Junto a Ti)\nSeñor, te amo con todo mi ser.\nSuples toda necesidad que hay en mí,\nLlenas mi vida y mi alma\nDe gozo, Señor.\n\n2.\nA solas con el Maestro,\nMi corazón está dispuesto,\nAunque cante alabanzas al que reina.\nTodo mi corazón lo derramo a Él.\nAnte todos mis problemas\nSiempre le alabaré,\nAnte toda dificultad\nTu nombre exaltaré,\nY hoy preciso decirte, Señor.",
+        "audioUrl": "https://youtu.be/_8ZCY4jXTTQ?si=j5e-OpyFrlg-M5Di"
     },
     {
         "id": 2352,
@@ -9309,7 +9318,8 @@
     {
         "id": 2353,
         "title": "ERES TODO EN MI VIDA",
-        "lyrics": "¿Como no he de alabarte,\nSi eres todo para mi, Señor?\nEres mi fuerza y mi refugio,\nSol de la mañana,\nSanto eres Tú, Señor.\nEres mi justicia,\nMi ayudador, eres Tú\nOh, Dios\n\nCORO:\nEres la fuente de vida\nQue sacia la sed que hay en mi,\nEres el alfa y omega,\nEl principio y el fin,\nEres mi calma y mi paz\nEn medio de la tempestad,\nTú eres mi Rey, eres mi amor,\nEres en mi vida, todo Señor.\n\nPUENTE:\n(Solistas)\nHas sido, Señor,\nMás que un amigo;\nTu mano siempre\nHa estado a mi favor\n\n(Hermana) por siempre, Tú serás\n(Hermano) mi eterno Salvador\n(Todos) ya siento tu presencia\n(Solistas) tu Espíritu\n(Todos) hoy se mueve en mi"
+        "lyrics": "¿Como no he de alabarte,\nSi eres todo para mi, Señor?\nEres mi fuerza y mi refugio,\nSol de la mañana,\nSanto eres Tú, Señor.\nEres mi justicia,\nMi ayudador, eres Tú\nOh, Dios\n\nCORO:\nEres la fuente de vida\nQue sacia la sed que hay en mi,\nEres el alfa y omega,\nEl principio y el fin,\nEres mi calma y mi paz\nEn medio de la tempestad,\nTú eres mi Rey, eres mi amor,\nEres en mi vida, todo Señor.\n\nPUENTE:\n(Solistas)\nHas sido, Señor,\nMás que un amigo;\nTu mano siempre\nHa estado a mi favor\n\n(Hermana) por siempre, Tú serás\n(Hermano) mi eterno Salvador\n(Todos) ya siento tu presencia\n(Solistas) tu Espíritu\n(Todos) hoy se mueve en mi",
+        "audioUrl": "https://www.youtube.com/watch?v=Yrz74cG0h-g&list=RD8Azkbu-VASk&index=2"
     },
     {
         "id": 2354,
@@ -9614,17 +9624,24 @@
     {
         "id": 2423,
         "title": "A CADA MOMENTO",
-        "lyrics": "1.\nA cada momento del día\nTe ruego Señor me permitas\nSentir de tu gracia en mi vida\nDe gozo mi alma llenar\n\nQue solo al tocar de tus manos\nMi alma tu nombre alabe\nMi boca tu gloria exalte\nAhora y por la eternidad\n\nLas pruebas no deben quitarme\nEl gozo que me has entregado\n¡Oh Dios de los cielos!\n¡Oh Padre eterno!\nDerrama en mi vida poder\n\nCORO:\nPorque a cada momento del día Señor\nQuisiera sentir de tu gracia en mi ser\nQue solo al pensar que tu vives en mi\nMe llene de gozo y poder\nTu haces mi vida tan bella Señor\nMomentos felices que siempre tendré\nPor eso mi anhelo ferviente es sentirte\nA cada momento Señor\n\n2.\nHas sido Jesús mi baluarte\nMi amigo, mi fiel compañero\nMi ayuda, mi único anhelo\nMi bella razón de existir\n\nFerviente deseo servirte\nY en todo por siempre agradarte\nMi vida tu gloria exalte\nAhora y por la eternidad\n\nLas pruebas no deben quitarme\nEl gozo que me has entregado\n¡Oh Dios de los cielos!\n¡Oh Padre eterno!\nDerrama en mi vida poder"
+        "lyrics": "1.\nA Cada Momento del día,\nTe ruego, Señor, me permitas\nSentir de Tu gracia en mi vida,\nDe gozo mi alma llenar.\n\nQue solo al tocar de Tus manos,\nMi alma Tu nombre alabe,\nMi boca Tu gloria exalte\nAhora y por la eternidad.\n\nLas pruebas no deben quitarme\nEl gozo que me has entregado.\n¡Oh, Dios de los cielos!\n¡Oh, Padre eterno!\nDerrama en mi vida poder.\n\nCORO:\nPorque a cada momento del día, Señor,\nQuisiera sentir de Tu gracia en mi ser.\nQue solo al pensar que Tú vives en mí\nMe llene de gozo y poder.\nTú haces mi vida tan bella, Señor,\nMomentos felices que siempre tendré.\nPor eso mi anhelo ferviente es sentirte\nA cada momento, Señor.\n\n2.\nHas sido, Jesús, mi baluarte,\nMi amigo, mi fiel compañero,\nMi ayuda, mi único anhelo,\nMi bella razón de existir.\n\nFerviente deseo servirte\nY en todo por siempre agradarte.\nMi vida Tu gloria exalte\nAhora y por la eternidad.\n\nLas pruebas no deben quitarme\nEl gozo que me has entregado.\n¡Oh, Dios de los cielos!\n¡Oh, Padre eterno!\nDerrama en mi vida poder.",
+        "tone": "DO  /  2 TIEMPOS (6/8)",
+        "toneNote": "DO",
+        "beats": "2",
+        "timeSignature": "6/8",
+        "audioUrl": "https://firebasestorage.googleapis.com/v0/b/himnario-vito-2026.firebasestorage.app/o/audios%2Fcanto_especiales_2423.m4a?alt=media&token=9ca05a6f-e90c-45ee-a74a-f7cf4b2e06a3"
     },
     {
         "id": 2424,
         "title": "A LA DIESTRA DE TI",
-        "lyrics": "1.\nYo sin pensar, que Tú estabas ahí\nY al olvidar que eras todo para mi,\nPequé y de Ti me olvidé\nLágrimas cayeron de tus ojos por mi\n\nEse dolor causado en Ti,\nAl no recordar, que moriste Tú por mi,\nSi todo lo que yo soy\nTe lo debo todo, por amor\n\nCORO:\nQuiero estar sentado a la diestra de Ti\nY gozar las maravillas preparadas para mi\nAyúdame Señor, solo no me siento capaz\nTómame en tus manos,\n\nPorque al cielo yo quiero volar\n(Yo también quiero volar)\nA tu presencia Señor\nTocar con mis manos\nLo que está preparado para mi\nAyúdame Señor, solo no me siento capaz\nTómame en tus manos,\nPorque al cielo yo quiero llegar\n\n2.\nAhora se, Tú siempre estas ahí\nY que tu amor morará en mi,\nSeñor, en Ti confiaré\nMi vida ya no es nada\nSi no estás junto a mi\n\nQuiero Señor, no apartarme jamás\nY no olvidar que vida eterna Tú me das\nPerdido estaba sin Ti,\nTu gran amor me has dado\nY hoy me siento feliz\n\nFINAL:\nSolista: Tómame en tus manos,\nPorque al cielo yo quiero llegar"
+        "lyrics": "1.\nYo sin pensar, que Tú estabas ahí\nY al olvidar que eras todo para mi,\nPequé y de Ti me olvidé\nLágrimas cayeron de tus ojos por mi\n\nEse dolor causado en Ti,\nAl no recordar, que moriste Tú por mi,\nSi todo lo que yo soy\nTe lo debo todo, por amor\n\nCORO:\nQuiero estar sentado a la diestra de Ti\nY gozar las maravillas preparadas para mi\nAyúdame Señor, solo no me siento capaz\nTómame en tus manos,\n\nPorque al cielo yo quiero volar\n(Yo también quiero volar)\nA tu presencia Señor\nTocar con mis manos\nLo que está preparado para mi\nAyúdame Señor, solo no me siento capaz\nTómame en tus manos,\nPorque al cielo yo quiero llegar\n\n2.\nAhora se, Tú siempre estas ahí\nY que tu amor morará en mi,\nSeñor, en Ti confiaré\nMi vida ya no es nada\nSi no estás junto a mi\n\nQuiero Señor, no apartarme jamás\nY no olvidar que vida eterna Tú me das\nPerdido estaba sin Ti,\nTu gran amor me has dado\nY hoy me siento feliz\n\nFINAL:\nSolista: Tómame en tus manos,\nPorque al cielo yo quiero llegar",
+        "audioUrl": "https://www.youtube.com/watch?v=A9IOkcnvkSw&list=RDA9IOkcnvkSw&start_radio=1"
     },
     {
         "id": 2425,
         "title": "ALZO MIS MANOS",
-        "lyrics": "Alzo mis manos\nTiempo 4 / Nota: LA\n\n1.\nUna vez mas, cierro mis ojos\nY comienzo a sentir el perfume de su amor\nComienza a mecerme, a tomarme en sus brazos\nY no puedo resistirme a la presencia del Señor\n\nCORO\nY alzo mis manos, rindiéndome ante Ti Señor\nTe quiero alabar (te quiero alabar)\nTe quiero alabar\nY alzo mis manos, ante tu presencia\nPara rendirme ante Ti\n\nFINAL:\nPara rendirme ante Ti\nPara rendirme ante Ti\nPara rendirme a Ti\n\n2.\nTan solo una alabanza, tan solo una adoración\nSOLO UN TE AMO, NECESITA Él\nLevanta tus manos, y alaba al Señor\nLevanta tus manos, y dale gloria a Dios\n\nVariación: a cada momento\nA cada segundo\nA cada instante, te alabare"
+        "lyrics": "1.\nUna vez más, cierro mis ojos\nY comienzo a sentir el perfume de su amor\nComienza a mecerme, a tomarme en sus brazos\nY no puedo resistirme a la presencia del Señor.\n\nCORO:\nY alzo mis manos, rindiéndome ante Ti, Señor\nTe quiero alabar (te quiero alabar)\nTe quiero alabar\nY alzo mis manos, ante Tu presencia\nPara rendirme ante Ti.\n\n2.\nTan solo una alabanza, tan solo una adoración\nSolo un te amo, necesita Él\nLevanta tus manos, y alaba al Señor\nLevanta tus manos, y dale gloria a Dios.\n\nVariación:\nA cada momento\nA cada segundo\n\nFINAL:\nPara rendirme ante Ti\nPara rendirme ante Ti\nPara rendirme a Ti\nA cada instante, te alabaré.",
+        "category": "Coros Unidos"
     },
     {
         "id": 2426,
@@ -9674,7 +9691,10 @@
     {
         "id": 2438,
         "title": "HAY UN LIRIO",
-        "lyrics": "1.\nHay un lirio que habita en los valles,\nEn los valles del huerto de Dios\nEse lirio es Jesús, el dueño de mi amor\nEse lirio da vida al corazón.\n\nCORO:\nComo el manzano crece en los prados,\nAsí crece mi amado en mi ser,\nEn su sombra, una vez mi calor refresqué,\nDesde entonces soy feliz con Él.\n\n2.\nEs la voz de mi amado tan dulce,\nQue al oírla, yo gozo de amor\nUna vez mi Jesús a mi alma le habló,\nDesde entonces conozco su voz.\n\n3.\nOh qué hermoso es mi lirio escogido,\nPara Él tengo esta dulce canción\nHoy yo quiero cantar, a mi Cristo esperar\nCuando Él venga a su iglesia a buscar.\n\n4.\nOh, levántate dice mi amado\nEl invierno ha pasado ya\nEn su dulce canción dice a mi corazón\nQue a su iglesia el viene a buscar."
+        "lyrics": "1.\nHay un lirio que habita en los valles,\nEn los valles del huerto de Dios.\nEse lirio es Jesús, el dueño de mi amor;\nEse lirio da vida al corazón.\n\nCORO:\nComo el manzano que crece en los prados,\nAsí crece mi Amado en mi ser;\nEn su sombra, una vez mi calor refresqué;\nDesde entonces soy feliz con Él.\n\n2.\nEs la voz de mi Amado tan dulce,\nQue al oírla, yo gozo de amor.\nUna vez mi Jesús a mi alma le habló;\nDesde entonces conozco su voz.\n\n3.\n¡Oh, qué hermoso es mi lirio escogido!\nPara Él tengo está dulce canción.\nHoy yo quiero cantar, a mi Cristo esperar;\nCuando Él venga a su iglesia a buscar.\n\n4.\n«¡Oh, levántate!», dice mi Amado;\nEl invierno ha pasado ya.\nEn su dulce canción dice a mi corazón:\nQue a su iglesia Él viene a buscar.",
+        "tone": "MIm",
+        "toneNote": "MIm",
+        "audioUrl": "https://www.youtube.com/watch?v=71eX_ID3X88&list=RD71eX_ID3X88&start_radio=1"
     },
     {
         "id": 2439,
@@ -9749,7 +9769,11 @@
     {
         "id": 2462,
         "title": "SANTA LA NOCHE",
-        "lyrics": "SANTA LA NOCHE\nTiempo 2 / Nota: DO\n\nI\nSANTA LA NOCHE, HERMOSAS LAS ESTRELLAS\nLA NOCHE CUANDO NACIO EL SEÑOR\nEL MUNDO ENVUELTO ESTUVO EN SUS QUERELLAS\nHASTA QUE DIOS NOS MANDO AL SALVADOR\nUNA ESPERANZA TODO EL MUNDO SIENTE\nLA LUZ DE UN NUEVO DIA AL FIN BRILLO\nHOY ADORAD A CRISTO REVERENTE\nOH NOCHE DIVINA NACIO EL SALVADOR\nDIVINA NOCHE DE CRISTO EL SEÑOR\n\nII\nMAGOS VINIERON EN REAL ALIANZA\nSIGUIENDO UN ASTRO DE GLORIOSA LUZ\nHOY POR LA LUZ DE FE Y DE ESPERANZA\nGUIADOS SOMOS A CRISTO JESUS\nNACIO EL REY DE REYES EN PESEBRE\nAMIGO ES EL DE TODO PECADOR\nAL SALVADOR VENID CON ALMA ALEGRE\nPOSTRADOS DAD GLORIA AL DIVINO SALVADOR\nDAD GLORIA ETERNA A CRISTO EL SALVADOR\n\nIII\nNOS ENSEÑO A AMARNOS UNOS A OTROS\nSU LEY DE AMOR SU EVANGELIO DE PAZ\nNOS ENSEÑO QUE HERMANOS SOMOS TODOS\nY CON AMOR EL NOS LLEVA A SOLAZ\nGOZOSOS HOY CON GRATITUD CANTAMOS\nAL NOMBRE DULCE DEL SEÑOR LOAD\nHOY SU PODER DE GLORIA PROCLAMANDO\nA CRISTO DAD GLORIA HONOR Y MAJESTAD\nAL CRISTO ETERNO TODOS ADORAD"
+        "lyrics": "1.\nSanta la noche, hermosas las estrellas,\nLa noche cuando nació el Señor.\nEl mundo envuelto estuvo en sus querellas,\nHasta que Dios nos mandó al Salvador.\nUna esperanza todo el mundo siente,\nLa luz de un nuevo día al fin brilló.\nHoy adorad a Cristo reverente:\n¡Oh, noche divina, nació el Salvador!\n¡Divina noche de Cristo, el Señor!\n\n2.\nMagos vinieron en real alianza,\nSiguiendo un astro de gloriosa luz.\nHoy, por la luz de fe y de esperanza,\nGuiados somos a Cristo Jesús.\nNació el Rey de Reyes en pesebre,\nAmigo es Él de todo pecador.\nAl Salvador venid con alma alegre,\nPostrados, dad gloria al Divino Salvador.\n¡Dad gloria eterna a Cristo, el Salvador!\n\n3.\nNos enseñó a amarnos unos a otros,\nSu ley de amor, su evangelio de paz.\nNos enseñó que hermanos somos todos,\nY con amor Él nos lleva a solaz.\nGozosos hoy, con gratitud cantamos,\nAl nombre dulce del Señor, load.\nHoy, su poder de gloria proclamando,\nA Cristo dad gloria, honor y majestad.\n¡Al Cristo Eterno todos adorad!",
+        "tone": "LA  /  2 TIEMPOS (6/8)",
+        "toneNote": "LA",
+        "beats": "2",
+        "timeSignature": "6/8"
     },
     {
         "id": 2463,
@@ -9874,7 +9898,12 @@
     {
         "id": 2493,
         "title": "EL CENTRO DE MI VIDA",
-        "lyrics": "EL CENTRO DE MI VIDA\nTiempo 0 / Nota: 0\n\nI\nSOLISTA\nCUANDO SOLO ME ENCONTRÉ\nDECEPCIONADO EN MI DOLOR\nAL DARME CUENTA QUE CAÍ\nTRISTEMENTE EN ERROR\nSÓLO ASÍ PUDE ENTENDER\nQUE ME AMASTE TANTO DIOS\nCONOCÍ EL VERDADERO Y PURO AMOR.\n\nCORO\nPOR ESO YO TE CANTO MI JESÚS\nEL CENTRO DE MI VIDA ERES TÚ\nAUNQUE FALTE TODO ALREDEDOR\nSI TÚ ESTÁS NO IMPORTA NADA\nHAS PERMANECIDO SIEMPRE FIEL\nTU GLORIA EN MI VIDA PUEDO VER\nY AUNQUE ME QUEDARA YO SIN VOZ\nAUN CON MI ALMA TE ALABARÍA.\n\nII\nESAS VECES QUE DUDÉ\nY QUIZÁS HASTA TE  NEGUÉ\nYO LO HICE SIN SABER\nREALMENTE QUIEN ERAS TÚ\nPERO TUVE QUE ENTENDER\nY HASTA EL POLVO FUI A CAER\nFUE EL MOMENTO QUE TU GRACIA ME ALZÓ.\n\n(FINAL SOLISTA)\nPOR ESO YO TE CANTO\nPOR ESO YO TE CANTO\nPOR ESO YO TE CANTO MI JESÚS."
+        "lyrics": "1.\n(Solista)\nCuando solo me encontré,\nDecepcionado en mi dolor,\nAl darme cuenta que caí\nTristemente en error;\nSolo así pude entender\nQue me amaste tanto, Dios;\nConocí el verdadero y puro amor.\n\nCORO:\nPor eso te canto, mi Jesús;\nEl centro de mi vida eres Tú;\nAunque falte todo alrededor,\nSi Tú estás, no importa nada.\n\n// Has permanecido siempre fiel;\nTu gloria en mi vida puedo ver;\nY aunque me quedara yo sin voz,\nAun con mi alma te alabaría. //\n\n2.\nEsas veces que dudé\nY quizás hasta te negué,\nYo lo hice sin saber\nRealmente quién eras Tú.\nPero tuve que entender\nY hasta el polvo fui a caer;\nFue el momento que tu gracia me alzó.\n\nFINAL:\n(Solista)\nPor eso yo te canto,\nPor eso yo te canto,\nPor eso yo te canto, mi Jesús.",
+        "tone": "E  /  2 TIEMPOS (6/8)",
+        "toneNote": "E",
+        "beats": "2",
+        "timeSignature": "6/8",
+        "audioUrl": "https://firebasestorage.googleapis.com/v0/b/himnario-vito-2026.firebasestorage.app/o/audios%2Fcanto_especiales_2493.m4a?alt=media&token=7db1bf39-c7aa-4b42-89d1-50101935658e"
     },
     {
         "id": 2494,
@@ -9949,12 +9978,14 @@
     {
         "id": 2509,
         "title": "ESTÁ AQUI",
-        "lyrics": "1. El Dios que abrió el mar rojo,\nEl Dios que levantó a Lazaro\nEl Dios que calmó la tempestad\nEstá aqui...\n\nEl Dios que sanó a los ciegos,\nEl Dios que levantó a los muertos,\nEse Dios que ha resucitado\nEstá aqui,\n\nSin tan solo Tú crees verás\nEl poder de Dios,\nEn esta noche\nSe está moviendo en este lugar,\n\nEsto no es para todos hermanos,\nEs para aquellos que creen en Él...\nSi en esta noche Tú crees verás\nEl poder de Dios...\n\nCORO:\n//Está aqui... su gloria está aqui,\nSanando tu corazón,\nSanando tu cuerpo,\nEstá aqui, rescatando y libertando,\nEsta aqui, restaurando levantando,\nHoy abre tu corazón, tu corazón...//\n\nTu eres tan importante para mi\n\nTú me enseñaste a sonreír en la vida\nTú me enseñaste a valorarme tanto\nCuando mi vida no valía nada\nLlegaste Tú Señor Jesús\nY este camino que va cuesta arriba\nQue cada día hay que estar luchando\nSeguro estoy que tu estas conmigo\nAyudándome a continuar\n\nCORO:// Tú eres tan importante para mi\nJesús tu eres el dueño de mi vida\nMi entrada y mi salida has guardado\nMi consejero eres todo para mi.//"
+        "lyrics": "1. El Dios que abrió el mar rojo,\nEl Dios que levantó a Lazaro\nEl Dios que calmó la tempestad\nEstá aqui...\n\nEl Dios que sanó a los ciegos,\nEl Dios que levantó a los muertos,\nEse Dios que ha resucitado\nEstá aqui,\n\nSin tan solo Tú crees verás\nEl poder de Dios,\nEn esta noche\nSe está moviendo en este lugar,\n\nEsto no es para todos hermanos,\nEs para aquellos que creen en Él...\nSi en esta noche Tú crees verás\nEl poder de Dios...\n\nCORO:\n//Está aqui... su gloria está aqui,\nSanando tu corazón,\nSanando tu cuerpo,\nEstá aqui, rescatando y libertando,\nEsta aqui, restaurando levantando,\nHoy abre tu corazón, tu corazón...//\n\nTu eres tan importante para mi\n\nTú me enseñaste a sonreír en la vida\nTú me enseñaste a valorarme tanto\nCuando mi vida no valía nada\nLlegaste Tú Señor Jesús\nY este camino que va cuesta arriba\nQue cada día hay que estar luchando\nSeguro estoy que tu estas conmigo\nAyudándome a continuar\n\nCORO:// Tú eres tan importante para mi\nJesús tu eres el dueño de mi vida\nMi entrada y mi salida has guardado\nMi consejero eres todo para mi.//",
+        "audioUrl": "https://www.youtube.com/watch?v=lcRF7HYcl2Q&list=RDlcRF7HYcl2Q&start_radio=1"
     },
     {
         "id": 2510,
         "title": "EL DIABLO ESTA VENCIDO",
-        "lyrics": "1. Tienes que ser probado como se prueba el oro\nPrimero por el fuego\nY tienes que luchar también tienes que orar\nPara que satanás no te vaya a derrotar\n\nDios dijo en su palabra: os sea necesario\nPasar por duras pruebas,\nSe fiel hasta la muerte y pelea la batalla,\nQue Dios está contigo dondequiera que Tú vayas\n\nCORO:\n//El diablo está vencido y la victoria es nuestra\nOh, gloria, Aleluya cuan grande es nuestro Dios\nSi Dios es por nosotros, ¿quién contra nosotros?\nY nada en este mundo me apartará de Dios//\n\n2. Cristo es mi roca eterna\nTambién mi pronto auxilio\nEn las tribulaciones\nA Él sea la gloria\nY toda la victoria\nPor su infinito amor\nY su misericordia"
+        "lyrics": "1. Tienes que ser probado como se prueba el oro\nPrimero por el fuego\nY tienes que luchar también tienes que orar\nPara que satanás no te vaya a derrotar\n\nDios dijo en su palabra: os sea necesario\nPasar por duras pruebas,\nSe fiel hasta la muerte y pelea la batalla,\nQue Dios está contigo dondequiera que Tú vayas\n\nCORO:\n//El diablo está vencido y la victoria es nuestra\nOh, gloria, Aleluya cuan grande es nuestro Dios\nSi Dios es por nosotros, ¿quién contra nosotros?\nY nada en este mundo me apartará de Dios//\n\n2. Cristo es mi roca eterna\nTambién mi pronto auxilio\nEn las tribulaciones\nA Él sea la gloria\nY toda la victoria\nPor su infinito amor\nY su misericordia",
+        "audioUrl": "https://www.youtube.com/watch?v=9YxQglkS8TY&list=RDlcRF7HYcl2Q&index=2"
     },
     {
         "id": 2511,
@@ -9975,34 +10006,65 @@
         "id": 2514,
         "title": "CUAL LA FLOR",
         "lyrics": "1.\nCual la flor que se cubre de rocío\nAsí está mi alma cuando siente de su amor\nCual el río que se extiende en el sequío\nEl agua fresca sobre el sol abrasador\nEl alma ríe, el alma llora\nElla se goza con gran placer\nQue dicha inmensa es la del hombre\nQue Dios visite su humilde ser\n//Ah, ah, que Dios visite su humilde ser//\n\n2.\nCual la flor que se cubre y se engalana\nDe hermosura y riquísimo olor\nCual las aves que en el alba abren sus alas\nY dan gracias por el día al Creador\nAsí mi alma se siente inmensa\nDe hermosura y fragante olor\nElla quisiera tener las alas\nPara volar hasta su mansión\n//Ah, ah, para volar hasta su mansión//\n\n3.\nCual la flor que hermosea los jardines\nQue en el día y en la noche ven tu ser\nCual el ave que busca en los confines\nEl tiempo bueno y el nuevo amanecer\nAsí mi alma quiere acercarse\nQuiere volar hasta donde estás\nCuando visites mi inquieta alma\nLlévame al cielo contigo a estar\n//Ah, ah, llévame al cielo contigo a estar//",
-        "tone": "LAm"
+        "tone": "LAm",
+        "toneNote": "LAm"
     },
     {
         "id": 2515,
         "title": "TEMPRANO YO TE BUSCARÉ",
         "lyrics": "Temprano yo te buscaré,\nDe madrugada yo me acercaré a Ti.\nMi alma te anhela y tiene sed\nPara ver tu gloria y tu poder.\n\nMi socorro has sido Tú,\nEn la sombra de tus alas yo me gozaré.\nMi alma está pegada a Ti,\nPorque tu diestra me ha sostenido.\nOh, tu diestra me ha sostenido.\n\nTemprano yo te buscaré,\nDe madrugada yo me acercaré a Ti.\nMi alma te anhela y tiene sed\nPara ver tu gloria y tu poder.\n\nMi socorro has sido Tú,\nEn la sombra de tus alas yo me gozaré.\nMi alma está pegada a Ti,\nPorque tu diestra me ha sostenido.\nOh, tu diestra me ha sostenido.\n\nPorque tu diestra me ha sostenido.\nOh, tu diestra me ha sostenido.\nPorque tu diestra me ha sostenido.\nOh, tu diestra me ha sostenido.",
-        "tone": "SOL MAYOR"
+        "tone": "SOL MAYOR",
+        "toneNote": "SOL MAYOR"
     },
     {
         "id": 2516,
         "title": "ENCIENDE UNA LUZ",
-        "lyrics": "Enciende una luz,\nDéjala brillar\nLa luz de Jesús\nQue brilla en todo lugar\nNo la puedes esconder,\nNo te puedes callar\nAnte tal necesidad,\nEnciende una luz\nEn la oscuridad.\n\n¿Cómo pues invocarán\nA aquel en el cual no han creído?\n¿Y cómo creerán\nEn aquel de quien no han oído?\n¿Y cómo oirán\nSi no hay quien les predique?\nHermosos son los pies\nDe los que anuncian la paz\nLas buenas nuevas de Jesús."
+        "lyrics": "Enciende una luz,\nDéjala brillar\nLa luz de Jesús\nQue brilla en todo lugar\nNo la puedes esconder,\nNo te puedes callar\nAnte tal necesidad,\nEnciende una luz\nEn la oscuridad.\n\n¿Cómo pues invocarán\nA aquel en el cual no han creído?\n¿Y cómo creerán\nEn aquel de quien no han oído?\n¿Y cómo oirán\nSi no hay quien les predique?\nHermosos son los pies\nDe los que anuncian la paz\nLas buenas nuevas de Jesús.",
+        "toneNote": "DO MAYOR"
     },
     {
         "id": 2517,
         "title": "JONAS (BAJO LA SOMBRA)",
         "lyrics": "1.\nBajo la sombra de la calabacera\nEsta un profeta inspirándose a Jehová\nPuso sus manos sobre el rebelde pueblo\nPara callar su vicio y su maldad.\n\nCORO:\n//Pobre Jonás que se olvidó\nQue Dios nos ama y nos da su perdón//\n\n2.\nPero ese pueblo reconoció su falta\nHecho sus joyas e ídolos quemo\nVistió cilicio y todos ayunaron\nJonás espera y Dios le perdonó.\n\n3.\nTambién la vida de esa calabacera\nVino un gusano y se la destruyó\nJonás reclama deseándole la muerte\nA un arbusto que nada le costó.",
-        "tone": "SOL  /  4 TIEMPOS (4/4)"
+        "tone": "SOL  /  4 TIEMPOS (4/4)",
+        "toneNote": "SOL",
+        "beats": "4",
+        "timeSignature": "4/4"
     },
     {
         "id": 2518,
         "title": "JUAN 3:16",
         "lyrics": "1.\nMi Biblia abrí para escuchar su dulce voz.\nEn Juan busqué y allí leí su amor por mí.\n3:16, Me dijo Él,\nEn Él amé al mundo más que mi existir.\n\nCORO:\nEn el espejo fiel, yo me miré y contemplé\nLa hermosa y dulce faz\nDel Salvador y buen Jesús.\nVi su amor, vi su perdón.\nY en sus hojas vi cuánto me amó el Padre Dios.\n\n2.\nCual gozo fue saber que Él por mí murió.\nY contemplar su dulce faz en mi oración.\n3:16, Cuán dulce es,\nEs en la Biblia como fuente de amor.\n\n3.\nPorque de tal manera Dios al mundo amó.\nAmó a Ti, amó a mí, amor de Dios;\n3:16, Me dijo Él,\nGuárdalo en tu corazón y sigue fiel.",
-        "tone": "SOL  /  2 TIEMPOS (2/4)"
+        "tone": "SOL  /  2 TIEMPOS (2/4)",
+        "toneNote": "SOL",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 2521,
         "title": "HOLA",
         "lyrics": "hdhdhdjdjdjjdjdjd"
+    },
+    {
+        "id": 2522,
+        "title": "SALMO 23",
+        "lyrics": "1.\nTengo todo.\nEres todo lo que necesito.\nTú me llevas\nAl lugar donde encontré descanso.\nRenuevas mis fuerzas,\nTú guías mis pasos.\nRenuevas mis fuerzas,\nTú guías mis pasos.\n\nCORO:\nTu amor inagotable es.\nTu bondad me persigue, te persigo.\nEn tu mesa me diste un lugar.\nMe recibes en casa para siempre.\n\n2.\nEn tus brazos\nCada miedo y temor se apaga.\nTú me enseñas\nA confiar cuando mi fe desmaya.\nRenuevas mis fuerzas,\nTú guías mis pasos.\nRenuevas mis fuerzas,\nTú guías mis pasos.\n\nPUENTE:\nAunque pase por el valle\nDe la sombra y muerte,\nYa no temo, yo confío.\nTú estás conmigo.\nY si caigo o me pierdo,\nVienes a buscarme.\nNo me olvidas y me encuentras,\nY nunca te rindes.",
+        "tone": "DO",
+        "toneNote": "DO",
+        "audioUrl": "https://youtu.be/MjMcj453CYQ?si=UusY7-xPZ9KPQK9O"
+    },
+    {
+        "id": 2523,
+        "title": "JESÚS DE NAZARET",
+        "lyrics": "1.\nEres Tú, Jesús de Nazaret,\nDe la noche, quietud,\nDel mundo eres la luz.\nLa verdad no se pudo ocultar,\nTampoco sepultar ni en una cruz clavar.\n\nCORO:\nEres para esta gran multitud,\nPoema de amor, como rayo de luz.\nEres como una ola del mar\nQue llegó hasta la playa de mi corazón.\nTú, mi Jesús.\n\n2.\nEres Tú, Jesús de Nazaret,\nDe la miel, su dulzor,\nAroma de una flor.\nEl poder que a la muerte venció,\nLa fuerza de Sansón,\nLa vara de Moisés.",
+        "tone": "LAm  /  3 TIEMPOS (3/4)",
+        "toneNote": "LAm",
+        "beats": "3",
+        "timeSignature": "3/4"
+    },
+    {
+        "id": 2524,
+        "title": "ES EL",
+        "lyrics": "Estoy preparando el camino\n​Enderezando las veredas\n​Cada vez más disminuyendo\n​Porque importa que Él crezca\n​Mi placer\n​Mi placer en Él está\n​Yo no soy digno de desatar\n​Sus sandalias\n​Mi vida entera en Él está\n​Y yo camino con la certeza\n​De que volverá\n​Es Él\n​Y por él que estoy gastando mi vida\n​Perdiendo todo por amor y con alegría\n​Dueño de mis días\n​Estoy preparando el camino\n​Enderezando las veredas\n​Y cada vez más disminuyendo\n​Porque importa que Él crezca\n​Mi placer en Él está\n​Mi placer en Él está\n​Yo no soy digno de desatar\n​Sus sandalias\n​Mi vida entera en Él está\n​Y yo camino con la certeza\n​De que volverá\n​Es Él\n​Por él que estoy gastando mi vida\n​Perdiendo todo por amor y con alegría\n​Dueño de mis días\n​Es Él\n​Por él que estoy gastando mi vida\n​Perdiendo todo por amor y con alegría\n​Dueño de mis días\n​Y Él volverá\n​Soberano en poder\n​Él volverá\n​Y el gobierno en Él está\n​Y vean, Él traerá\n​En Sus manos su recompensa\n​Él volverá\n​Soberano en poder\n​Él volverá\n​Y el gobierno en Él está\n​Y vean, Él traerá\n​En Sus manos su recompensa\n​Es Él (por Él)\n​Por él que estoy gastando mi vida\n​(Perdiendo todo) perdiendo todo por amor y con alegría\n​Dueño de mis días\n​Y Es Él (por Él)\n​Por él que estoy gastando mi vida\n​Perdiendo todo por amor y con alegría\n​Dueño de mis días\n​Clamamos por Ti, eh\n​Y Él volverá\n​Y soberano en poder\n​Él volverá\n​(Y el gobierno) y el gobierno en Él está\n​Y vean, Él traerá\n​En Sus manos su recompensa\n​Él volverá\n​Soberano en poder\n​Él volverá\n​Y el gobierno en Él está\n​Y vean, Él traerá\n​En Sus manos su recompensa\n​Es Él\n​Por él que estoy gastando mi vida\n​(Perdiendo todo por amor) perdiendo todo por amor y con alegría\n​Dueño de mis días\n​Es Él\n​(Es Él)\n​(Por él que estoy gastando mi vida)\n​(Perdiendo todo por amor y con alegría)\n​(Dueño de mis días)"
     }
 ]

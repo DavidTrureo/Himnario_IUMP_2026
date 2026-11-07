@@ -2,8 +2,10 @@
     {
         "id": 1,
         "title": "DULCE REFUGIO",
-        "lyrics": "Dulce refugio\nEn la tormenta\nEs Jesucristo\nEl salvador.\n\nÉl me alienta\nY me alimenta\nCon su palabra\ny su amor.\n\nVengo a reposar en el\nÉl es mi amigo fiel\nUna poderosa y fresca unción\nLlenará mi corazón.\n\nDulce refugio\nEn la tormenta\nEs Jesucristo\nEl salvador.\n\nFinal:\n//Es Jesucristo\nel salvador//",
-        "tone": "C"
+        "lyrics": "Dulce refugio\nEn la tormenta\nEs Jesucristo\nEl Salvador.\n\nÉl me alienta\nY me alimenta\nCon su palabra\nY su amor.\n\nVengo a reposar en él\nÉl es mi amigo fiel\nUna poderosa y fresca unción\nLlenará mi corazón.\n\nDulce refugio\nEn la tormenta\nEs Jesucristo\nEl Salvador.\n\nFinal:\n//Es Jesucristo\nEl Salvador//",
+        "tone": "C",
+        "toneNote": "C",
+        "audioUrl": "https://youtu.be/rXb85JcrhDM?si=vAroGr1P4eBvMWus"
     },
     {
         "id": 2,
@@ -18,8 +20,8 @@
     },
     {
         "id": 4,
-        "title": "DESPIERTA HIJA DE SION",
-        "lyrics": "Despierta, despierta\nDespierta hija de Sión\nLevántate Jerusalén\nVístete de hermosura\nQue el Rey ya viene de Sión"
+        "title": "DESPIERTA, HIJA DE SION",
+        "lyrics": "Despierta, despierta,\nDespierta, hija de Sión;\nLevántate, Jerusalén,\nVístete de hermosura,\nQue el Rey ya viene de Sión."
     },
     {
         "id": 5,
@@ -45,7 +47,8 @@
         "id": 10,
         "title": "YO ESPERO EL SON",
         "lyrics": "Yo espero el son, Yo espero el son\nYo espero el son de la trompeta final\n\nYo se que Cristo pronto vendrá\nY a su pueblo Él llevará\nY a su pueblo Él llevará\nCuando suene la trompeta final",
-        "tone": "MIm"
+        "tone": "MIm",
+        "toneNote": "MIm"
     },
     {
         "id": 11,
@@ -115,12 +118,14 @@
     {
         "id": 25,
         "title": "CUANDO JEHOVÁ HICIERE VOLVER",
-        "lyrics": "Cuando Jehová hiciere volver\nLa cautividad de Sión\nSeremos como los que sueñan\nSeremos como los que sueñan\n\nEntonces nuestra boca,\nSe llenará de risa\n//Y nuestra boca de alabanza//\n//Entonces dirán entre las naciones\nGrandes cosas ha hecho Jehová con estos//\n\n//Grandes cosas ha hecho Jehová con nosotros//\n///Estaremos alegres///\nAleluya"
+        "lyrics": "Cuando Jehová hiciere volver\nLa cautividad de Sión,\nSeremos como los que sueñan,\nSeremos como los que sueñan.\n\nEntonces nuestra boca\nSe llenará de risa\n// Y nuestra lengua de alabanza. //\n// Entonces dirán entre las naciones:\nGrandes cosas ha hecho Jehová con estos. //\n\n// Grandes cosas ha hecho Jehová con nosotros; //\n/// Estaremos alegres. ///\n¡Aleluya!",
+        "tone": "LA",
+        "toneNote": "LA"
     },
     {
         "id": 26,
         "title": "DIGNO ERES",
-        "lyrics": "Digno eres, digno eres,\nDigno eres Señor,\nDe la alabanza y de la gloria\nDigno eres Señor\n\nPorque tu has creado todas las cosas\nLas hiciste con tu poder\nPara tu gloria las has creado\nDigno eres Señor"
+        "lyrics": "Digno eres, digno eres,\nDigno eres, Señor,\nDe la alabanza y de la gloria;\nDigno eres, Señor.\n\nPorque Tú has creado todas las cosas,\nLas hiciste con tu poder,\nPara tu gloria las has creado:\nDigno eres, Señor."
     },
     {
         "id": 27,
@@ -190,8 +195,9 @@
     {
         "id": 38,
         "title": "CUANDO VENGA EL SEÑOR",
-        "lyrics": "1\nCuando venga el Señor de los cielos,\nEstés vivo o estés muerto,\n¿Que cuenta le darás?\n\n2\nAmigo ya no peques más,\nJesús te dice: “Ven a mi”.\nRecuerda que es tu Salvador\nNunca se olvidará de ti…\nOh, vienen los ángeles,\nVienen los ángeles\nA dejar al Rey…",
-        "tone": "AM"
+        "lyrics": "Cuando venga el Señor de los cielos,\nEstés vivo o estés muerto,\n¿Que cuenta le darás?\n\nAmigo ya no peques más,\nJesús te dice: “Ven a mi”.\nRecuerda que es tu Salvador\nNunca se olvidará de ti…\n\nOh, vienen los ángeles,\nVienen los ángeles\nA dejar al Rey…",
+        "tone": "Am",
+        "toneNote": "Am"
     },
     {
         "id": 39,
@@ -227,7 +233,8 @@
         "id": 44,
         "title": "ALABARÉ, ALABARÉ",
         "lyrics": "Alabaré, alabaré,\nAlabaré, alabaré,\nAlabaré a mi Señor.\n\nJuan vio el número\nDe los redimidos\nY todos alababan al Señor.\nUnos oraban,\nOtros cantaban,\nY todos alababan al Señor.",
-        "tone": "G"
+        "tone": "G",
+        "toneNote": "G"
     },
     {
         "id": 45,
@@ -257,7 +264,8 @@
         "id": 49,
         "title": "ALABAD A JEHOVÁ",
         "lyrics": "1.\nAlabad a Jehová,\nNaciones todas,\nPueblos todos,\nAlabadle.\nPorque ha engrandecido\nSobre nosotros su misericordia,\n\nY la verdad de Jehová\nEs para siempre,\n¡Aleluya, Amén!\nY la verdad de Jehová\nEs para siempre,\n¡Aleluya, Amén!",
-        "tone": "G"
+        "tone": "G",
+        "toneNote": "G"
     },
     {
         "id": 50,
@@ -267,8 +275,8 @@
     },
     {
         "id": 51,
-        "title": "DIOS ESTA AQUÍ",
-        "lyrics": "1\n//Dios está aquí,\nQue precioso es,\nÉl lo prometió\nDonde hay dos o tres//\n\nCoro:\nQuédate Señor,\nQuédate Señor,\nQuédate Señor,\nEn cada corazón\nQuédate Señor,\nQuédate Señor,\nQuédate Señor,\nAquí\n\n2\nOh, Cristo mío,\nHas en mi alma un altar,\nPara adorarte,\nCon devoción,\nPara beber\nDel agua de la vida\nY así saciar\nSiempre mi corazón"
+        "title": "DIOS ESTÁ AQUÍ",
+        "lyrics": "// Dios está aquí,\n¡Qué precioso es!\nÉl lo prometió\nDonde hay dos o tres //\n\n/// Quédate, Señor ///\nEn cada corazón,\n/// Quédate, Señor ///\nAquí.\n\n¡Oh, Cristo mío!\nHaz en mi alma un altar\nPara adorarte\nCon devoción,\nPara beber\nDel agua de la vida\nY así saciar\nSiempre mi corazón."
     },
     {
         "id": 52,
@@ -498,7 +506,8 @@
         "id": 91,
         "title": "CRISTO ROMPE",
         "lyrics": "///Cristo rompe las cadenas///\nY me da seguridad.\n\n¿Cómo es posible yo vivir sin mi Jesús?,\nSí el fundamento de mi vida eres Tú?\nTú me libraste del pecado\nY de la muerte.\n¿Cómo es posible yo vivir sin mi Jesús?",
-        "tone": "A"
+        "tone": "A",
+        "toneNote": "A"
     },
     {
         "id": 92,
@@ -510,7 +519,8 @@
         "id": 93,
         "title": "120 EN PENTECOSTÉS",
         "lyrics": "//120 En Pentecostés,\nOrando pedían al Señor//\n\n//Bautízame, bautízame.\nBautízame con tu poder//",
-        "tone": "G"
+        "tone": "G",
+        "toneNote": "G"
     },
     {
         "id": 94,
@@ -1216,7 +1226,8 @@
     {
         "id": 238,
         "title": "CUANDO VEO TU AMOR",
-        "lyrics": "CUANDO VEO TU AMOR\nTiempo 2 / Nota: RE\n\nCUANDO VEO TU AMOR\nCUANDO ESCUCHO TU VERDAD\nCUANDO SIENTO TU CALOR\nY ADMIRO TU BONDAD\nME DELEITO EN TI SEÑOR\nYO ME GOZO SOLO EN TI\nME SUSTENTO EN TU AMOR\nY POR SIEMPRE TE ALABARE\nSOLO A TI\n\nYO ME POSTRO EN TU PRESENCIA\nTE ADORO EN SANTIDAD\nTE BENDIGO CON MI VIDA\nY YO QUIERO OFRENDARME A TI\nEN SANTIDAD"
+        "lyrics": "Cuando veo Tu amor,\nCuando escucho Tu verdad,\nCuando siento Tu calor\nY admiro Tu bondad,\n\nMe deleito en Ti, Señor;\nYo me gozo solo en Ti,\nMe sustento en Tu amor\nY por siempre te alabaré,\nSolo a Ti.\n\nCORO:\nYo me postro en Tu presencia,\nTe adoro en santidad,\nTe bendigo con mi vida\nY yo quiero ofrendarme a Ti\nEn santidad.",
+        "audioUrl": "https://youtu.be/yKffRiAwsUc?si=1-AlAuV9nX0H9fhc"
     },
     {
         "id": 239,
@@ -1356,7 +1367,7 @@
     {
         "id": 268,
         "title": "OH, MI DIOS ES REAL",
-        "lyrics": "Oh, mi Dios es real\nTiempo 2 / Nota: LA\n\nHay cosas que\nYo no comprendo\nLugares hay\nDo yo, no iré\nPero si sé y es verdad\nQue mi Dios es real\nPorque lo siento\nEn mi ser.\n\nCoro:\nOh, mi Dios es real\nReal en mí\nMe ha lavado\nCon su sangre carmesí\nSu dulce amor\nEs para mí, y también para ti\nOh, mi Dios es real\nPorque lo siento en mi ser.\n\nYo no alcanzo a comprender\nPorque él me amó\nY me sacó del mundo vil\nPero si sé\nY es verdad\nQue mi Dios es real\nPorque lo siento en mi ser."
+        "lyrics": "1.\nHay cosas que yo no comprendo,\nLugares hay do yo no iré,\nPero sí sé y es verdad\nQue mi Dios es real,\nPorque lo siento en mi ser.\n\nCoro:\nOh, mi Dios es real, real en mí,\nMe ha lavado con su sangre carmesí;\nSu dulce amor es para mí\n(Y también para ti),\nOh, mi Dios es real,\nPorque lo siento en mi ser.\n\n2.\nYo no alcanzo a comprender\nPor qué Él me amó\nY me sacó del mundo vil,\nPero sí sé y es verdad\nQue mi Dios es real,\nPorque lo siento en mi ser."
     },
     {
         "id": 270,
@@ -1382,11 +1393,6 @@
         "id": 274,
         "title": "CREER",
         "lyrics": "CREER\nTiempo 2 / Nota: DO\n\nCreer es más que una simple palabra, creer es más que una declaración.\nCreer es declarar lo que tus ojos aún no han visto, teniendo la confianza,\nDe que un día Dios lo hará.\nCreer es adorarle aun en medio de la prueba, creer es no dudar de su\nPalabra de poder, creer es doblegarte a los pies de Jesucristo y dejar en\nSus manos poderosa tu necesidad.\n\nCoro:\nSolo cree con todo tu ser, cierra tus ojos y vera lo que anhela tu\nCorazón Dios te lo dará, //y solo va a ser creer, creer, con firme\nFe creer creer espera en el tan solo creer Dios tiene poder//\n\nI\n\nSi tú dices a mi siervo que sea sano, yo sé que mi siervo sanara,\nAsí declaro aquel centurión romano que creo completamente en\nEl poder del salvador. Si tan solo yo tocare su manto, yo sé que\nSana yo seré, así declaro aquella mujer valiente que entre la\nMultitud toco su manto, y sana fue.\n\nCoro:\nSolo cree con todo tu ser, cierra tus ojos y vera lo que anhela tu\nCorazón Dios te lo dará, //y solo va a ser creer, creer, con firme\nFe creer creer espera en el tan solo creer Dios tiene poder//\n//Jesucristo está obrando, rompiendo cadena él está sanando\nTu alma y tu cuerpo dale gloria al rey, él tiene poder, dale gloria\nAl rey. //\n\nSolo debes creer."
-    },
-    {
-        "id": 275,
-        "title": "CUANDO VENGA EL SEÑOR DE LOS CIELOS",
-        "lyrics": "Cuando venga el Señor de los cielos\nTiempo 2 / Nota: DO\n\n//Cuando venga de los cielos el señor\nestes vivo o estes muerto que cuenta tu le darás//\n\namigo ya no peques mas\nJesus te dice ven a mi\nrecuerda que es tu salvador\n!jamás se olvidara ti\n\ny antes de entrar al coro hacen dos golpes a Am y d\nos golpes a G eso es para\nadornar la alabanza\n\n!Hoo vienen los angeles\nvienen los angeles\na buscar al rey//\nJesús..."
     },
     {
         "id": 276,
@@ -1834,11 +1840,6 @@
         "lyrics": "suelta lo que es mio\nTiempo 3 / Nota: SIm\n\nINTRO:/Em Bm/ A G F#\nBm\nEN UN MOMENTO DE PRUEBA EN MI\nEm\nVIDA DECIDI ALEJARME\nF#\nERAN TANTAS LA PRUEBAS QUE\nBm\nHABIAN QUE EMPEZA A TURBARME\nBm\nCOMENZE A SOLTAR LAS COSAS QUE\nEm\nDIOS ME HABIA DADO\nF#\nY DESPUES ME ENCONTRABA EN UNA\nBm B7\nESQUINA SOLO Y LLORANDO\nEm\nEL ENEMIGO DE MI SE REIA POR MI\nBm\nCONDICION\nEm\nME ACUSABA Y ME PREGUNTABA\nBm\nDONDE ESTA TU DIOS\nEm\nEN MI MENTE YO ANALISANDO EL\nBm\nCULPABLE SOY YO\n\nG\nY AL OTRO LADO EL ESPIRITU ME\nF#\nDECIA TODAVIA AQUI ESTOY\nEm              A D G\nTODAVIA YO ESTOY AQUI ESPERANDO QUE TE RINDAS A MI Em F# Bm B7 LEVANTATE DE TU AFLICCION Y RECUPERA LO QUE HAS PERDIDO Em A D G CUANDO EL ESPIRITU A MI ME HABLO ME LEVANTE BAJO LA UNCION DE DIOS Em Em F# Y COMENZE A DECIRLE AL ENEMIGO SUELTA LO QUE ES MIO Bm G SUELTA MIS PERTENENSIAS, SUELTA MIS SUEñ\nOS Em F# SUELTA MI MATRIMONIO, SUELTA MI MINISTERIO Bm G Em SUELTA MI FAMILIA SUELTA MI SALUD HOY YO VENGO COTRA TI F# Em Bm EN EL NOMBRE DE JESUS Y TE DIGO SUELTA LO QUE ES MIO Em Bm SUELTA LO QUE ES MIO"
     },
     {
-        "id": 368,
-        "title": "SANTA LA NOCHE",
-        "lyrics": "SANTA LA NOCHE\nTiempo 4 / Nota: LA\n\nSanta la noche\nHermosas las estrellas\nLa noche cuando nació el Señor\nEl mundo envuelto\nestuvo en sus querellas\nHasta que Dios nos envió al Salvador\nUna esperanza todo el mundo tiene\nLa luz de un nuevo día al fin brilló\nHoy adorad a Cristo reverente\n//Oh noche divina nació el Salvador//\n\nNos enseñó a amarnos uno al otro\nSu ley nos dio, su evangelio de paz\nÉl nos libró y rompió las cadenas\nY en su Nombre cesó la opresión\nLas gracias damos con alegre canto\nEn oración su nombre proclamamos\nCon gran fervor los ángeles anuncian\n//Oh noche divina nació el Salvador//\n\nSanta la noche, hermosas las estrellas\nLa noche cuando nació el Señor\nCristo el Señor, adoradle eternamente\n//Su gloria y poder por siempre proclamad//"
-    },
-    {
         "id": 369,
         "title": "JESUS VOLVERA",
         "lyrics": "jesus volvera\nTiempo 2 / Nota: SOL\n\njesús volvera\n\n//jesús volvera, jesús volvera, el viene del cielo los viene abuscar//\nCoro:\n//yo quiero subir subir subir yo quiero llegar llegar llegar quiero descansar en la feliz manción//"
@@ -2021,7 +2022,12 @@
     {
         "id": 409,
         "title": "DIGNO",
-        "lyrics": "Digno\nTiempo 2 / Nota: RE\n\nNo tengo nada para ofrecer\nNo hay nada que te pueda sorprender\nSólo un corazón quebrantado\nUna y otra vez\n\nNo hay nada que me enamoré más\nNada que me apasione más\nsólo tu presencia, sólo tu mirada\nMe hacen suspirar\n\nMe inclino ante ti\nRey que perdona multitud de errores\nMe inclino ante ti\n\nDigno, eternamente Digno\nImpresionante, Digno\nSólo ante ti yo me inclino"
+        "lyrics": "No tengo nada para ofrecer\nNada que Te pueda sorprender\nSolo un corazón quebrantado\nUna y otra vez.\n\nNo hay nada que me enamore más\nNada que me apasione más\nSolo Tu presencia, solo Tu mirada\nMe hacen suspirar.\n\nMe inclino ante Ti\nRey que perdona multitud de errores\nMe inclino ante Ti.\n\nCORO:\nDigno, eternamente Digno\nImpresionante, Digno\nSolo ante Ti yo me inclino.",
+        "tone": "SOL#  /  4 TIEMPOS (4/4)",
+        "toneNote": "SOL#",
+        "beats": "4",
+        "timeSignature": "4/4",
+        "audioUrl": "https://youtu.be/q1SxbBtXLkw?si=J1pBmlxrQaYbQYy8"
     },
     {
         "id": 410,
@@ -2086,7 +2092,8 @@
     {
         "id": 424,
         "title": "DIGNO ERES DE GLORIA",
-        "lyrics": "Digno Eres de Gloria\nTiempo 2 / Nota: DO\n\n//Digno eres de gloria y\nalabanza, Levantamos\nnuestras manos adorandote\nSeñor//.\n\nCoro:\n\n//Grande eres tú, grandes\ntus milagros son, no hay\notro como tú, no hay otro\ncomo tú//"
+        "lyrics": "Digno eres de gloria,\nY alabanza;\nLevantamos nuestras manos,\nAdorándote, Señor.\n\nCORO:\nGrande eres Tú;\nGrandes tus milagros son.\nNo hay otro como Tú,\nNo hay otro como Tú.",
+        "audioUrl": "https://youtu.be/PHDtkvXAjUg?si=rB00ariskkG44eZ7"
     },
     {
         "id": 425,
@@ -2287,11 +2294,6 @@
         "id": 470,
         "title": "EL POZO DE JACOB",
         "lyrics": "El pozo de Jacob\nTiempo 2 / Nota: MI\n\nEl pozo de Jacob\nTiene agua para sacar\nEl que saca una vez\nDos veces tiene que sacar\n\nEl pozo de Jacob\nTiene agua para sacar\nEl que saca una vez\nDos veces tiene que sacar\n\n// Pero Jesucristo\nEs la fuente de agua viva\nSi tú bebés de esta agua\nNunca más sed sentirás//"
-    },
-    {
-        "id": 472,
-        "title": "¡OH YO SIENTO GOZO!",
-        "lyrics": "¡oh yo siento gozo!\nTiempo 2 / Nota: SOL\n\n//Oh yo siento gozo al saber que todos los que estan presentes son hijos del rey//\n//pero si alguno todavia no llega a los pies de cristo puede hacerlo hoy//\n//ven ven ven, ven ven ven, a jesus el rey//\n//hermano date prisa por que el tiempo es corto Jesucristo viene preparate ya//\npero si alguno...\nven ven ven..."
     },
     {
         "id": 473,
@@ -2612,7 +2614,8 @@
         "id": 541,
         "title": "CUIDA TU LUZ",
         "lyrics": "//Cuida tu luz que no se apague\nLa luz que Cristo te entregó//\n\n//Y cuando venga\nJesús del cielo\nTu lámpara encendida debe estar//",
-        "tone": "SOL"
+        "tone": "SOL",
+        "toneNote": "SOL"
     },
     {
         "id": 542,
@@ -2733,11 +2736,6 @@
         "id": 565,
         "title": "DIOS NO FALLA",
         "lyrics": "Dios no falla\nTiempo 2 / Nota: DO\n\nPara los de fe ya casi muerta,\nLos que tienen la esperanza en vida artificial,\nPara el corazón que se despierta\ny deja de soñar,\nEn esos momentos incalmables\nde la espera y la inseguridad,\nEs preciso y tan indispensable recordar.\nCORO:\nDios no falla,Dios no falla,\nDios no falla, lo ha prometido en un instante llegará,\nDios no falla,Dios no falla,\nDios no falla, sigue adelante no te rindas,ya veraz que todo es parte de un proceso, que el tiempo de la prueba pasará,y aunque hoy no puedas entenderlo,él no se equivoca,tiene un plan.\nPara todo aquel que está esperando una vos de estruendo ex la tormenta  escuchar,Dios en el silencio sigue obrando,nunca fallará."
-    },
-    {
-        "id": 566,
-        "title": "A TI OH DIOS",
-        "lyrics": "A Ti Oh Dios levantaré mi alma\nA Ti Oh Dios levantaré mi alma\nOh Dios mio en Ti confió\n//Tengo gozo y solas\nY a pesar del enemigo tengo paz//"
     },
     {
         "id": 567,
@@ -3188,7 +3186,8 @@
         "id": 665,
         "title": "YO SÉ QUE ESTÁS AQUÍ MI SEÑOR",
         "lyrics": "//Yo sé que estás aquí, mi Señor\nYo sé que estás aquí, mi Señor//\n\n///Y mi alma te alaba///\nPorque se que estás aquí\n\n///Y mi alma te alaba///\nPorque se que estás aquí, mi Señor",
-        "tone": "MIm"
+        "tone": "MIm",
+        "toneNote": "MIm"
     },
     {
         "id": 666,
@@ -3198,8 +3197,9 @@
     },
     {
         "id": 669,
-        "title": "ALGO ESTA CAYENDO",
-        "lyrics": "SOL, SIm, MIm, DO, RE, SOLSOL                 LAmALGO ESTÁ CAYENDO AQUÍRE                  SOLES TAN FUERTE SOBRE MIMIm          LAmMIS MANOS LEVANTARÉRE             SOLY SU GLORIA TOCARECORO        SOLESTÁ CAYENDO                 SImSU GLORIA SOBRE MÍ           DOSANANDO HERIDAS              LAmLLEVANDO AL CAÍDO                 RESU GLORIA ESTA AQUÍ                 SOLSU GLORIA ESTA AQUÍ..REm RE7 SOLm DO7 FA REm LA SIb LA REm",
-        "tone": "G"
+        "title": "ALGO ESTÁ CAYENDO",
+        "lyrics": "Algo está cayendo aquí,\nEs tan fuerte sobre mí;\nMis manos levantaré\nY su gloria tocaré.\n\nCoro:\nEstá cayendo\nSu gloria sobre mí,\nSanando heridas,\nLevantando al caído;\nSu gloria está aquí,\nSu gloria está aquí.",
+        "tone": "A",
+        "toneNote": "A"
     }
 ]

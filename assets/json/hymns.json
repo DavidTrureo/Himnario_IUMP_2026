@@ -3,7 +3,10 @@
         "id": 1,
         "title": "VEN, OH TODOPODEROSO",
         "lyrics": "1.\nVen, ¡Oh, Todopoderoso,\nAdorable Creador!\nPadre Santo, cariñoso,\nManifiesta tu amor.\nA tu trono de clemencia\nLevantamos nuestra voz.\nTu presencia te pedimos.\nNuestro Padre, nuestro Dios.\n\n2.\nVen, ¡Oh Salvador Divino\nDios de nuestra salvación!\nEn nosotros haz morada,\nVive en nuestro corazón.\nEres Tú, Jesús benigno,\nEres infinito amor:\nÓyenos, te suplicamos.\nVen, bendícenos, Señor.\n\n3.\nVen, ¡Espíritu Divino!\nDanos tu precioso don;\nDios consolador, inspira\nPaz en todo corazón.\nDe los santos la herencia\nDéjanos hallar en Ti.\nY la vida de los cielos\nGozaremos ya aquí.",
-        "tone": "SOL  /  3 TIEMPOS (3/4)"
+        "tone": "SOL  /  3 TIEMPOS (3/4)",
+        "toneNote": "SOL",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 2,
@@ -32,7 +35,10 @@
         "id": 6,
         "title": "CUAN FIRME CIMIENTO",
         "lyrics": "1.\n¡Cuán f[DOADD9]irm[LAM7]e cimiento se ha dado a la fe,\nDe Dios en su eterna Palabra d[RE]e am[DOM7(B5)]or!\n¿Qué más Él pudiera en su libro añadir\nSi todo a sus hijos lo ha dicho el Señor?\n(Mateo 7:24; 24:43)\n\n2.\nYa te halles enfermo o en plena salud,\nYa rico, ya pobre se encuentre tu ser,\nEn casa, o viajando por tierra, o por mar,\n“Conforme a tus años será tu poder”.\n(Deuteronomio 33:25)\n\n3.\n“No temas por nada, contigo Yo soy;\nTu Dios Yo soy sólo, tu ayuda seré\nTu fuerza y firmeza en mi diestra estarán,\nY en ella sostén y poder te daré”.\n(Isaías 41:10)\n\n4.\n“No habrán de anegarte las ondas del mal\nSi en aguas profundas te ordeno salir;\nYo siempre contigo en tu angustia seré\nY todas tus penas podré bendecir”.\n(Isaías 43:2)\n\n5.\n“La llama no puede dañarte jamás\nSi en medio del fuego te ordeno pasar,\nEl oro de tu alma más puro será,\nPues solo la escoria se habrá de quemar”.\n(Isaías 43:2)\n\n6.\n“Mi amor siempre tierno, invariable, eternal\nConstante a mi pueblo mostrarle podré;\nSi nívea corona ya ciñe su sien,\nCual tiernos corderos aún cuidaré”.\n(Isaías 46:4)\n\n7.\n“Al alma que anhele la paz que hay en Mí\nJamás en sus luchas le habré de dejar;\nSi todo el infierno la quiere perder,\n¡Yo nunca, no, nunca la puedo olvidar!”\n(Deuteronomio 31:8 - Hebreos 13:5)",
-        "tone": "DO  /  3 TIEMPOS (3/4)"
+        "tone": "DO  /  3 TIEMPOS (3/4)",
+        "toneNote": "DO",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 7,
@@ -817,7 +823,10 @@
         "id": 140,
         "title": "CUANDO CESAREN MIS PENAS",
         "lyrics": "1.\nCuando cesaren mis penas aquí,\nY comenzaren los goces allí,\nCon mi amado Señor, eso sí,\nGloria eterna será para mí.\n\nCORO:\nGloria será, sí, para mí,\nSí, para mí, sí para mí.\nCuando en la luz contemplare a Jesús,\nGloria eterna será para mí.\n\n2.\nCuando mediante su gracia sin par,\nYo en el cielo encuentre lugar,\nEn su presencia tan sólo estar,\nGloria eterna será para mí.\n\n3.\nEntre amigos que antes amé,\nGlorificado allí gozaré.\nDulces miradas de Cristo, yo sé\nGloria eterna será para mí.",
-        "tone": "LA  /  3 TIEMPOS (3/4)"
+        "tone": "LA  /  3 TIEMPOS (3/4)",
+        "toneNote": "LA",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 141,
@@ -1435,7 +1444,10 @@
         "id": 243,
         "title": "CANTARÉ A CRISTO",
         "lyrics": "1.\nCantaré a Cristo por su gran amor,\nCómo vino para ser mi Salvador,\n¡Cuán humilde fue el lugar\nEn el pueblo de Judá,\nDonde Cristo vino por amor a mí!\n\nCORO:\nEs sin igual su infinito amor.\nY en una horrenda cruz su vida dio\nPor mí.\nYo cantaré su dulce nombre, sí.\nOh, Salvador Eterno, loores doy a Ti.\n\n2.\nCantaré a Cristo quien en humildad\nHizo siempre la divina voluntad;\nLos enfermos Él sanó,\nA los muertos levantó,\nA los pobres Él colmó con su bondad.\n\n3.\nCantaré a Cristo sin cesar aquí,\nCantaré lo que Él ha hecho para mí,\nMis pecados Él llevó\nMi perdón y paz compró;\nCantaré su dulce Nombre, siempre sí.",
-        "tone": "RE  /  2 TIEMPOS (2/4)"
+        "tone": "RE  /  2 TIEMPOS (2/4)",
+        "toneNote": "RE",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 244,
@@ -1591,7 +1603,10 @@
         "id": 269,
         "title": "CON EL ALMA ENTRISTECIDA",
         "lyrics": "1.\nCon el alma entristecida\nVengo a Ti mi Salvador\nPues sentí tu gran ternura\nY lo inmenso de tu amor.\nFalsa paz ofrece el mundo,\nSólo Tú me das solaz,\n¡Oh, Jesús, amparo mío,\nFiel y pura mi alma haz!\n\nCORO:\nYo creo sí, yo creo sí,\nJesús murió, murió por mí,\nY en la cruz vertida fue\nSu sangre carmesí.\n\n2.\nCristo mío, veo al mundo\nQue se aleja de su Dios;\nVeo al hombre desprovisto,\nDe tu oferta y de tu voz,\nEsa vida tan torcida\nNunca más voy a seguir,\nCon tu ayuda Cristo mío\nQuiero para Ti vivir.\n\n3.\nMuy oscura fue la senda\nPor la cual me encaminé,\nMas tu tierno amor me trajo,\nY contrito me humillé.\nHeme, pues, aquí en tus plantas\n¡Oh, perdona mi maldad!\nNo desoigas mis plegarias\nSálvame por tu bondad.",
-        "tone": "RE  /  3 TIEMPOS (3/4)"
+        "tone": "RE  /  3 TIEMPOS (3/4)",
+        "toneNote": "RE",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 270,
@@ -1753,7 +1768,10 @@
         "id": 296,
         "title": "POR TI, OH CRISTO",
         "lyrics": "1.\nPor Ti, Oh Cristo, yo tengo salvación,\nPor Ti, Oh Cristo, mi alma tiene paz.\nCon tu muerte para mí, se abrió el cielo,\nY con amor perdonaste mi maldad.\n\nCORO:\nY es por eso que yo digo al mundo\nQue en tu sangre hay salvación\nY remisión de pecados,\nQue Tú diste tu vida allí en la cruz\nPor el justo y por el malvado.\n\n2.\nYo te ruego que guardes a tu Iglesia\nY bendigas a tus hijos, Oh Señor,\nQue la llenes de tu Espíritu Santo,\nPara que así se convierta el pecador.\n\n3.\nYo te alabo porque me sacaste\nDe este mundo de vicios y de errores.\nTe prometo, serte fiel hasta la muerte,\nDe no cumplirte, llévame antes, Oh Señor.",
-        "tone": "DO  /  2 TIEMPOS (2/4)"
+        "tone": "DO  /  2 TIEMPOS (2/4)",
+        "toneNote": "DO",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 297,
@@ -1986,8 +2004,11 @@
     {
         "id": 335,
         "title": "EN LA VERGONZOSA CRUZ",
-        "lyrics": "1.\nEn la vergonzosa cruz,\nPadeció por mí, Jesús;\nPor la sangre que vertió,\nMis pecados Él expió;\nLavará de todo mal\nEse rojo manantial;\nEl que abrió por mí, Jesús,\nEn la vergonzosa cruz.\n\nCORO:\nSí, fue por mí, Sí, fue por mí,\nFue por mí; murió Jesús\nEn la vergonzosa cruz.\n\n2.\n¡Oh! ¡qué amor, qué inmenso amor!\nReveló mi Salvador:\nLa maldad que hice yo,\nAl suplicio le llevó.\nAhora a Ti mi todo doy,\nCuerpo y alma tuyo soy;\nMientras permanezca aquí.\nHazme siempre fiel a Ti.\n\n3.\nYo de Cristo solo soy;\nA seguirle pronto estoy;\nAl bendito Redentor\nServiré con firme amor;\nSea mi alma ya su hogar,\nY mi corazón su altar;\nVida emana, paz y luz\nDel Calvario, de la cruz.",
-        "tone": "LA  /  2 TIEMPOS (2/4)"
+        "lyrics": "1.\nEn la vergonzosa cruz,\nPadeció por mí, Jesús;\nPor la sangre que vertió,\nMis pecados Él expió;\nLavará de todo mal\nEse rojo manantial;\nEl que abrió por mí, Jesús,\nEn la vergonzosa cruz.\n\nCORO:\nSí, fue por mí, sí, fue por mí,\nFue por mí; murió Jesús\nEn la vergonzosa cruz.\n\n2.\n¡Oh! ¡Qué amor, qué inmenso amor!\nReveló mi Salvador:\nLa maldad que hice yo,\nAl suplicio le llevó.\nAhora a Ti mi todo doy,\nCuerpo y alma Tuyo soy;\nMientras permanezca aquí,\nHazme siempre fiel a Ti.\n\n3.\nYo de Cristo solo soy;\nA seguirle pronto estoy;\nAl bendito Redentor\nServiré con firme amor;\nSea mi alma ya su hogar,\nY mi corazón su altar;\nVida emana, paz y luz\nDel Calvario, de la cruz.",
+        "tone": "LA  /  2 TIEMPOS (2/4)",
+        "toneNote": "LA",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 336,
@@ -2502,8 +2523,11 @@
     {
         "id": 421,
         "title": "TENER, QUISIERA TENER",
-        "lyrics": "1. Tener, quisiera tener,\nLa fe que tuvo Abraham,\nAmor también poseer\nComo habla el apóstol Juan.\nSe sabio cual Salomón\nY como Daniel revelar,\nSer fuerte como Sansón\nY al cielo poder entrar.\n\nCORO: Tener quisiera tener,\nLo que tenia Jesús,\nSentir una misma cosa,\nTener una misma luz.\nPoder agradar al Padre,\nCumpliendo su voluntad,\nEntonces que dicha\nInmensa, gozar por la eternidad.\n\n2. También quisiera pelear,\nValiente como David,\nLuchar hasta derrotar,\nY alzar la cruz en la lid.\nCual gozo es ser esforzado,\nY como Pablo sufrido,\nLlevar a Cristo grabado,\nPor ser su amor tan querido.\n\n3. Tener quisiera tener,\nVisiones como Isaías.\nPara poder conocer\nLo que en el cielo se haría.\nVivir en Apocalipsis\nCapítulo veintiuno,\nEntonces que bendiciones\nSerá para cada uno.",
-        "tone": "SOL | 2 TIEMPOS (2/4)"
+        "lyrics": "1.\nTener, quisiera tener,\nLa fe que tuvo Abraham,\nAmor también poseer\nComo habla el apóstol Juan.\nSe sabio cual Salomón\nY como Daniel revelar,\nSer fuerte como Sansón\nY al cielo poder entrar.\n\nCORO:\nTener quisiera tener,\nLo que tenia Jesús,\nSentir una misma cosa,\nTener una misma luz.\nPoder agradar al Padre,\nCumpliendo su voluntad,\nEntonces que dicha inmensa,\nGozar por la eternidad.\n\n2.\nTambién quisiera pelear,\nValiente como David,\nLuchar hasta derrotar,\nY alzar la cruz en la lid.\nCual gozo es ser esforzado,\nY como Pablo sufrido,\nLlevar a Cristo grabado,\nPor ser su amor tan querido.\n\n3.\nTener quisiera tener,\nVisiones como Isaías.\nPara poder conocer\nLo que en el cielo se haría.\nVivir en Apocalipsis\nCapítulo veintiuno,\nEntonces que bendiciones\nSerá para cada uno.",
+        "tone": "MIm  /  3 TIEMPOS (3/4)",
+        "toneNote": "MIm",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 422,
@@ -2514,8 +2538,11 @@
     {
         "id": 423,
         "title": "OH SEÑOR CREO EN TI",
-        "lyrics": "1. Quise huir de Ti,\nPero tu mano fue sobre mí\nAl saber que tu camino iba a dejar\nComo hombre fui a buscar\nMejor vida, mejor vida para mí.\n\nCORO: Y he recorrido largos senderos\nAl caminar\nY te puedo decir que no hay\nMejor amor, mejor amor,\nQue el de Dios.\nCreo en Ti, porque Tú eres\nMi esperanza para vivir\nPorque me hiciste a tu imagen\nOh, Señor\nPorque Tú eres mis pasos al caminar,\nCreo en Ti, porque Tú eres\nMi voz al cantar\nPorque Tú eres mi boca al hablar\nPorque Tú eres mi mente al pensar\nCreo en Ti, creo en Ti, Oh Señor\nCreo en Ti.\n\n2. Y ahora que pienso en los que quedan\nEn los que quedan sin salvación\nQue pena me da el saber\nQue para ellos la salvación también fue.",
-        "tone": "LA | 2 TIEMPOS (2/4)"
+        "lyrics": "1.\nQuise huir de Ti,\nPero Tu mano fue sobre mí\nAl saber que Tu camino iba a dejar\nComo hombre fui a buscar\nMejor vida, mejor vida para mí.\n\nCORO:\nY he recorrido largos senderos\nAl caminar\nY te puedo decir que no hay\nMejor amor, mejor amor,\nQue el de Dios.\n\nCreo en Ti,\nPorque Tú eres\nMi esperanza para vivir\nPorque me hiciste\nA Tu imagen, Oh, Señor\nPorque Tú eres\nMis pasos al caminar\n\nCreo en Ti,\nPorque Tú eres\nMi voz al cantar\nPorque Tú eres\nMi boca al hablar\nPorque Tú eres mi mente al pensar\nCreo en Ti, creo en Ti,\n¡Oh, Señor!, creo en Ti.\n\n2.\nY ahora que pienso en los que quedan\nEn los que quedan sin salvación\nQue pena me da el saber\nQue para ellos la salvación también fue.",
+        "tone": "REm  /  4 TIEMPOS (12/8)",
+        "toneNote": "REm",
+        "beats": "4",
+        "timeSignature": "12/8"
     },
     {
         "id": 424,
@@ -2545,7 +2572,10 @@
         "id": 428,
         "title": "SI CRUZAS ESTE VALLE TENEBROSO",
         "lyrics": "1.\nSi cruzas este valle tenebroso\nSin luz en tu camino y fatigado\nSi nadie a tu clamor ha respondido\nNo temas que el Señor está a tu lado.\n\nCORO:\nTrae al Señor dolores y quebrantos\nY ven a Él con toda tu impureza\nY Tú te harás de su bondad inmensa\nTe llenará de amor sublime y Santo.\n\n2.\nJesús es viva fuente de consuelo\nQue quita los pesares de la vida\nQue trajo cual paloma desde el cielo\nEl bálsamo de amor al alma herida.\n\n3.\nEscucha el amoroso llamamiento\nDe Cristo inocentísimo cordero\nQue vino a redimirnos con su sangre\nMuriendo escarnecido en un madero.",
-        "tone": "RE  /  3 TIEMPOS (3/4)"
+        "tone": "RE  /  3 TIEMPOS (3/4)",
+        "toneNote": "RE",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 429,
@@ -2593,7 +2623,10 @@
         "id": 436,
         "title": "A DIOS SEA LA GLORIA",
         "lyrics": "1.\nComo podré agradecer tanto amor\nQue me has dado a mí\nCosas tan maravillosas\nQue no logro yo comprender\nLas voces de millones de ángeles\nNo podrían expresar mi gratitud\nTodo lo que soy y lo que yo espero ser\nSe lo debo todo a Él.\n\nCORO:\nA Dios sea la gloria\nA Dios sea la gloria\nA Dios sea la gloria\nPor lo que Él ha hecho en mí\nCon su sangre me ha lavado\nSu poder me ha transformado\nA Dios le doy la gloria\nPor lo que Él ha hecho en mí.\n\n2.\nQuisiera consagrar mi vida a Él\nY ser agradecido con mi Señor\nY si algo de gloria recibo en mí\nQue toda sea la gloria a Dios.\n\nFINAL:\nPorque suyo es el Reino\nEl Poder y la Gloria\nPor siempre, por siempre,\nAmén, Amén.",
-        "tone": "DO  /  3 TIEMPOS (3/4)"
+        "tone": "DO  /  3 TIEMPOS (3/4)",
+        "toneNote": "DO",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 437,
@@ -2616,14 +2649,20 @@
     {
         "id": 440,
         "title": "NO TEMAS",
-        "lyrics": "1. No temas, confía, victoria te dará el Señor,\nÉl es tu protector, Jehová tu sanador,\nTu Dios de amor, tu salvación.\n\n2. No temas, el Señor está contigo\nÉl es tu mejor amigo, Él jamás te dejará\nNo temas, aunque fuerte sople el viento\nY te turben pensamientos,\nEl Señor te sostendrá,\nNo temas, si el infierno se levanta\nEs Jehová el que te guarda,\nÉl jamás se dormirá.\n\nCORO: No temas, confía,\nVictoria te dará el Señor\nÉl es tu protector, Jehová tu sanador\nTu Dios de amor, tu salvación.\n\n3. No temas, Jehová es tu castillo\nFortaleza de tu vida, es tu luz y salvación\nNo temas, si la cruel desesperanza\nCon su sombra te abraza,\nEl Señor te sostendrá,\nNo temas, si luchada está tu alma\nEs Jehová El que te guarda,\nÉl jamás se dormirá.",
-        "tone": "SIM | 2 TIEMPOS (2/4)"
+        "lyrics": "CORO:\nNo temas, confía,\nVictoria te dará el Señor.\nÉl es tu protector, Jehová tu sanador,\nTu Dios de amor, tu salvación.\n\n1.\nNo temas, el Señor está contigo.\nÉl es tu mejor amigo, Él jamás te dejará.\nNo temas, aunque fuerte sople el viento\nY te turben pensamientos,\nEl Señor te sostendrá.\nNo temas, si el infierno se levanta,\nEs Jehová el que te guarda;\nÉl jamás se dormirá.\n\nCORO:\nNo temas, confía,\nVictoria te dará el Señor.\nÉl es tu protector, Jehová tu sanador,\nTu Dios de amor, tu salvación.\n\n2.\nNo temas, Jehová es tu castillo,\nFortaleza de tu vida, es tu luz y salvación.\nNo temas, si la cruel desesperanza\nCon su sombra te abraza,\nEl Señor te sostendrá.\nNo temas, si luchada está tu alma,\nEs Jehová el que te guarda;\nÉl jamás se dormirá.",
+        "tone": "SIm  /  2 TIEMPOS (2/4)",
+        "toneNote": "SIm",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 441,
         "title": "ALMA MÍA",
-        "lyrics": "1. Alma mía, alma mía bendice a Jehová\nY no te olvides jamás, jamás\nDe todo el bien, su amor, su gran bondad\nQue cada día te da fuerzas, te da paz\nQue va contigo donde quiera que tu vas.\n\nCORO: No, no te olvides\nQue el Señor te perdonó te dijo viva,\nQue estando lejos de tu Dios\nEras muy triste\nY ahora ríes y ahora ríes:\nNo, no te olvides\nQue dio su sangre\nPor salvar tu pobre alma\nQue fue herida sin piedad\nPorque te amaba,\nOh alma mía y aún te ama\nNo, no te olvides: no, no te olvides\nAlma mía.\n\n2. Alma mía, alma mía bendice a Jehová\nY no te canses jamás de alabar\nSu santo nombre en Espíritu y verdad\nÉl te corona y te sacia de bondad\nRejuvenece como el águila al volar.",
-        "tone": "LAM | 2 TIEMPOS (2/4)"
+        "lyrics": "1.\nAlma mía, alma mía, bendice a Jehová,\nY no te olvides jamás, jamás,\nDe todo el bien, su amor, su gran bondad,\nQue cada día te da fuerzas, te da paz,\nQue va contigo dondequiera que tú vas.\n\nCORO:\nNo, no te olvides\nQue el Señor te perdonó, te dijo: vive,\nQue estando lejos de tu Dios\nEras muy triste\nY ahora ríes, y ahora ríes.\nNo, no te olvides\nQue dio su sangre\nPor salvar tu pobre alma,\nQue fue herido sin piedad\nPorque te amaba,\n¡Oh, alma mía!, y aún te ama.\nNo, no te olvides; no, no te olvides.\n\n2.\nAlma mía, alma mía, bendice a Jehová,\nY no te canses jamás de alabar\nSu Santo nombre en Espíritu y verdad.\nÉl te corona y te sacia de bondad,\nRejuveneces como el águila al volar.",
+        "tone": "REm  /  2 TIEMPOS (2/4)",
+        "toneNote": "REm",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 442,
@@ -2653,7 +2692,10 @@
         "id": 446,
         "title": "LAS BODAS DEL CORDERO",
         "lyrics": "1.\nCristo viene pronto a buscar\nCristo viene luego a regalar\nSuenan las pisadas franca están\nY en gloria con victoria esperan ya.\n\nCORO:\nA la cena del Señor convidado estoy\nYo con traje blanco iré,\nLino fino me pondré\n///Y justificado yo entraré///\n\n2.\nCon su sangre yo mi ser limpié\nDe rodillas a Él acepté\nConvidado por el Padre fui\nY mi Cristo Salvador fue para mí.\n\n3.\nEn la cena gozo allí habrá\nCon blancura celestial será\nLa esposa al esposo fue\nY el comienzo de la boda ahora es.",
-        "tone": "LAm  /  2 TIEMPOS (2/4)"
+        "tone": "LAm  /  2 TIEMPOS (2/4)",
+        "toneNote": "LAm",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 447,
@@ -2671,7 +2713,10 @@
         "id": 449,
         "title": "SÚPLICA",
         "lyrics": "1.\nVengo a suplicarte mi Señor\nQue me dejes reposar\nEn tu amante pecho mi Señor\nComo el Apóstol Juan.\n\nCORO:\nMe has dado tantas cosas,\nMi precioso Jesús\nMe has dado fe, me has dado paz,\nMe has dado amor\nMe has dado gozo eternal\nEn plenitud\nMe has dado tantas cosas,\nMi precioso Jesús\nQue yo sería ingrato, si negara\nTu amor.\n\n2.\nCuando estoy Señor ante tu altar\nMe conmueve el corazón\nAl verte clavado en esa cruz\nPor mis culpas y mi error.",
-        "tone": "REm  /  3 TIEMPOS (3/4)"
+        "tone": "REm  /  3 TIEMPOS (3/4)",
+        "toneNote": "REm",
+        "beats": "3",
+        "timeSignature": "3/4"
     },
     {
         "id": 450,
@@ -2754,14 +2799,20 @@
     {
         "id": 463,
         "title": "LA IGLESIA DEL SEÑOR",
-        "lyrics": "1. La iglesia del Señor, ¿cuál será?\nEs aquella que en el nombre del Señor,\nSana enfermos, echa fuera demonios,\nEs aquella que rescata al pecador,\nEsa, si, es la iglesia del Señor.",
-        "tone": "MIM | 2 TIEMPOS (2/4)"
+        "lyrics": "La iglesia del Señor, ¿cuál será?\nLa iglesia del Señor, ¿cuál será?\nEs aquella que en el nombre del Señor,\nSana enfermos, echa fuera demonios,\nEs aquella que rescata al pecador,\nEsa, sí, es la iglesia del Señor.",
+        "tone": "MIm  /  2 TIEMPOS (2/4)",
+        "toneNote": "MIm",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 464,
         "title": "CUANDO VENGA EL SEÑOR",
-        "lyrics": "1. Cuando venga el Señor,\nY te pregunte por tu talento,\n¿Qué dirás al Señor,\nDel talento que Cristo te dio?\nMultiplícalo, multiplícalo,\nMultiplica, hermano, tu talento,\nEl talento que Cristo te dio.",
-        "tone": "DO | 2 TIEMPOS (2/4)"
+        "lyrics": "Cuando venga el Señor,\nY te pregunte por tu talento,\n¿Qué dirás al Señor,\nDel talento que Cristo te dio?\n\nMultiplícalo, multiplícalo,\nMultiplica, hermano, tu talento.\nMultiplícalo, multiplícalo,\nEl talento que Cristo te dio.",
+        "tone": "DO  /  2 TIEMPOS (2/4)",
+        "toneNote": "DO",
+        "beats": "2",
+        "timeSignature": "2/4"
     },
     {
         "id": 465,
