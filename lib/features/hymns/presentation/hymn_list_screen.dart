@@ -2247,11 +2247,13 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
           : Padding(
               padding: const EdgeInsets.only(bottom: 140.0),
               child: FloatingActionButton(
-                tooltip: 'Añadir Canto',
+                tooltip: adminMode ? 'Publicar Canto' : 'Añadir Canto',
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AddHymnScreen(),
+                    builder: (context) => AddHymnScreen(
+                      initialCollection: activeCollection,
+                    ),
                   ),
                 ),
                 child: const Icon(Icons.add),
@@ -4072,8 +4074,9 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
                           setState(() {
                             selectedCollection = 'iump';
                             if (idController.text.isEmpty) {
-                              final targetHymns =
-                                  ref.read(hymnsProvider('iump')).value ?? [];
+                              final targetHymns = (ref.read(hymnsProvider('iump')).value ?? [])
+                                  .where((h) => !h.isLocalOnly)
+                                  .toList();
                               int nextId = 1;
                               if (targetHymns.isNotEmpty) {
                                 nextId =
@@ -4197,51 +4200,38 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
             onPressed: isAdmin
                 ? () async {
                     final targetCollection = selectedCollection;
-                    final targetHymns =
-                        ref.read(hymnsProvider(targetCollection)).value ?? [];
-
-                    int idToSave;
-                    if (targetCollection == 'iump') {
-                      idToSave = int.tryParse(idController.text) ?? 1;
-                      if (targetHymns.any((h) => h.id == idToSave)) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'El número de himno $idToSave ya existe en el Himnario IUMP',
-                              style: GoogleFonts.nunito(),
-                            ),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: Colors.redAccent,
-                          ),
-                        );
-                        return;
-                      }
-                    } else {
-                      int nextId = 1;
-                      if (targetHymns.isNotEmpty) {
-                        nextId =
-                            targetHymns
-                                .map((h) => h.id)
-                                .reduce((a, b) => a > b ? a : b) +
-                            1;
-                      }
-                      idToSave = nextId;
-                    }
+                    final int? explicitId = targetCollection == 'iump'
+                        ? (int.tryParse(idController.text) ?? 1)
+                        : null;
 
                     final parsedTone = Hymn.parseToneComponents(
                       toneController.text.trim(),
                     );
-                    await ref
-                        .read(hymnsProvider(targetCollection).notifier)
-                        .saveHymn(
-                          id: idToSave,
-                          title: titleController.text.trim(),
-                          toneNote: parsedTone['toneNote']!,
-                          beats: parsedTone['beats']!,
-                          timeSignature: parsedTone['timeSignature']!,
-                          lyrics: lyricsController.text.trim(),
-                          isNew: true,
-                        );
+                    try {
+                      await ref
+                          .read(hymnsProvider(targetCollection).notifier)
+                          .publishNewOfficialHymn(
+                            title: titleController.text.trim(),
+                            toneNote: parsedTone['toneNote']!,
+                            beats: parsedTone['beats']!,
+                            timeSignature: parsedTone['timeSignature']!,
+                            lyrics: lyricsController.text.trim(),
+                            explicitId: explicitId,
+                          );
+                    } on StateError catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            e.message,
+                            style: GoogleFonts.nunito(),
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                      return;
+                    }
 
                     if (!context.mounted) return;
                     Navigator.pop(context);

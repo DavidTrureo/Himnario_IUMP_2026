@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../core/services/hymn_pdf_service.dart';
+
 import '../../../core/services/local_hymn_storage_service.dart';
 import '../domain/hymn.dart';
 import 'hymn_list_screen.dart';
@@ -17,23 +19,48 @@ class ScannerResultScreen extends ConsumerStatefulWidget {
 }
 
 class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
+  late TextEditingController _idCtrl;
   late TextEditingController _titleCtrl;
   late TextEditingController _keyCtrl;
   late TextEditingController _timeSigCtrl;
   late TextEditingController _lyricsCtrl;
+  String _selectedCollection = 'coros';
+  String _selectedCategory = '';
   bool _isLoading = false;
+
+  static const List<String> _collections = ['iump', 'especiales', 'coros'];
 
   @override
   void initState() {
     super.initState();
-    _titleCtrl = TextEditingController(text: widget.initialData['title'] ?? '');
-    _keyCtrl = TextEditingController(text: widget.initialData['key'] ?? '');
-    _timeSigCtrl = TextEditingController(text: widget.initialData['timeSignature'] ?? '');
-    _lyricsCtrl = TextEditingController(text: widget.initialData['lyrics'] ?? '');
+    _idCtrl = TextEditingController();
+    _titleCtrl = TextEditingController(
+      text: (widget.initialData['title'] ?? '').toString().toUpperCase(),
+    );
+    _keyCtrl = TextEditingController(
+      text: (widget.initialData['key'] ?? '').toString().toUpperCase(),
+    );
+    _timeSigCtrl = TextEditingController(
+      text: (widget.initialData['timeSignature'] ?? '').toString(),
+    );
+    _lyricsCtrl = TextEditingController(
+      text: (widget.initialData['lyrics'] ?? '').toString(),
+    );
+  }
+
+  void _prefillNextIumpId() {
+    if (_selectedCollection != 'iump') return;
+    final list = ref.read(hymnsProvider('iump')).value ?? [];
+    final official = list.where((h) => !h.isLocalOnly).toList();
+    final nextId = official.isEmpty
+        ? 1
+        : official.map((h) => h.id).reduce((a, b) => a > b ? a : b) + 1;
+    _idCtrl.text = nextId.toString();
   }
 
   @override
   void dispose() {
+    _idCtrl.dispose();
     _titleCtrl.dispose();
     _keyCtrl.dispose();
     _timeSigCtrl.dispose();
@@ -41,59 +68,78 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
     super.dispose();
   }
 
-  Hymn _buildTempHymn() {
-    return Hymn(
-      id: DateTime.now().millisecondsSinceEpoch % 1000000,
-      title: _titleCtrl.text.trim().isEmpty ? 'Sin Título' : _titleCtrl.text.trim(),
-      toneNote: _keyCtrl.text.trim(),
-      beats: '4', // Default
-      timeSignature: _timeSigCtrl.text.trim(),
-      lyrics: _lyricsCtrl.text.trim(),
-      collection: 'coros',
-      audioUrl: '',
-      category: 'Transcripción IA',
-    );
-  }
-
-
-  bool _isDuplicate(String lyrics, List<dynamic> existingHymns) {
-    // A simple heuristic for duplicate checking: check if any existing hymn's lyrics are very similar.
-    final cleanLyrics = lyrics.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
-    for (final hymn in existingHymns) {
-      final existingClean = (hymn.lyrics ?? '').toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
-      if (existingClean.isNotEmpty && cleanLyrics.contains(existingClean) || existingClean.contains(cleanLyrics)) {
-        return true;
-      }
+  String _collectionLabel(String c) {
+    switch (c) {
+      case 'iump':
+        return 'HIMNARIO IUMP';
+      case 'especiales':
+        return 'ALABANZAS ESPECIALES';
+      case 'coros':
+        return 'COROS DE AVIVAMIENTO';
+      default:
+        return c.toUpperCase();
     }
-    return false;
   }
 
-  Future<void> _saveHymn(bool isLocal) async {
+  Future<void> _saveHymn({required bool isLocal, required bool isAdmin}) async {
     final title = _titleCtrl.text.trim();
     final lyrics = _lyricsCtrl.text.trim();
-    
+    final messenger = ScaffoldMessenger.of(context);
+
     if (title.isEmpty || lyrics.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Por favor, ingresa título y letra')),
       );
       return;
     }
 
-    final existingHymns = ref.read(allHymnsProvider).value ?? [];
+    int? explicitIumpId;
+    if (!isLocal && isAdmin && _selectedCollection == 'iump') {
+      explicitIumpId = int.tryParse(_idCtrl.text.trim());
+      if (explicitIumpId == null || explicitIumpId <= 0) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Ingresa un número válido para el Himno IUMP.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+      final iumpHymns = ref.read(hymnsProvider('iump')).value ?? [];
+      if (iumpHymns.any((h) => !h.isLocalOnly && h.id == explicitIumpId)) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('El himno N° $explicitIumpId ya existe en el Himnario IUMP.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+    }
 
-    if (_isDuplicate(lyrics, existingHymns)) {
+    final existingHymns = ref.read(allHymnsProvider).value ?? [];
+    final duplicate = Hymn.findPossibleDuplicate(lyrics, existingHymns);
+    if (duplicate != null) {
       final confirm = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogCtx) => AlertDialog(
           title: const Text('Posible Duplicado'),
-          content: const Text('Este canto se parece mucho a uno que ya existe en el himnario. ¿Seguro que deseas añadirlo?'),
+          content: Text(
+            'Este canto se parece mucho a "${duplicate.title}" que ya existe en el himnario. ¿Seguro que deseas añadirlo?',
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Añadir de todos modos')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Añadir de todos modos'),
+            ),
           ],
         ),
       );
-      if (confirm != true) return;
+      if (confirm != true || !mounted) return;
     }
 
     setState(() => _isLoading = true);
@@ -101,33 +147,61 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
     try {
       if (isLocal) {
         await LocalHymnStorageService.saveCustomHymn(
-          title, 
-          lyrics, 
-          'coros',
+          title.toUpperCase(),
+          lyrics,
+          _selectedCollection,
           key: _keyCtrl.text.trim(),
           beats: '4',
           timeSignature: _timeSigCtrl.text.trim(),
+          category: _selectedCategory,
         );
+        ref.invalidate(hymnsProvider(_selectedCollection));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Guardado localmente.')),
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Guardado localmente en tu dispositivo.'),
+              backgroundColor: Color(0xFF10B981),
+            ),
+          );
+        }
+      } else if (isAdmin) {
+        final savedId = await ref
+            .read(hymnsProvider(_selectedCollection).notifier)
+            .publishNewOfficialHymn(
+              title: title.toUpperCase(),
+              toneNote: _keyCtrl.text.trim(),
+              beats: '4',
+              timeSignature: _timeSigCtrl.text.trim(),
+              lyrics: lyrics,
+              explicitId: explicitIumpId,
+              category: _selectedCategory,
+            );
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                '¡Publicado directo en ${_collectionLabel(_selectedCollection)} (N° $savedId)!',
+              ),
+              backgroundColor: const Color(0xFF10B981),
+            ),
           );
         }
       } else {
         await FirebaseFirestore.instance.collection('cantos_sugeridos').add({
-          'title': title,
+          'title': title.toUpperCase(),
           'lyrics': lyrics,
-          'collection': 'coros',
+          'collection': _selectedCollection,
           'key': _keyCtrl.text.trim(),
           'beats': '4',
           'timeSignature': _timeSigCtrl.text.trim(),
+          'category': _selectedCategory,
           'requesterName': 'Usuario (Escáner IA)',
           'requesterChurch': 'Himnario App',
           'timestamp': FieldValue.serverTimestamp(),
           'status': 'pending',
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             const SnackBar(content: Text('Canto sugerido enviado a revisión.')),
           );
         }
@@ -135,8 +209,11 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
       if (mounted) Navigator.popUntil(context, (route) => route.isFirst);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -150,6 +227,8 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isAdmin = ref.watch(adminModeProvider);
+    final categoryItems = Hymn.categoriesForCollection(_selectedCollection);
 
     return Scaffold(
       appBar: AppBar(
@@ -158,13 +237,12 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
       ),
       body: Stack(
         children: [
-          // Background
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: isDark 
+                colors: isDark
                     ? [const Color(0xFF0F172A), const Color(0xFF020617)]
                     : [const Color(0xFFF8FAFC), const Color(0xFFE2E8F0)],
               ),
@@ -175,7 +253,6 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Info Banner
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -189,9 +266,11 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Letra procesada con éxito. Puedes editar el título, tonalidad o letra antes de guardar o exportar.',
+                          isAdmin
+                              ? 'Letra procesada con éxito. Revisa la colección destino y publícala directo en la BD oficial.'
+                              : 'Letra procesada con éxito. Puedes editar el título, tonalidad o letra antes de guardar o enviar.',
                           style: GoogleFonts.nunito(
-                            color: isDark ? Colors.amber[200] : Colors.amber[900], 
+                            color: isDark ? Colors.amber[200] : Colors.amber[900],
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
@@ -200,31 +279,76 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                
-                // Form Fields
+                const SizedBox(height: 20),
+
+                _buildLabel('Colección destino'),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCollection,
+                  decoration: _buildInputDecoration(theme, isDark),
+                  items: _collections
+                      .map((c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(_collectionLabel(c)),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      _selectedCollection = v;
+                      _selectedCategory = '';
+                      _prefillNextIumpId();
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                if (isAdmin && _selectedCollection == 'iump') ...[
+                  _buildLabel('Número del Himno (IUMP)'),
+                  TextFormField(
+                    controller: _idCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: _buildInputDecoration(theme, isDark),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                _buildLabel('Categoría'),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCategory,
+                  decoration: _buildInputDecoration(theme, isDark),
+                  items: categoryItems
+                      .map((cat) => DropdownMenuItem<String>(
+                            value: cat['id']!,
+                            child: Text(cat['name']!, overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _selectedCategory = v);
+                  },
+                ),
+                const SizedBox(height: 16),
+
                 _buildLabel('Título'),
                 TextFormField(
                   controller: _titleCtrl,
+                  textCapitalization: TextCapitalization.characters,
                   style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 18),
                   decoration: _buildInputDecoration(theme, isDark),
                 ),
-                const SizedBox(height: 20),
-                
+                const SizedBox(height: 16),
+
                 Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Tonalidad (Armadura)'),
+                          _buildLabel('Tonalidad'),
                           TextFormField(
                             controller: _keyCtrl,
-                            
-                            style: GoogleFonts.nunito(fontWeight: FontWeight.w600, color: Colors.grey),
-                            decoration: _buildInputDecoration(theme, isDark).copyWith(
-                              fillColor: isDark ? Colors.black26 : Colors.grey[200],
-                            ),
+                            style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+                            decoration: _buildInputDecoration(theme, isDark),
                           ),
                         ],
                       ),
@@ -237,19 +361,16 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                           _buildLabel('Métrica'),
                           TextFormField(
                             controller: _timeSigCtrl,
-                            
-                            style: GoogleFonts.nunito(fontWeight: FontWeight.w600, color: Colors.grey),
-                            decoration: _buildInputDecoration(theme, isDark).copyWith(
-                              fillColor: isDark ? Colors.black26 : Colors.grey[200],
-                            ),
+                            style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+                            decoration: _buildInputDecoration(theme, isDark),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                
+                const SizedBox(height: 16),
+
                 _buildLabel('Letra y Acordes'),
                 Container(
                   decoration: BoxDecoration(
@@ -260,7 +381,7 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                         color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
-                      )
+                      ),
                     ],
                   ),
                   child: ClipRRect(
@@ -269,20 +390,20 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                       controller: _lyricsCtrl,
                       maxLines: 18,
                       style: GoogleFonts.robotoMono(
-                        fontSize: 14, 
-                        height: 1.6, 
-                        color: isDark ? Colors.white : Colors.black87
+                        fontSize: 14,
+                        height: 1.6,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFFDFBF7), // Slight off-white like paper
+                        fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFFDFBF7),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.all(20),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 100), // Space for bottom buttons
+                const SizedBox(height: 100),
               ],
             ),
           ),
@@ -304,24 +425,31 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
         child: SafeArea(
           child: Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isLoading ? null : () => _saveHymn(true),
-                  icon: const Icon(Icons.save_alt_rounded),
-                  label: const Text('Guardar Local'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              if (!kIsWeb) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () => _saveHymn(isLocal: true, isAdmin: isAdmin),
+                    icon: const Icon(Icons.save_alt_rounded),
+                    label: const Text('Guardar Local'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
+                const SizedBox(width: 16),
+              ],
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _isLoading ? null : () => _saveHymn(false),
-                  icon: const Icon(Icons.cloud_upload_rounded),
-                  label: const Text('Sugerir Oficial'),
+                  onPressed: _isLoading
+                      ? null
+                      : () => _saveHymn(isLocal: false, isAdmin: isAdmin),
+                  icon: Icon(isAdmin ? Icons.publish_rounded : Icons.cloud_upload_rounded),
+                  label: Text(isAdmin ? 'Publicar Oficial' : 'Sugerir Oficial'),
                   style: FilledButton.styleFrom(
+                    backgroundColor: isAdmin ? const Color(0xFF10B981) : null,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -342,7 +470,7 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
         style: GoogleFonts.nunito(
           fontWeight: FontWeight.bold,
           fontSize: 14,
-          color: Colors.grey[400],
+          color: Colors.grey[500],
         ),
       ),
     );
@@ -358,7 +486,10 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[300]!, width: 1),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[300]!,
+          width: 1,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

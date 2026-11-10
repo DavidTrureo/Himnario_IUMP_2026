@@ -59,6 +59,7 @@ class LocalHymnStorageService {
     String key = '',
     String beats = '',
     String timeSignature = '',
+    String category = '',
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final customHymns = await _getCustomHymnsRaw();
@@ -74,6 +75,7 @@ class LocalHymnStorageService {
       'key': key,
       'beats': beats,
       'timeSignature': timeSignature,
+      'category': category,
       'isLocalOnly': true,
       'timestamp': DateTime.now().toIso8601String(),
     });

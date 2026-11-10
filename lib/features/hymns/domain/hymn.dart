@@ -863,6 +863,88 @@ class Hymn {
 
     return buffer.toString();
   }
+
+  /// Retorna la lista de categorías válidas para la colección dada.
+  static List<Map<String, String>> categoriesForCollection(String collection) {
+    if (collection == 'especiales') {
+      return const [
+        {'id': '', 'name': 'Sin Categoría / Ninguna'},
+        {'id': 'Coro Nacional', 'name': 'Coro Nacional'},
+        {'id': 'Coros Unidos', 'name': 'Coros Unidos'},
+      ];
+    } else if (collection == 'coros') {
+      return const [
+        {'id': '', 'name': 'Sin Categoría / Ninguna'},
+        {'id': 'Con Acordes', 'name': 'Con Acordes'},
+        {'id': 'DO', 'name': 'Tono DO'},
+        {'id': 'RE', 'name': 'Tono RE'},
+        {'id': 'MI', 'name': 'Tono MI'},
+        {'id': 'FA', 'name': 'Tono FA'},
+        {'id': 'SOL', 'name': 'Tono SOL'},
+        {'id': 'LA', 'name': 'Tono LA'},
+        {'id': 'SI', 'name': 'Tono SI'},
+        {'id': 'Menores', 'name': 'Ritmo / Modo Menor'},
+      ];
+    }
+    return const [
+      {'id': '', 'name': 'Sin Categoría / Ninguna'},
+      {'id': 'Predicación', 'name': 'Predicación'},
+      {'id': 'Adoración', 'name': 'Adoración'},
+      {'id': 'Consagración', 'name': 'Consagración'},
+      {'id': 'Santa Cena', 'name': 'Santa Cena'},
+      {'id': 'Coritos', 'name': 'Coritos'},
+      {'id': 'Fúnebre', 'name': 'Fúnebre'},
+      {'id': 'Navidad', 'name': 'Navidad'},
+    ];
+  }
+
+  /// Detecta si una letra nueva coincide en >80% (por trigramas) con algún canto existente.
+  static Hymn? findPossibleDuplicate(String newLyrics, List<Hymn> existingHymns) {
+    String normalize(String s) =>
+        s.replaceAll(RegExp(r'[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]'), '').toLowerCase();
+
+    final cleanNew = normalize(newLyrics);
+    if (cleanNew.length < 20) return null;
+
+    Set<String> trigramsOf(String str) {
+      final result = <String>{};
+      for (int i = 0; i <= str.length - 3; i++) {
+        result.add(str.substring(i, i + 3));
+      }
+      return result;
+    }
+
+    final newTrigrams = trigramsOf(cleanNew);
+    if (newTrigrams.isEmpty) return null;
+
+    for (final hymn in existingHymns) {
+      final cleanExisting = normalize(hymn.lyrics);
+      if (cleanExisting.length < 20) continue;
+      if (cleanNew.contains(cleanExisting) || cleanExisting.contains(cleanNew)) {
+        return hymn;
+      }
+      final existingTrigrams = trigramsOf(cleanExisting);
+      if (existingTrigrams.isEmpty) continue;
+      int intersection = 0;
+      for (final t in newTrigrams) {
+        if (existingTrigrams.contains(t)) intersection++;
+      }
+      final similarity = (2.0 * intersection) / (newTrigrams.length + existingTrigrams.length);
+      if (similarity > 0.8) return hymn;
+    }
+    return null;
+  }
+
+  /// Combina una nota musical con su modo ('Mayor' o 'Menor').
+  static String applyToneMode(String toneNote, String mode) {
+    final trimmed = toneNote.trim();
+    if (trimmed.isEmpty) return '';
+    String root = trimmed.toUpperCase();
+    if (root.endsWith('M') && !root.endsWith('MI')) {
+      root = root.substring(0, root.length - 1);
+    }
+    return mode == 'Menor' ? '${root}m' : root;
+  }
 }
 
 // Notifier para el modo Administrador
@@ -924,12 +1006,40 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
 
   HymnsNotifier(this.collection);
 
+  Future<List<Hymn>> _mergeLocalCustomHymns(List<Hymn> baseList) async {
+    final list = List<Hymn>.from(baseList);
+    final localHymnsRaw = await LocalHymnStorageService.getCustomHymns();
+    final localHymns = localHymnsRaw
+        .where((h) => h['collection'] == collection)
+        .map((h) => Hymn(
+              id: h['id'],
+              title: h['title'],
+              toneNote: h['key'] ?? '',
+              beats: h['beats'] ?? '',
+              timeSignature: h['timeSignature'] ?? '',
+              lyrics: h['lyrics'],
+              collection: h['collection'],
+              category: h['category'] ?? '',
+              isLocalOnly: true,
+            ))
+        .toList();
+
+    list.addAll(localHymns);
+    if (collection == 'iump') {
+      list.sort((a, b) => a.id.compareTo(b.id));
+    } else {
+      list.sort((a, b) => a.title.compareTo(b.title));
+    }
+    return list;
+  }
+
   @override
   Future<List<Hymn>> build() async {
     final firestore = FirebaseFirestore.instance;
 
-    // 1. Cargar los cantos locales embebidos de inmediato (0.01s)
+    // 1. Cargar los cantos locales embebidos + personalizados locales de inmediato (0.01s)
     final baseHymns = await _loadBaseHymns(collection);
+    final initialWithLocals = await _mergeLocalCustomHymns(baseHymns);
 
     // 2. Suscribirse a actualizaciones de Firestore en segundo plano
     final subscription = firestore.collection(collection).snapshots().listen(
@@ -940,37 +1050,13 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
 
         if (snapshot.docs.isEmpty) return;
 
-        final List<Hymn> list = snapshot.docs.map((doc) {
+        final List<Hymn> firestoreList = snapshot.docs.map((doc) {
           final data = doc.data();
           return Hymn.fromJson(data, collection);
         }).toList();
 
-        // Mezclar cantos locales creados por el usuario
-        final localHymnsRaw = await LocalHymnStorageService.getCustomHymns();
-        final localHymns = localHymnsRaw
-            .where((h) => h['collection'] == collection)
-            .map((h) => Hymn(
-                  id: h['id'],
-                  title: h['title'],
-                  toneNote: h['key'] ?? '',
-                  beats: '',
-                  timeSignature: '',
-                  lyrics: h['lyrics'],
-                  collection: h['collection'],
-                  category: '',
-                  isLocalOnly: true,
-                ))
-            .toList();
-        
-        list.addAll(localHymns);
-
-        if (collection == 'iump') {
-          list.sort((a, b) => a.id.compareTo(b.id));
-        } else {
-          list.sort((a, b) => a.title.compareTo(b.title));
-        }
-
-        state = AsyncValue.data(list);
+        final merged = await _mergeLocalCustomHymns(firestoreList);
+        state = AsyncValue.data(merged);
         ref.read(databaseStatusProvider.notifier).setStatus('Conectado');
       },
       onError: (error) {
@@ -983,7 +1069,7 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
       subscription.cancel();
     });
 
-    return baseHymns;
+    return initialWithLocals;
   }
 
   Future<void> _migrateFirestoreCollection() async {
@@ -1153,6 +1239,48 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
     if (!kIsWeb && kDebugMode) {
       await _syncToSourceFile();
     }
+  }
+
+  /// Calcula el ID oficial disponible (ignorando IDs locales) y publica un nuevo canto en Firestore.
+  Future<int> publishNewOfficialHymn({
+    required String title,
+    required String toneNote,
+    required String beats,
+    required String timeSignature,
+    required String lyrics,
+    int? explicitId,
+    String? audioUrl,
+    String? category,
+    List<String>? sheetMusicUrls,
+  }) async {
+    final currentHymns = state.value ?? await future;
+    final officialHymns = currentHymns.where((h) => !h.isLocalOnly).toList();
+
+    final int idToSave;
+    if (collection == 'iump' && explicitId != null) {
+      if (officialHymns.any((h) => h.id == explicitId)) {
+        throw StateError('El número de himno $explicitId ya existe en el Himnario IUMP.');
+      }
+      idToSave = explicitId;
+    } else {
+      idToSave = officialHymns.isEmpty
+          ? 1
+          : officialHymns.map((h) => h.id).reduce((a, b) => a > b ? a : b) + 1;
+    }
+
+    await saveHymn(
+      id: idToSave,
+      title: title,
+      toneNote: toneNote,
+      beats: beats,
+      timeSignature: timeSignature,
+      lyrics: lyrics,
+      isNew: true,
+      audioUrl: audioUrl,
+      category: category,
+      sheetMusicUrls: sheetMusicUrls,
+    );
+    return idToSave;
   }
 
   // Eliminar
