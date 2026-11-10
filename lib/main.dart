@@ -84,10 +84,14 @@ void main() async {
 
     try {
       await FirebaseAppCheck.instance.activate(
-        androidProvider: kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
-        appleProvider: kDebugMode ? AppleProvider.debug : AppleProvider.appAttest,
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleAppAttestProvider(),
         // reCAPTCHA v3 site key para la web
-        webProvider: ReCaptchaV3Provider('6LeCoostAAAAADjlTZgUZk3KXlf0neU9S-FV3so5'),
+        providerWeb: ReCaptchaV3Provider('6LeCoostAAAAADjlTZgUZk3KXlf0neU9S-FV3so5'),
       );
     } catch (e) {
       debugPrint('Error inicializando Firebase App Check: $e');

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/services/gemini_ai_service.dart';
 import '../../../core/services/local_hymn_storage_service.dart';
 import '../domain/hymn.dart';
 import 'hymn_list_screen.dart';
@@ -22,9 +23,13 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
   late TextEditingController _idCtrl;
   late TextEditingController _titleCtrl;
   late TextEditingController _keyCtrl;
+  late TextEditingController _beatsCtrl;
   late TextEditingController _timeSigCtrl;
   late TextEditingController _lyricsCtrl;
+  late TextEditingController _nameCtrl;
+  late TextEditingController _churchCtrl;
   String _selectedCollection = 'coros';
+  String _selectedMode = 'Mayor';
   String _selectedCategory = '';
   bool _isLoading = false;
 
@@ -34,18 +39,39 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
   void initState() {
     super.initState();
     _idCtrl = TextEditingController();
+
+    final rawTitle = (widget.initialData['title'] ?? '').toString().trim();
     _titleCtrl = TextEditingController(
-      text: (widget.initialData['title'] ?? '').toString().toUpperCase(),
+      text: rawTitle.toLowerCase() == 'título desconocido' ? '' : rawTitle.toUpperCase(),
     );
-    _keyCtrl = TextEditingController(
-      text: (widget.initialData['key'] ?? '').toString().toUpperCase(),
-    );
-    _timeSigCtrl = TextEditingController(
-      text: (widget.initialData['timeSignature'] ?? '').toString(),
-    );
+
+    final rawKey = (widget.initialData['key'] ?? '').toString().trim();
+    String parsedNote = '';
+    if (rawKey.isNotEmpty && !rawKey.toLowerCase().contains('desconocid')) {
+      final parsed = Hymn.parseToneComponents(rawKey);
+      final note = parsed['toneNote'] ?? '';
+      if (note.endsWith('m')) {
+        _selectedMode = 'Menor';
+        parsedNote = note.substring(0, note.length - 1);
+      } else {
+        parsedNote = note;
+      }
+    }
+    _keyCtrl = TextEditingController(text: parsedNote);
+
+    final rawSig = (widget.initialData['timeSignature'] ?? '').toString().trim();
+    final cleanSig = rawSig.toLowerCase().contains('desconocid') ? '' : rawSig;
+    _timeSigCtrl = TextEditingController(text: cleanSig);
+
+    // Inferir tiempos automáticamente si la métrica empieza con un número (ej: "4/4" -> "4", "3/4" -> "3")
+    final beatsMatch = RegExp(r'^(\d+)/').firstMatch(cleanSig);
+    _beatsCtrl = TextEditingController(text: beatsMatch?.group(1) ?? '');
+
     _lyricsCtrl = TextEditingController(
       text: (widget.initialData['lyrics'] ?? '').toString(),
     );
+    _nameCtrl = TextEditingController();
+    _churchCtrl = TextEditingController();
   }
 
   void _prefillNextIumpId() {
@@ -63,8 +89,11 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
     _idCtrl.dispose();
     _titleCtrl.dispose();
     _keyCtrl.dispose();
+    _beatsCtrl.dispose();
     _timeSigCtrl.dispose();
     _lyricsCtrl.dispose();
+    _nameCtrl.dispose();
+    _churchCtrl.dispose();
     super.dispose();
   }
 
@@ -143,6 +172,7 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
     }
 
     setState(() => _isLoading = true);
+    final normalizedTone = Hymn.applyToneMode(_keyCtrl.text, _selectedMode);
 
     try {
       if (isLocal) {
@@ -150,8 +180,8 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
           title.toUpperCase(),
           lyrics,
           _selectedCollection,
-          key: _keyCtrl.text.trim(),
-          beats: '4',
+          key: normalizedTone,
+          beats: _beatsCtrl.text.trim(),
           timeSignature: _timeSigCtrl.text.trim(),
           category: _selectedCategory,
         );
@@ -169,8 +199,8 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
             .read(hymnsProvider(_selectedCollection).notifier)
             .publishNewOfficialHymn(
               title: title.toUpperCase(),
-              toneNote: _keyCtrl.text.trim(),
-              beats: '4',
+              toneNote: normalizedTone,
+              beats: _beatsCtrl.text.trim(),
               timeSignature: _timeSigCtrl.text.trim(),
               lyrics: lyrics,
               explicitId: explicitIumpId,
@@ -191,12 +221,16 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
           'title': title.toUpperCase(),
           'lyrics': lyrics,
           'collection': _selectedCollection,
-          'key': _keyCtrl.text.trim(),
-          'beats': '4',
+          'key': normalizedTone,
+          'beats': _beatsCtrl.text.trim(),
           'timeSignature': _timeSigCtrl.text.trim(),
           'category': _selectedCategory,
-          'requesterName': 'Usuario (Escáner IA)',
-          'requesterChurch': 'Himnario App',
+          'requesterName': _nameCtrl.text.trim().isNotEmpty
+              ? _nameCtrl.text.trim()
+              : 'Usuario (Escáner IA)',
+          'requesterChurch': _churchCtrl.text.trim().isNotEmpty
+              ? _churchCtrl.text.trim()
+              : 'Himnario App',
           'timestamp': FieldValue.serverTimestamp(),
           'status': 'pending',
         });
@@ -268,7 +302,7 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                         child: Text(
                           isAdmin
                               ? 'Letra procesada con éxito. Revisa la colección destino y publícala directo en la BD oficial.'
-                              : 'Letra procesada con éxito. Puedes editar el título, tonalidad o letra antes de guardar o enviar.',
+                              : 'Letra procesada con éxito. Puedes editar los datos antes de guardar o enviar.',
                           style: GoogleFonts.nunito(
                             color: isDark ? Colors.amber[200] : Colors.amber[900],
                             fontWeight: FontWeight.w600,
@@ -344,21 +378,61 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Tonalidad'),
+                          _buildLabel('Tono (Ej: DO, SOL)'),
                           TextFormField(
                             controller: _keyCtrl,
+                            textCapitalization: TextCapitalization.characters,
                             style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
                             decoration: _buildInputDecoration(theme, isDark),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Métrica'),
+                          _buildLabel('Modo'),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedMode,
+                            decoration: _buildInputDecoration(theme, isDark),
+                            items: const [
+                              DropdownMenuItem(value: 'Mayor', child: Text('Mayor (M)')),
+                              DropdownMenuItem(value: 'Menor', child: Text('Menor (m)')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) setState(() => _selectedMode = val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabel('Tiempos (Ej: 3)'),
+                          TextFormField(
+                            controller: _beatsCtrl,
+                            style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+                            decoration: _buildInputDecoration(theme, isDark),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabel('Métrica (Ej: 4/4)'),
                           TextFormField(
                             controller: _timeSigCtrl,
                             style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
@@ -371,7 +445,31 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                _buildLabel('Letra y Acordes'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildLabel('Letra y Acordes'),
+                    TextButton.icon(
+                      icon: const Icon(Icons.auto_awesome_rounded, color: Colors.amber, size: 18),
+                      label: Text(
+                        'Pulir Ortografía',
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      onPressed: () async {
+                        if (_lyricsCtrl.text.trim().isEmpty) return;
+                        final res = await GeminiAiService.correctHymnGrammar(
+                          context: context,
+                          title: _titleCtrl.text.trim(),
+                          lyrics: _lyricsCtrl.text.trim(),
+                        );
+                        if (res != null && mounted) {
+                          _titleCtrl.text = res['title']!;
+                          _lyricsCtrl.text = res['lyrics']!;
+                        }
+                      },
+                    ),
+                  ],
+                ),
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
@@ -403,7 +501,34 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 100),
+
+                if (!isAdmin) ...[
+                  const SizedBox(height: 20),
+                  _buildLabel('Datos del Sugeridor (Opcional)'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _nameCtrl,
+                          decoration: _buildInputDecoration(theme, isDark).copyWith(
+                            labelText: 'Tu Nombre',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _churchCtrl,
+                          decoration: _buildInputDecoration(theme, isDark).copyWith(
+                            labelText: 'Iglesia / Local',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 110),
               ],
             ),
           ),
