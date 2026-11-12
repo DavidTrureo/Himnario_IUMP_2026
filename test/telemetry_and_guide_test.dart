@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:himnario_iump/core/services/app_telemetry_service.dart';
 import 'package:himnario_iump/features/home/presentation/feature_guide_screen.dart';
+import 'package:himnario_iump/features/home/presentation/tools_screen.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
 import 'package:himnario_iump/features/hymns/presentation/admin_dashboard_screen.dart';
 
@@ -195,6 +196,25 @@ void main() {
       expect(find.text('Administrador Oficial'), findsOneWidget);
       expect(find.text('Pulso del Himnario en Tiempo Real'), findsOneWidget);
       expect(find.text('Gestión de Contenido y Cantos'), findsOneWidget);
+    });
+  });
+
+  group('ToolsScreen Tests', () {
+    testWidgets('Herramientas no contiene el Centro de Control duplicado', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            adminModeProvider.overrideWith(() => _MockAdminModeNotifier(true)),
+          ],
+          child: const MaterialApp(
+            home: ToolsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Centro de Control Oficial (Admin)'), findsNothing);
+      expect(find.text('Guía Rápida de Funciones'), findsOneWidget);
     });
   });
 }

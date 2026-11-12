@@ -128,32 +128,7 @@ class ToolsScreen extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 16),
-          if (isAdmin) ...[
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('cantos_sugeridos')
-                  .where('status', isEqualTo: 'pending')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                int count = 0;
-                if (snapshot.hasData) {
-                  count = snapshot.data!.docs.length;
-                }
-                
-                return _ToolCard(
-                  title: 'Centro de Control Oficial (Admin)',
-                  subtitle: 'Métricas en vivo, cantos sugeridos, dispositivos y gestión',
-                  icon: Icons.shield_rounded,
-                  iconColor: const Color(0xFFF59E0B),
-                  badgeCount: count,
-                  onTap: () {
-                    context.push('/admin-dashboard');
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
+
           _ToolCard(
             title: 'Guía Rápida de Funciones',
             subtitle: 'Descubre todo lo que puedes hacer con la app',

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -31,6 +32,9 @@ final adminTapCountProvider = NotifierProvider<AdminTapCountNotifier, int>(() {
 
 
 final pendingSuggestionsProvider = StreamProvider.autoDispose<int>((ref) {
+  if (Firebase.apps.isEmpty) {
+    return Stream.value(0);
+  }
   return FirebaseFirestore.instance
       .collection('cantos_sugeridos')
       .where('status', isEqualTo: 'pending')
@@ -72,6 +76,7 @@ class HomeScreen extends ConsumerWidget {
       loading: () => '...',
       error: (e, s) => '0',
     );
+    final pendingSuggestionsCount = ref.watch(pendingSuggestionsProvider).value ?? 0;
 
     return Scaffold(
       body: Stack(
@@ -135,7 +140,7 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 // Header (Título e icono)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24.0, 32.0, 24.0, 16.0),
+                  padding: const EdgeInsets.fromLTRB(20.0, 24.0, 20.0, 16.0),
                   child: Row(
                     children: [
                       GestureDetector(
@@ -149,8 +154,8 @@ class HomeScreen extends ConsumerWidget {
                           }
                         },
                         child: Container(
-                          width: 56,
-                          height: 56,
+                          width: 52,
+                          height: 52,
                           decoration: BoxDecoration(
                             color: isDark 
                               ? Colors.white.withValues(alpha: 0.04) 
@@ -177,66 +182,86 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                       ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              children: [
-                                Text(
-                                  'Himnos & Alabanzas',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? Colors.white : theme.colorScheme.primary,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                if (ref.watch(adminModeProvider)) ...[
-                                  const SizedBox(width: 8),
-                                  InkWell(
-                                    onTap: () => context.push('/admin-dashboard'),
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.15),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: Colors.amber, width: 1.2),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.shield_rounded, color: Colors.amber, size: 16),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Panel Admin',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.amber,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ).animate().shake(delay: 200.ms),
-                                ],
-                              ],
+                            Text(
+                              'Himnos & Alabanzas',
+                              style: GoogleFonts.outfit(
+                                fontSize: 21,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : theme.colorScheme.primary,
+                                letterSpacing: 0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               'Iglesia Primera San Bernardo',
                               style: GoogleFonts.nunito(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: isDark ? Colors.white60 : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
+                                letterSpacing: 0.3,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
+                      if (ref.watch(adminModeProvider)) ...[
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () => context.push('/admin-dashboard'),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.15),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.amber, width: 1.2),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.shield_rounded, color: Colors.amber, size: 15),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Admin',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber,
+                                  ),
+                                ),
+                                if (pendingSuggestionsCount > 0) ...[
+                                  const SizedBox(width: 5),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF4444),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$pendingSuggestionsCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ).animate().shake(delay: 200.ms),
+                      ],
 
                     ],
                   ),
