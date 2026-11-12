@@ -3,17 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/services/gemini_ai_service.dart';
+import '../../../../core/services/hymn_semantic_retriever.dart';
 import '../../domain/hymn.dart';
 import '../hymn_list_screen.dart';
+
+typedef SemanticSearchExecutor = Future<Map<String, dynamic>> Function({
+  required BuildContext context,
+  required String query,
+  required List<Hymn> catalog,
+  Set<String>? allowedCollections,
+  String searchMode,
+});
 
 class SemanticSearchDialog extends ConsumerStatefulWidget {
   final String? initialQuery;
   final String defaultMode; // 'simple', 'biblical' o 'conceptual'
+  final SemanticSearchExecutor? searchExecutor;
 
   const SemanticSearchDialog({
     super.key,
     this.initialQuery,
     this.defaultMode = 'simple',
+    this.searchExecutor,
   });
 
   @override
@@ -26,12 +37,19 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
   late String _activeMode; // 'simple', 'biblical' o 'conceptual'
   bool _isLoading = false;
   bool _isContextCardCollapsed = false;
+  bool _hasSearchedAi = false;
+  String? _lastAiMode;
+  bool _fromCache = false;
+  bool _isLocalFallback = false;
+  bool _quotaReached = false;
   String? _errorMessage;
   String? _summary;
   String? _biblicalPassage;
   String? _biblicalContext;
   String? _spiritualTone;
   List<Map<String, dynamic>> _results = [];
+  Map<String, Map<String, dynamic>> _collectionResults = {};
+  String _activeResultCollection = 'iump';
   List<String> _keywords = [];
   final Set<String> _selectedCollections = {'iump', 'especiales', 'coros'};
 
@@ -114,13 +132,97 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     super.dispose();
   }
 
+  List<String> _orderedSelectedCollections() {
+    return HymnSemanticRetriever.collectionOrder
+        .where(_selectedCollections.contains)
+        .toList();
+  }
+
+  Map<String, Map<String, dynamic>> _parseCollectionPayload(
+    Map<String, dynamic> searchResponse,
+    List<Map<String, dynamic>> flatMatches,
+  ) {
+    final orderedCols = _orderedSelectedCollections();
+    final rawCols = searchResponse['collections'];
+    final parsed = <String, Map<String, dynamic>>{};
+
+    if (rawCols is Map) {
+      for (final col in orderedCols) {
+        final rawEntry = rawCols[col];
+        if (rawEntry is Map) {
+          final matches = List<Map<String, dynamic>>.from(
+            (rawEntry['matches'] as List?) ?? const [],
+          );
+          final rawReason = rawEntry['noMoreReason']?.toString().trim() ?? '';
+          final reason = rawReason.isNotEmpty
+              ? rawReason
+              : HymnSemanticRetriever.buildDefaultNoMoreReason(
+                  collection: col,
+                  foundCount: matches.length,
+                );
+          parsed[col] = {
+            'matches': matches,
+            'noMoreReason': reason,
+          };
+        }
+      }
+    }
+
+    // Respaldo si alguna fuente antigua devolvió solo lista plana
+    for (final col in orderedCols) {
+      if (parsed.containsKey(col)) continue;
+      final colMatches = flatMatches.where((item) {
+        final hymn = item['hymn'];
+        return hymn is Hymn && hymn.collection == col;
+      }).take(HymnSemanticRetriever.maxResultsPerCollection).toList();
+      parsed[col] = {
+        'matches': colMatches,
+        'noMoreReason': HymnSemanticRetriever.buildDefaultNoMoreReason(
+          collection: col,
+          foundCount: colMatches.length,
+        ),
+      };
+    }
+
+    return parsed;
+  }
+
+  String _pickInitialActiveCollection(
+    Map<String, Map<String, dynamic>> colResults,
+  ) {
+    final ordered = _orderedSelectedCollections();
+    for (final col in ordered) {
+      final matches = colResults[col]?['matches'] as List?;
+      if (matches != null && matches.isNotEmpty) {
+        return col;
+      }
+    }
+    return ordered.isNotEmpty ? ordered.first : 'iump';
+  }
+
+  void _runKeywordSearch(String keyword) {
+    final clean = keyword.trim();
+    if (clean.isEmpty) return;
+    _controller.text = clean;
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: _controller.text.length),
+    );
+    _performSearch();
+  }
+
   void _performSimpleSearch() {
     final query = _controller.text.trim();
     if (query.isEmpty) {
       setState(() {
         _isLoading = false;
+        _hasSearchedAi = false;
+        _lastAiMode = null;
+        _fromCache = false;
+        _isLocalFallback = false;
+        _quotaReached = false;
         _errorMessage = null;
         _results = [];
+        _collectionResults = {};
         _summary = null;
         _biblicalPassage = null;
         _biblicalContext = null;
@@ -176,6 +278,11 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
 
     setState(() {
       _isLoading = false;
+      _hasSearchedAi = false;
+      _lastAiMode = null;
+      _fromCache = false;
+      _isLocalFallback = false;
+      _quotaReached = false;
       _errorMessage = matches.isEmpty
           ? 'No se encontraron cantos con "$query" en las colecciones seleccionadas.'
           : null;
@@ -186,6 +293,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       _biblicalContext = null;
       _spiritualTone = null;
       _results = matches;
+      _collectionResults = {};
       _keywords = [];
     });
   }
@@ -203,8 +311,13 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
 
     setState(() {
       _isLoading = true;
+      _hasSearchedAi = false;
+      _fromCache = false;
+      _isLocalFallback = false;
+      _quotaReached = false;
       _errorMessage = null;
       _results = [];
+      _collectionResults = {};
       _summary = null;
       _biblicalPassage = null;
       _biblicalContext = null;
@@ -227,34 +340,45 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       }
       if (!mounted) return;
 
-      final searchResponse = await GeminiAiService.searchHymnsSemantically(
+      final executor =
+          widget.searchExecutor ?? GeminiAiService.searchHymnsSemantically;
+      final searchResponse = await executor(
         context: context,
         query: query,
         catalog: allHymns,
-        allowedCollections: _selectedCollections,
+        allowedCollections: Set<String>.from(_selectedCollections),
         searchMode: _activeMode,
       );
+
+      final flatMatches =
+          List<Map<String, dynamic>>.from(searchResponse['matches'] ?? []);
+      final colResults = _parseCollectionPayload(searchResponse, flatMatches);
+      final initialTab = _pickInitialActiveCollection(colResults);
 
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasSearchedAi = true;
+          _lastAiMode = _activeMode;
+          _fromCache = searchResponse['fromCache'] == true;
+          _isLocalFallback = searchResponse['isLocalFallback'] == true;
+          _quotaReached = searchResponse['quotaReached'] == true;
           _summary = searchResponse['summary']?.toString();
           _biblicalPassage = searchResponse['biblicalPassage']?.toString();
           _biblicalContext = searchResponse['biblicalContext']?.toString();
           _spiritualTone = searchResponse['spiritualTone']?.toString();
-          _results =
-              List<Map<String, dynamic>>.from(searchResponse['matches'] ?? []);
+          _results = flatMatches;
+          _collectionResults = colResults;
+          _activeResultCollection = initialTab;
           _keywords = List<String>.from(searchResponse['keywords'] ?? []);
-          if (_results.isEmpty) {
-            _errorMessage =
-                'Gemini no encontró coincidencias para esta búsqueda. Intenta describir el tema bíblico con otras palabras.';
-          }
+          _errorMessage = null;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasSearchedAi = false;
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
@@ -470,7 +594,8 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                   });
                   if (newMode == 'simple') {
                     _performSimpleSearch();
-                  } else if (_controller.text.trim().isNotEmpty && _results.isEmpty) {
+                  } else if (_controller.text.trim().isNotEmpty &&
+                      (!_hasSearchedAi || _lastAiMode != newMode)) {
                     _performSearch();
                   }
                 },
@@ -606,72 +731,43 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                       color: isDark ? Colors.white70 : Colors.black87,
                     ),
                   ),
-                  FilterChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                    label: const Text('Himnario IUMP'),
-                    labelStyle: GoogleFonts.nunito(fontSize: 11),
-                    selected: _selectedCollections.contains('iump'),
-                    onSelected: (val) {
-                      setState(() {
-                        if (val) {
-                          _selectedCollections.add('iump');
-                        } else if (_selectedCollections.length > 1) {
-                          _selectedCollections.remove('iump');
+                  for (final col in HymnSemanticRetriever.collectionOrder)
+                    FilterChip(
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                      label: Text(_getCollectionName(col)),
+                      labelStyle: GoogleFonts.nunito(fontSize: 11),
+                      selected: _selectedCollections.contains(col),
+                      onSelected: (val) {
+                        setState(() {
+                          if (val) {
+                            _selectedCollections.add(col);
+                          } else if (_selectedCollections.length > 1) {
+                            _selectedCollections.remove(col);
+                          }
+                          if (!_selectedCollections
+                              .contains(_activeResultCollection)) {
+                            _activeResultCollection =
+                                _pickInitialActiveCollection(_collectionResults);
+                          }
+                        });
+                        if (_activeMode == 'simple') {
+                          _performSimpleSearch();
+                        } else if (val &&
+                            _hasSearchedAi &&
+                            !_collectionResults.containsKey(col) &&
+                            _controller.text.trim().isNotEmpty) {
+                          _performSearch();
                         }
-                      });
-                      if (_activeMode == 'simple') {
-                        _performSimpleSearch();
-                      }
-                    },
-                  ),
-                  FilterChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                    label: const Text('Especiales'),
-                    labelStyle: GoogleFonts.nunito(fontSize: 11),
-                    selected: _selectedCollections.contains('especiales'),
-                    onSelected: (val) {
-                      setState(() {
-                        if (val) {
-                          _selectedCollections.add('especiales');
-                        } else if (_selectedCollections.length > 1) {
-                          _selectedCollections.remove('especiales');
-                        }
-                      });
-                      if (_activeMode == 'simple') {
-                        _performSimpleSearch();
-                      }
-                    },
-                  ),
-                  FilterChip(
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                    label: const Text('Coros'),
-                    labelStyle: GoogleFonts.nunito(fontSize: 11),
-                    selected: _selectedCollections.contains('coros'),
-                    onSelected: (val) {
-                      setState(() {
-                        if (val) {
-                          _selectedCollections.add('coros');
-                        } else if (_selectedCollections.length > 1) {
-                          _selectedCollections.remove('coros');
-                        }
-                      });
-                      if (_activeMode == 'simple') {
-                        _performSimpleSearch();
-                      }
-                    },
-                  ),
+                      },
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
 
               // Chips de sugerencia rápida según modo
-              if (_results.isEmpty && !_isLoading && _errorMessage == null) ...[
+              if (!_hasSearchedAi && _results.isEmpty && !_isLoading && _errorMessage == null) ...[
                 Text(
                   _activeMode == 'simple'
                       ? 'Búsquedas rápidas sugeridas:'
@@ -741,16 +837,17 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
             const SizedBox(height: 18),
             Text(
               _activeMode == 'biblical'
-                  ? 'Analizando contexto bíblico y teológico...'
-                  : 'Buscando metáforas y conceptos en el catálogo...',
+                  ? 'Analizando contexto bíblico y letras completas...'
+                  : 'Explorando metáforas y estrofas en toda la base...',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
-              'Gemini IA está cruzando las Escrituras con el catálogo de himnos y coros',
+              'Buscando hasta 10 coincidencias reales en Himnario IUMP, Especiales y Coros',
               style: GoogleFonts.nunito(
                 fontSize: 13,
                 color: isDark ? Colors.white60 : Colors.black54,
@@ -788,7 +885,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       );
     }
 
-    if (_results.isEmpty) {
+    final isAiStructuredView = _activeMode != 'simple' && _hasSearchedAi;
+
+    if (!isAiStructuredView && _results.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -821,8 +920,8 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
               _activeMode == 'simple'
                   ? 'Búsqueda instantánea en el Himnario IUMP, Coros y Especiales en tiempo real.'
                   : (_activeMode == 'biblical'
-                      ? 'Gemini identificará el pasaje sagrado, comprenderá el contexto espiritual y te sugerirá los cantos más idóneos para ministrar'
-                      : 'Gemini entenderá la figura poética y te sugerirá los cantos más afines del catálogo'),
+                      ? 'Analizará las letras reales y te mostrará hasta 10 cantos afines por colección.'
+                      : 'Interpretará la figura poética y seleccionará hasta 10 cantos por colección.'),
               style: GoogleFonts.nunito(
                 fontSize: 12,
                 color: isDark ? Colors.white38 : Colors.black38,
@@ -837,27 +936,463 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     final hasContext = (_biblicalContext != null && _biblicalContext!.isNotEmpty) ||
         (_summary != null && _summary!.isNotEmpty);
 
-    return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 16),
-      itemCount: _results.length + (hasContext ? 1 : 0),
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        if (hasContext && index == 0) {
-          return _buildContextCard(context, theme, isDark, isCompact);
-        }
-        final resultIndex = hasContext ? index - 1 : index;
-        return _buildHymnResultCard(
-          context,
-          theme,
-          isDark,
-          _results[resultIndex],
-        );
-      },
+    if (!isAiStructuredView) {
+      return ListView.separated(
+        padding: const EdgeInsets.only(bottom: 16),
+        itemCount: _results.length + (hasContext ? 1 : 0),
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemBuilder: (context, index) {
+          if (hasContext && index == 0) {
+            return _buildContextCard(context, theme, isDark, isCompact);
+          }
+          final resultIndex = hasContext ? index - 1 : index;
+          return _buildHymnResultCard(
+            context,
+            theme,
+            isDark,
+            _results[resultIndex],
+          );
+        },
+      );
+    }
+
+    final orderedCols = _orderedSelectedCollections();
+    final activeCol = orderedCols.contains(_activeResultCollection)
+        ? _activeResultCollection
+        : (orderedCols.isNotEmpty ? orderedCols.first : 'iump');
+    final activePayload = _collectionResults[activeCol];
+    final activeMatches = List<Map<String, dynamic>>.from(
+      (activePayload?['matches'] as List?) ?? const [],
+    );
+    final rawNoMore = activePayload?['noMoreReason']?.toString().trim() ?? '';
+    final noMoreReason = rawNoMore.isNotEmpty
+        ? rawNoMore
+        : HymnSemanticRetriever.buildDefaultNoMoreReason(
+            collection: activeCol,
+            foundCount: activeMatches.length,
+          );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildCollectionResultTabs(context, theme, isDark, isCompact, orderedCols, activeCol),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView(
+            key: const ValueKey('ai_results_listview'),
+            padding: const EdgeInsets.only(bottom: 16),
+            children: [
+              if (hasContext) ...[
+                _buildContextCard(context, theme, isDark, isCompact),
+                const SizedBox(height: 10),
+              ],
+              if (activeMatches.isEmpty)
+                _buildCollectionEmptyState(
+                  context,
+                  theme,
+                  isDark,
+                  activeCol,
+                  noMoreReason,
+                  orderedCols,
+                )
+              else ...[
+                for (int i = 0; i < activeMatches.length; i++) ...[
+                  _buildHymnResultCard(
+                    context,
+                    theme,
+                    isDark,
+                    activeMatches[i],
+                    rank: i + 1,
+                  ),
+                  if (i < activeMatches.length - 1) const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 12),
+                _buildCollectionStatusBanner(
+                  context,
+                  theme,
+                  isDark,
+                  activeCol,
+                  activeMatches.length,
+                  noMoreReason,
+                  orderedCols,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCollectionResultTabs(
+    BuildContext context,
+    ThemeData theme,
+    bool isDark,
+    bool isCompact,
+    List<String> orderedCols,
+    String activeCol,
+  ) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (int i = 0; i < orderedCols.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Builder(
+              builder: (context) {
+                final col = orderedCols[i];
+                final count =
+                    ((_collectionResults[col]?['matches'] as List?) ?? const [])
+                        .length;
+                final isSelected = col == activeCol;
+                final colColor = _getCollectionColor(col, theme);
+                final shortLabel = (isCompact && col == 'iump')
+                    ? 'Himnario'
+                    : _getCollectionName(col);
+
+                return InkWell(
+                  key: ValueKey('ai_collection_tab_$col'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    setState(() {
+                      _activeResultCollection = col;
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? colColor.withValues(alpha: isDark ? 0.28 : 0.14)
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : Colors.black.withValues(alpha: 0.04)),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? colColor
+                            : (isDark ? Colors.white12 : Colors.black12),
+                        width: isSelected ? 1.4 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          shortLabel,
+                          style: GoogleFonts.outfit(
+                            fontSize: isCompact ? 12 : 12.5,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            color: isSelected
+                                ? (isDark ? Colors.white : colColor)
+                                : (isDark ? Colors.white70 : Colors.black87),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: count > 0
+                                ? colColor.withValues(alpha: isSelected ? 0.9 : 0.18)
+                                : (isDark ? Colors.white12 : Colors.black12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '$count',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: count > 0
+                                  ? (isSelected ? Colors.white : colColor)
+                                  : (isDark ? Colors.white54 : Colors.black54),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<String> _otherCollectionsWithMatches(
+    String currentCol,
+    List<String> orderedCols,
+  ) {
+    return orderedCols.where((col) {
+      if (col == currentCol) return false;
+      final list = _collectionResults[col]?['matches'] as List?;
+      return list != null && list.isNotEmpty;
+    }).toList();
+  }
+
+  Widget _buildCollectionStatusBanner(
+    BuildContext context,
+    ThemeData theme,
+    bool isDark,
+    String col,
+    int count,
+    String noMoreReason,
+    List<String> orderedCols,
+  ) {
+    final otherWithMatches = _otherCollectionsWithMatches(col, orderedCols);
+    final isFull = count >= HymnSemanticRetriever.maxResultsPerCollection;
+    final colColor = _getCollectionColor(col, theme);
+    final colFullName = HymnSemanticRetriever.collectionDisplayName(col);
+
+    return Container(
+      key: ValueKey('ai_collection_footer_$col'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isFull
+            ? colColor.withValues(alpha: isDark ? 0.12 : 0.06)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : Colors.amber.shade50.withValues(alpha: 0.65)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isFull
+              ? colColor.withValues(alpha: 0.25)
+              : Colors.amber.withValues(alpha: 0.30),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isFull
+                    ? Icons.verified_rounded
+                    : Icons.auto_awesome_motion_rounded,
+                size: 16,
+                color: isFull
+                    ? colColor
+                    : (isDark ? Colors.amber.shade300 : Colors.amber.shade800),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isFull
+                      ? 'Top $count más certeros en $colFullName'
+                      : '$count ${count == 1 ? "canto encontrado" : "cantos encontrados"} en $colFullName',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isFull
+                ? 'Se seleccionaron los $count cantos de $colFullName con mayor fidelidad bíblica y temática a tu búsqueda.'
+                : noMoreReason,
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              height: 1.35,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+          if (!isFull && otherWithMatches.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                for (final other in otherWithMatches)
+                  ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: _getCollectionColor(other, theme),
+                    ),
+                    label: Text(
+                      'Ver ${(_collectionResults[other]?['matches'] as List).length} en ${_getCollectionName(other)}',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _activeResultCollection = other;
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollectionEmptyState(
+    BuildContext context,
+    ThemeData theme,
+    bool isDark,
+    String col,
+    String noMoreReason,
+    List<String> orderedCols,
+  ) {
+    final colColor = _getCollectionColor(col, theme);
+    final colFullName = HymnSemanticRetriever.collectionDisplayName(col);
+    final otherWithMatches = _otherCollectionsWithMatches(col, orderedCols);
+
+    return Container(
+      key: ValueKey('ai_collection_empty_$col'),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.library_music_outlined,
+                  size: 20,
+                  color: colColor,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Sin coincidencias en $colFullName',
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            noMoreReason,
+            style: GoogleFonts.nunito(
+              fontSize: 13.5,
+              height: 1.4,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+          if (otherWithMatches.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Opciones disponibles en otras colecciones:',
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final other in otherWithMatches)
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _getCollectionColor(other, theme),
+                      side: BorderSide(
+                        color: _getCollectionColor(other, theme)
+                            .withValues(alpha: 0.5),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.music_note_rounded, size: 15),
+                    label: Text(
+                      '${_getCollectionName(other)} (${(_collectionResults[other]?['matches'] as List).length})',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _activeResultCollection = other;
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ],
+          if (_keywords.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              'Toca un concepto relacionado para ampliar la búsqueda:',
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final kw in _keywords)
+                  ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(
+                      '#$kw',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onPressed: () => _runKeywordSearch(kw),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildContextCard(
       BuildContext context, ThemeData theme, bool isDark, bool isCompact) {
+    final String sourceLabel;
+    final IconData sourceIcon;
+    if (_fromCache) {
+      sourceLabel = 'Caché instantánea';
+      sourceIcon = Icons.bolt_rounded;
+    } else if (_isLocalFallback) {
+      sourceLabel = _quotaReached
+          ? 'Búsqueda local profunda (cuota IA pausada)'
+          : 'Búsqueda local profunda (sin conexión)';
+      sourceIcon = Icons.offline_bolt_outlined;
+    } else {
+      sourceLabel = 'IA · Análisis completo de letras';
+      sourceIcon = Icons.auto_awesome_rounded;
+    }
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -944,6 +1479,44 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                   ],
                 ),
                 if (!_isContextCardCollapsed) ...[
+                  if (_hasSearchedAi) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.white.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.28),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            sourceIcon,
+                            size: 12,
+                            color: isDark
+                                ? Colors.amber.shade200
+                                : Colors.amber.shade900,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            sourceLabel,
+                            style: GoogleFonts.nunito(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? Colors.amber.shade200
+                                  : Colors.amber.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (_biblicalPassage != null && _biblicalPassage!.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
@@ -995,52 +1568,41 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                       ),
                     ),
                   ],
-                  if (_biblicalContext?.contains('Modo sin conexión') == true ||
-                      _summary?.contains('Modo sin conexión') == true) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: isDark ? Colors.amber.shade300 : Colors.amber.shade900,
-                        side: BorderSide(color: Colors.amber.withValues(alpha: 0.5)),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        visualDensity: VisualDensity.compact,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.vpn_key_rounded, size: 14),
-                      label: const Text('Revisar o Actualizar Clave API', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      onPressed: () async {
-                        final newKey = await GeminiAiService.showApiKeyInputDialog(
-                          context,
-                          reason: 'Actualiza o restablece la Clave API de Gemini para habilitar el análisis bíblico con IA:',
-                        );
-                        if (newKey != null && newKey.isNotEmpty && mounted) {
-                          _performSearch();
-                        }
-                      },
-                    ),
-                  ],
                   if (_keywords.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
+                      spacing: 5,
+                      runSpacing: 5,
                       children: _keywords
-                          .map((kw) => Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          .map(
+                            (kw) => InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () => _runKeywordSearch(kw),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2.5),
                                 decoration: BoxDecoration(
                                   color: isDark
                                       ? Colors.white10
-                                      : Colors.black.withValues(alpha: 0.04),
+                                      : Colors.black.withValues(alpha: 0.05),
                                   borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? Colors.white12
+                                        : Colors.black.withValues(alpha: 0.08),
+                                  ),
                                 ),
                                 child: Text(
                                   '#$kw',
                                   style: GoogleFonts.nunito(
-                                    fontSize: 10,
-                                    color: isDark ? Colors.white60 : Colors.black54,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white70 : Colors.black87,
                                   ),
                                 ),
-                              ))
+                              ),
+                            ),
+                          )
                           .toList(),
                     ),
                   ],
@@ -1067,11 +1629,14 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     BuildContext context,
     ThemeData theme,
     bool isDark,
-    Map<String, dynamic> item,
-  ) {
+    Map<String, dynamic> item, {
+    int? rank,
+  }) {
     final Hymn hymn = item['hymn'] as Hymn;
     final reason = item['relevanceReason'] as String? ?? '';
     final moment = item['worshipMoment'] as String?;
+    final relevanceLevel =
+        (item['relevanceLevel']?.toString().toLowerCase().trim() ?? '');
     final colColor = _getCollectionColor(hymn.collection, theme);
     final momentColor = _getMomentColor(moment);
 
@@ -1099,6 +1664,27 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
             children: [
               Row(
                 children: [
+                  if (rank != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: rank <= 3
+                            ? colColor
+                            : colColor.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '#$rank',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: rank <= 3 ? Colors.white : colColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -1150,6 +1736,36 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                     ),
                   ] else ...[
                     const Spacer(),
+                  ],
+                  if (relevanceLevel == 'directa' || relevanceLevel == 'alta') ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: (relevanceLevel == 'directa'
+                                ? Colors.green
+                                : Colors.amber.shade700)
+                            .withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        relevanceLevel == 'directa'
+                            ? 'Acierto directo'
+                            : 'Alta afinidad',
+                        style: GoogleFonts.nunito(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: relevanceLevel == 'directa'
+                              ? (isDark
+                                  ? Colors.green.shade300
+                                  : Colors.green.shade800)
+                              : (isDark
+                                  ? Colors.amber.shade300
+                                  : Colors.amber.shade900),
+                        ),
+                      ),
+                    ),
                   ],
                   if (hymn.toneNote.isNotEmpty) ...[
                     const SizedBox(width: 6),

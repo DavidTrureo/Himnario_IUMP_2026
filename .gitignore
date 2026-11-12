@@ -87,3 +87,10 @@ scripts/check_*
 scripts/add_scrollbar_*
 scripts/query_rest.dart
 test/test_pdf.dart
+
+# Variables de entorno locales y secretos de Cloud Functions
+functions/.env
+functions/.env.*
+.env
+.env.*
+scripts/.embed_cache.jsonl

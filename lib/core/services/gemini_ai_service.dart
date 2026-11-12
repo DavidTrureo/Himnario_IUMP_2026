@@ -5,27 +5,41 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'hymn_semantic_retriever.dart';
 import 'spanish_grammar_corrector.dart';
 import '../../features/hymns/domain/hymn.dart';
 
 class GeminiAiService {
   static const String _keyPref = 'gemini_api_key';
 
-  /// Clave oficial del servidor en nivel gratuito para funcionamiento inmediato y transparente
+  /// Clave de respaldo opcional inyectada solo en compilación (--dart-define=GEMINI_API_KEY=...).
+  /// En producción las Cloud Functions de Himnario usan exclusivamente su propia clave separada en servidor.
   static String get defaultServerApiKey =>
-      utf8.decode(base64.decode('QVEuQWI4Uk42SlBOUWdHeldTYkxiYmplb3JvUzBRN1RUWTVZUW42M0tKTGpiSlZ5MkYzMUE='));
+      const String.fromEnvironment('GEMINI_API_KEY');
+
+  static const List<String> _activeModels = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.8-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-lite-latest',
+  ];
+
+  static bool _isRetiredSharedKey(String key) {
+    final trimmed = key.trim();
+    if (trimmed.isEmpty) return false;
+    return trimmed.contains('AQ.Ab8RN6LMJy9J1QN') ||
+        trimmed.contains('AQ.Ab8RN6ORMW') ||
+        (trimmed.startsWith('AQ.Ab8RN6JP') && trimmed.endsWith('2F31A'));
+  }
 
   static Future<String> getApiKey() async {
     final prefs = await SharedPreferences.getInstance();
     final customKey = prefs.getString(_keyPref)?.trim() ?? '';
-    if (customKey == defaultServerApiKey) {
-      return defaultServerApiKey;
-    }
-    // Si el usuario tiene guardada una clave revocada o corrupta, purgarla
-    if (customKey.contains('AQ.Ab8RN6LMJy9J1QN') ||
-        customKey.contains('AQ.Ab8RN6ORMW') ||
+    // Si el usuario tiene guardada una clave obsoleta o la antigua clave compartida, purgarla
+    if (_isRetiredSharedKey(customKey) ||
         (customKey.isNotEmpty && customKey.length < 20)) {
-      debugPrint('Purgando clave guardada obsoleta en dispositivo: $customKey. Usando clave activa oficial.');
+      debugPrint('Purgando clave obsoleta/compartida guardada en dispositivo. Usando Cloud Function oficial.');
       await prefs.remove(_keyPref);
       return defaultServerApiKey;
     }
@@ -89,7 +103,8 @@ class GeminiAiService {
               TextField(
                 controller: controller,
                 decoration: InputDecoration(
-                  labelText: 'API Key (Google AI Studio)',
+                  labelText: 'API Key personal de Gemini (Opcional)',
+                  hintText: 'Deja vacío para usar el servidor oficial',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -102,7 +117,7 @@ class GeminiAiService {
               await resetToDefaultApiKey();
               if (context.mounted) Navigator.pop(context, defaultServerApiKey);
             },
-            child: const Text('Restablecer Oficial'),
+            child: const Text('Usar Servidor Oficial'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -141,24 +156,13 @@ class GeminiAiService {
     int totalCorrections = localResult.correctionsCount;
 
     String apiKey = (await getApiKey()).trim();
-    if (apiKey.isEmpty && context.mounted) {
-      final inputKey = await showApiKeyInputDialog(
-        context,
-        reason:
-            'Para corregir tildes, comas, puntuación y mayúsculas con los modelos más avanzados de IA (Gemini 2.5 / 2.0), ingresa tu API Key gratuita de Google Studio:',
-      );
-      if (inputKey != null && inputKey.trim().isNotEmpty) {
-        apiKey = inputKey.trim();
-        await saveApiKey(apiKey);
-      }
-    }
 
     bool isAiAssisted = false;
     bool geminiFailed = false;
     bool isProgressShown = false;
 
-    // Si hay clave API, consultar Gemini para perfeccionamiento contextual adicional
-    if (apiKey.isNotEmpty) {
+    // Consultar primero vía Cloud Function oficial (sin requerir clave en el cliente)
+    {
       if (context.mounted) {
         isProgressShown = true;
         showDialog(
@@ -201,7 +205,7 @@ class GeminiAiService {
         final cfRes = await callable.call({
           'title': currentTitle,
           'lyrics': currentLyrics,
-          'apiKey': apiKey,
+          if (apiKey.isNotEmpty) 'apiKey': apiKey,
         }).timeout(const Duration(seconds: 30));
 
         final data = cfRes.data;
@@ -215,11 +219,15 @@ class GeminiAiService {
           debugPrint('>>> Corrección IA completada con éxito vía Cloud Function (${data['modelUsed']})');
         }
       } catch (cfError) {
-        debugPrint('Cloud Function no respondió o falló: $cfError. Procediendo a HTTP directo...');
+        debugPrint('Cloud Function no respondió o falló: $cfError.');
       }
 
-      // 2. Si no respondió la Cloud Function, consultar directamente la API de Google con los modelos más modernos
-      if (!remoteSuccess) {
+      if (!remoteSuccess && apiKey.isEmpty) {
+        geminiFailed = true;
+      }
+
+      // 2. Si hay clave personalizada/compilada y falló la Cloud Function, intentar vía REST directo
+      if (!remoteSuccess && apiKey.isNotEmpty) {
         final promptText = '''Actúa como un corrector de estilo y editor lingüístico experto, aplicando estrictamente las normas ortográficas, gramaticales y de puntuación de la Real Academia Española (RAE). 
 
 Tu tarea es revisar, corregir y formatear la letra de un canto cristiano respetando las siguientes reglas de manera obligatoria:
@@ -284,22 +292,14 @@ JSON esperado:
         });
 
         http.Response? response;
-        final modelsToTry = [
-          {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
-          {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
-          {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-          {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-          {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
-        ];
 
         List<String> modelErrors = [];
         Future<http.Response?> callModels(String keyToUse) async {
-          for (final item in modelsToTry) {
-            final model = item['model']!;
-            final api = item['api']!;
+          for (final model in _activeModels) {
+            const api = 'v1beta';
             try {
               final url = Uri.parse(
-                  'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$keyToUse');
+                  'https://generativelanguage.googleapis.com/$api/models/$model:generateContent');
               final res = await http.post(
                 url,
                 headers: {
@@ -715,7 +715,7 @@ JSON esperado:
       final cfRes = await callable.call({
         'base64Image': base64Image,
         'mimeType': mimeType,
-        'apiKey': apiKey,
+        if (apiKey.isNotEmpty) 'apiKey': apiKey,
       }).timeout(const Duration(seconds: 35));
 
       final cfData = cfRes.data;
@@ -768,25 +768,19 @@ JSON esperado:
       }
     });
 
-    final modelsToTry = [
-      {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
-      {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
-      {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-      {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-      {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
-    ];
-    
     List<String> errors = [];
     Future<Map<String, dynamic>?> tryModels(String keyToUse) async {
-      for (final item in modelsToTry) {
-        final model = item['model']!;
-        final api = item['api']!;
-        final url = Uri.parse('https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$keyToUse');
+      for (final model in _activeModels) {
+        const api = 'v1beta';
+        final url = Uri.parse('https://generativelanguage.googleapis.com/$api/models/$model:generateContent');
 
         try {
           final response = await http.post(
             url,
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': keyToUse,
+            },
             body: requestBody,
           ).timeout(const Duration(seconds: 22));
 
@@ -849,23 +843,18 @@ JSON esperado:
       });
 
       http.Response? response;
-      final modelsToTry = [
-        {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
-        {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
-        {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-        {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-        {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
-      ];
 
       Future<http.Response?> callModels(String keyToUse) async {
-        for (final item in modelsToTry) {
-          final model = item['model']!;
-          final endpoint = item['api']!;
+        for (final model in _activeModels) {
+          const endpoint = 'v1beta';
           try {
-            final url = Uri.parse('https://generativelanguage.googleapis.com/$endpoint/models/$model:generateContent?key=$keyToUse');
+            final url = Uri.parse('https://generativelanguage.googleapis.com/$endpoint/models/$model:generateContent');
             final res = await http.post(
               url,
-              headers: {'Content-Type': 'application/json'},
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': keyToUse,
+              },
               body: requestBody,
             ).timeout(const Duration(seconds: 25));
             
@@ -903,10 +892,47 @@ JSON esperado:
     }
   }
 
-  /// Realiza una búsqueda semántica y conceptual en el catálogo de cantos utilizando Gemini IA.
-  /// Conecta con Gemini para permitir búsquedas conceptuales como:
-  /// "Himnos que hablen del mar tempestuoso o de la armadura de Dios"
-  /// cuando el usuario no recuerda el número ni el título exacto.
+  /// Obtiene vector de consulta vía `gemini-embedding-001` cuando hay clave API local opcional.
+  static Future<List<double>?> _embedQueryDirect(String query, String apiKey) async {
+    if (apiKey.trim().isEmpty || !HymnSemanticRetriever.hasEmbeddingsLoaded) {
+      return null;
+    }
+    try {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent',
+      );
+      final res = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey.trim(),
+        },
+        body: jsonEncode({
+          'model': 'models/gemini-embedding-001',
+          'content': {
+            'parts': [
+              {'text': query}
+            ]
+          },
+          'taskType': 'RETRIEVAL_QUERY',
+          'outputDimensionality': 256,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        final values = decoded['embedding']?['values'] as List?;
+        if (values != null && values.length == 256) {
+          return values.map((e) => (e as num).toDouble()).toList();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Realiza una búsqueda semántica y conceptual en toda la base de datos utilizando
+  /// recuperación híbrida (letras completas + embeddings) + curaduría estricta por colección,
+  /// devolviendo hasta 10 cantos más acertados por colección (`iump`, `especiales`, `coros`).
   static Future<Map<String, dynamic>> searchHymnsSemantically({
     required BuildContext context,
     required String query,
@@ -914,143 +940,176 @@ JSON esperado:
     Set<String>? allowedCollections,
     String searchMode = 'biblical', // 'biblical' o 'conceptual'
   }) async {
-    // 1. Obtener la clave API de Gemini
-    String apiKey = await getApiKey();
-    if (apiKey.isEmpty) {
-      if (!context.mounted) {
-        throw Exception('API Key de Gemini no configurada');
-      }
-      final enteredKey = await showApiKeyInputDialog(
-        context,
-        reason:
-            'Para acceder al Asistente Bíblico e Inteligencia Artificial necesitas ingresar tu API Key de Google Gemini.',
-      );
-      if (enteredKey == null || enteredKey.trim().isEmpty) {
-        throw Exception('Se requiere una clave API de Gemini para el Asistente Bíblico.');
-      }
-      apiKey = enteredKey.trim();
-    }
+    await HymnSemanticRetriever.ensureEmbeddingsLoaded();
 
-    final filteredCatalog = allowedCollections == null || allowedCollections.isEmpty
-        ? catalog
-        : catalog
-            .where((h) => allowedCollections.contains(h.collection))
-            .toList();
+    final effectiveAllowed = (allowedCollections == null || allowedCollections.isEmpty)
+        ? HymnSemanticRetriever.collectionOrder.toSet()
+        : allowedCollections;
+    final orderedCols = HymnSemanticRetriever.collectionOrder
+        .where(effectiveAllowed.contains)
+        .toList();
+
+    final filteredCatalog = catalog
+        .where((h) => effectiveAllowed.contains(h.collection))
+        .toList();
 
     if (filteredCatalog.isEmpty) {
+      final emptyCollections = <String, Map<String, dynamic>>{
+        for (final col in orderedCols)
+          col: {
+            'matches': <Map<String, dynamic>>[],
+            'noMoreReason': HymnSemanticRetriever.buildDefaultNoMoreReason(
+              collection: col,
+              foundCount: 0,
+            ),
+          }
+      };
       return {
         'summary': 'No hay cantos en las colecciones seleccionadas.',
+        'biblicalPassage': null,
         'biblicalContext': null,
         'spiritualTone': null,
+        'collections': emptyCollections,
         'matches': <Map<String, dynamic>>[],
         'keywords': <String>[],
+        'fromCache': false,
+        'isLocalFallback': true,
+        'quotaReached': false,
       };
     }
 
-    // 2. Construir índice resumido y compacto de los cantos para contexto en el prompt
-    final buffer = StringBuffer();
-    for (final h in filteredCatalog) {
-      buffer.writeln('${h.id}|${h.collection}|${h.title}');
-    }
+    // 1. Clave personal opcional del usuario (las Cloud Functions usan su clave oficial separada)
+    String apiKey = (await getApiKey()).trim();
+    final List<double>? clientQueryVec = await _embedQueryDirect(query, apiKey);
 
-    final catalogIndex = buffer.toString();
+    // 2. Preseleccionar en el dispositivo los mejores candidatos por colección leyendo letras completas
+    final lexicalCandidates = HymnSemanticRetriever.buildCandidatePool(
+      query: query,
+      catalog: filteredCatalog,
+      allowedCollections: effectiveAllowed,
+      queryVector: clientQueryVec,
+      perCollectionLimit: orderedCols.length == 1 ? 30 : 22,
+    );
+    final catalogSignature = HymnSemanticRetriever.computeCatalogSignature(
+      filteredCatalog,
+      effectiveAllowed,
+    );
 
-    // 3. Intentar primero a través de Cloud Function (aprovecha la caché inteligente en Firestore)
+    bool isQuotaError = false;
+
+    // 3. Intentar primero a través de Cloud Function v2 (caché compartida + vectores servidor + clave aislada)
     try {
       final callable = FirebaseFunctions.instance.httpsCallable('searchHymnsWithAi');
       final cfRes = await callable.call({
+        'schemaVersion': 2,
         'query': query,
         'searchMode': searchMode,
-        'catalogIndex': catalogIndex,
-        'apiKey': apiKey,
-      }).timeout(const Duration(seconds: 25));
+        'allowedCollections': orderedCols,
+        'catalogSignature': catalogSignature,
+        'lexicalCandidates': lexicalCandidates,
+        if (apiKey.isNotEmpty) 'apiKey': apiKey,
+      }).timeout(const Duration(seconds: 45));
 
       final cfData = cfRes.data;
       if (cfData is Map && cfData['success'] == true) {
-        final rawResults = (cfData['results'] as List?) ?? [];
-        final summary = cfData['summary']?.toString() ??
-            'Resultados identificados por el Asistente Bíblico';
-        final biblicalPassage = cfData['biblicalPassage']?.toString();
-        final biblicalContext = cfData['biblicalContext']?.toString();
-        final spiritualTone = cfData['spiritualTone']?.toString();
-        final keywords = (cfData['keywords'] as List?)
-                ?.map((e) => e.toString())
-                .toList() ??
-            [];
-
-        final matches = _mapRawResultsToHymns(rawResults, filteredCatalog);
-        return {
-          'summary': summary,
-          'biblicalPassage': biblicalPassage,
-          'biblicalContext': biblicalContext,
-          'spiritualTone': spiritualTone,
-          'matches': matches,
-          'keywords': keywords,
-        };
+        return _mapV2PayloadToResult(
+          rawPayload: cfData,
+          filteredCatalog: filteredCatalog,
+          orderedCols: orderedCols,
+          fromCache: cfData['fromCache'] == true,
+        );
       }
     } catch (cfError) {
-      debugPrint('Cloud Function searchHymnsWithAi falló o sin red directa: $cfError. Intentando HTTP directo...');
+      final errStr = cfError.toString().toLowerCase();
+      if (errStr.contains('resource-exhausted') || errStr.contains('429')) {
+        isQuotaError = true;
+      }
+      debugPrint('Cloud Function searchHymnsWithAi v2 falló ($cfError).');
     }
 
-    final modeGuidance = searchMode == 'biblical'
-        ? '''
-MODO: ASISTENTE BÍBLICO Y HERMENÉUTICA DE PREDICACIÓN / SERMÓN
-Misión: Actuar como un erudito teólogo bíblico, pastor e himnólogo cristiano con profundo conocimiento de las Sagradas Escrituras (Biblia Reina-Valera 1960) y de la himnología evangélica pentecostal (Himnario Oficial IUMP, Alabanzas Especiales y Coros Pentecostales).
+    // 4. Si el usuario configuró su propia clave REST (o --dart-define), intentar REST directo con candidatos prefiltrados
+    if (apiKey.isNotEmpty && !isQuotaError) {
+      final restResult = await _tryDirectRestSearchV2(
+        query: query,
+        searchMode: searchMode,
+        orderedCols: orderedCols,
+        lexicalCandidates: lexicalCandidates,
+        filteredCatalog: filteredCatalog,
+        apiKey: apiKey,
+      );
+      if (restResult != null) {
+        return restResult;
+      }
+    }
 
-REGLA DE ORO FUNDAMENTAL:
-QUEDA ESTRICTAMENTE PROHIBIDO buscar por simple coincidencia superficial de palabras textuales aisladas (ejemplo: si el usuario escribe "pastor", NO debes limitarte a buscar cantos que contengan la palabra literal "pastor").
-Tu función como IA Bíblica Avanzada es comprender el fondo teológico y espiritual:
+    // 5. Respaldo local de alta precisión (10+10+10 leyendo letras completas, nunca pantalla vacía ni error)
+    return HymnSemanticRetriever.searchLocally(
+      query: query,
+      catalog: filteredCatalog,
+      allowedCollections: effectiveAllowed,
+      searchMode: searchMode,
+      queryVector: clientQueryVec,
+      quotaFallback: isQuotaError,
+    );
+  }
 
-1. LOCALIZACIÓN E IDENTIFICACIÓN BÍBLICA:
-   - A partir de cualquier fragmento de versículo recordado a medias (ej: "aunque pase por aguas profundas no me ahogaré", "valle de sombra de muerte", "el profeta Elías cansado en el desierto"), cita bíblica o resumen de la predicación:
-   - Identifica con precisión qué pasaje sagrado es (Libro, Capítulo y Versículos) y regístralo en "biblicalPassage" (ej: "Isaías 43:1-3", "Salmo 23:1-6", "1 Reyes 19:4-8", "Efesios 6:10-18", "Lucas 15:11-32").
+  static Future<Map<String, dynamic>?> _tryDirectRestSearchV2({
+    required String query,
+    required String searchMode,
+    required List<String> orderedCols,
+    required Map<String, List<Map<String, dynamic>>> lexicalCandidates,
+    required List<Hymn> filteredCatalog,
+    required String apiKey,
+  }) async {
+    final candidateBlocks = <String>[];
+    for (final col in orderedCols) {
+      final list = lexicalCandidates[col] ?? const [];
+      final lines = list
+          .map((e) => '${e['id']}|${e['title']}|${(e['digest'] ?? '').toString().replaceAll('\n', ' ')}')
+          .join('\n');
+      candidateBlocks.add(
+        '=== COLECCIÓN "$col" (${HymnSemanticRetriever.collectionDisplayName(col)}) [ID|TÍTULO|LETRA_COMPACTA] ===\n'
+        '${lines.isNotEmpty ? lines : "(Sin candidatos)"}',
+      );
+    }
 
-2. EXÉGESIS Y CONTEXTO ESPIRITUAL REAL:
-   - En "biblicalContext", analiza en 2-3 oraciones el sentido espiritual profundo: el trasfondo histórico-doctrinal, qué necesidad del alma atiende (consuelo en aflicción, desánimo espiritual, llamado a la santidad, etc.) y las promesas de Dios.
-   - En "spiritualTone", define la atmósfera espiritual (ej: "Consagración", "Fe en la Prueba", "Guerra Espiritual", "Consuelo y Esperanza", "Gracia y Perdón", "Adoración y Alabanza").
-
-3. HERMENÉUTICA CON EL CATÁLOGO DE CANTOS:
-   - Selecciona entre 4 y 7 cantos del catálogo proporcionado cuyo mensaje teológico y espiritual de fondo abrace y ministre esta palabra, AUNQUE EL CANTO NO CONTENGA LAS PALABRAS LITERALES DEL PASAJE.
-   - Para cada canto:
-     * "worshipMoment": Momento litúrgico idóneo ("Sellar la Predicación", "Llamado al Altar / Consagración", "Oración de Fe / Afligidos", "Alabanza Congregacional").
-     * "relevanceReason": Explica con claridad pastoral qué verdad teológica o estrofa del canto sella espiritualmente la enseñanza de la Palabra de Dios.
-'''
-        : '''
-MODO: BÚSQUEDA CONCEPTUAL Y METAFÓRICA DE CANTOS
-Misión: Ayudar a encontrar cantos a partir de un recuerdo difuso, metáfora, frase o historia:
-1. Analiza el sentido poético y espiritual de la consulta (ej: "mar tempestuoso", "armadura de Dios", "el alfarero que rompe el vaso").
-2. Identifica los cantos del catálogo que abordan directa o metafóricamente estas ideas. Si se mencionan múltiples temas, incluye los mejores para cada uno.
-3. En "relevanceReason", detalla por qué coincide y qué estrofa o idea aborda.
-4. En "worshipMoment", sugiere el momento del culto adecuado.
-''';
+    final collectionsShape = orderedCols.map((col) => '''    "$col": {
+      "matches": [
+        {
+          "id": 123,
+          "collection": "$col",
+          "title": "TÍTULO EXACTO DEL CANTO",
+          "relevanceLevel": "alta",
+          "relevanceReason": "1-2 frases concretas citando la estrofa o verdad espiritual que conecta",
+          "worshipMoment": "Sellar la Predicación | Llamado al Altar | Oración de Fe | Alabanza Congregacional"
+        }
+      ],
+      "noMoreReason": "Explicación pastoral breve si hay menos de 10 o 0 cantos en esta colección"
+    }''').join(',\n');
 
     final prompt = '''
-$modeGuidance
+MODO: ${searchMode == 'biblical' ? 'ASISTENTE BÍBLICO DE PREDICACIÓN / SERMÓN' : 'BÚSQUEDA TEMÁTICA Y METAFÓRICA'}
+Evalúa por separado cada colección (${orderedCols.join(', ')}) leyendo sus títulos y LETRAS COMPACTAS reales.
+Para CADA colección, devuelve hasta 10 cantos más acertados (ordenados de mayor a menor acierto).
+REGLA ANTI-RELLENO OBLIGATORIA: Nunca incluyas cantos forzados para llegar a 10; si hay 0, 3 o 6 genuinos, devuelve solo esos y explica brevemente en "noMoreReason".
 
-CONSULTA DEL MINISTRO O CONGREGANTE:
+CONSULTA:
 "$query"
 
-CATÁLOGO OFICIAL DE CANTOS DISPONIBLES EN LA APP [ID|COLECCIÓN|TÍTULO]:
-$catalogIndex
+CANDIDATOS:
+${candidateBlocks.join('\n\n')}
 
-RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markdown ```json, sin texto adicional):
+RESPONDE EXCLUSIVAMENTE CON JSON VÁLIDO:
 {
-  "summary": "Breve resumen del mensaje o concepto (1 frase)",
-  "biblicalPassage": "Libro Capítulo:Versículos identificados (ej: Isaías 43:1-3, Salmo 23:1-6)",
-  "biblicalContext": "Análisis exegético del pasaje bíblico o trasfondo doctrinal del sermón (2-3 oraciones claras)",
+  "summary": "Resumen en 1 frase",
+  "biblicalPassage": "Cita bíblica principal si aplica",
+  "biblicalContext": "Análisis espiritual/exegético breve (2 oraciones)",
   "spiritualTone": "Consagración | Fe en la Prueba | Consuelo y Esperanza | Guerra Espiritual | Gracia y Perdón | Adoración",
-  "results": [
-    {
-      "id": 123,
-      "collection": "iump",
-      "title": "TÍTULO DEL CANTO",
-      "relevanceReason": "Conexión pastoral/doctrinal explicando qué estrofa o verdad teológica abraza la palabra...",
-      "worshipMoment": "Sellar la Predicación | Llamado al Altar | Oración de Fe | Congregacional"
-    }
-  ],
-  "keywords": ["tema1", "tema2"]
-}
-''';
+  "keywords": ["tema1", "tema2", "tema3"],
+  "collections": {
+$collectionsShape
+  }
+}''';
 
     final requestBody = jsonEncode({
       'contents': [
@@ -1062,188 +1121,179 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
       ],
       'generationConfig': {
         'response_mime_type': 'application/json',
-        'temperature': 0.2,
+        'temperature': 0.15,
+        'maxOutputTokens': 8192,
       }
     });
 
-    final modelsToTry = [
-      {'model': 'gemini-2.5-flash', 'api': 'v1beta'},
-      {'model': 'gemini-2.5-flash-lite', 'api': 'v1beta'},
-      {'model': 'gemini-2.0-flash', 'api': 'v1beta'},
-      {'model': 'gemini-2.5-pro', 'api': 'v1beta'},
-      {'model': 'gemini-2.0-flash-lite', 'api': 'v1beta'},
-    ];
-
-    http.Response? response;
-    List<String> errors = [];
-
-    Future<http.Response?> callModelsWithKey(String keyToUse) async {
-      for (final item in modelsToTry) {
-        final model = item['model']!;
-        final api = item['api']!;
+    for (final model in _activeModels) {
+      try {
         final url = Uri.parse(
-          'https://generativelanguage.googleapis.com/$api/models/$model:generateContent?key=$keyToUse',
+          'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
         );
+        final res = await http.post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: requestBody,
+        ).timeout(const Duration(seconds: 35));
 
-        try {
-          final res = await http.post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: requestBody,
-          ).timeout(const Duration(seconds: 22));
-
-          if (res.statusCode == 200) {
-            return res;
-          } else {
-            errors.add('$model ($api): ${res.statusCode}');
-            // Si es un error 400 (Bad Request / API_KEY_INVALID) o 403 (Forbidden),
-            // la clave no es válida para ningún modelo. Cortamos de inmediato.
-            if (res.statusCode == 400 || res.statusCode == 403) {
-              return null;
-            }
-          }
-        } catch (e) {
-          errors.add('$model ($api) exc: $e');
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          var text = (decoded['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '').toString().trim();
+          if (text.startsWith('```json')) text = text.substring(7);
+          if (text.startsWith('```')) text = text.substring(3);
+          if (text.endsWith('```')) text = text.substring(0, text.length - 3);
+          final parsed = jsonDecode(text.trim()) as Map;
+          return _mapV2PayloadToResult(
+            rawPayload: parsed,
+            filteredCatalog: filteredCatalog,
+            orderedCols: orderedCols,
+            fromCache: false,
+          );
+        } else if (res.statusCode == 400 || res.statusCode == 403) {
+          return null;
         }
-      }
-      return null;
+      } catch (_) {}
     }
+    return null;
+  }
 
-    response = await callModelsWithKey(apiKey);
-
-    // Si falló y la clave usada no era la oficial (ej: clave vieja o revocada guardada en SharedPreferences),
-    // reintentamos automáticamente con la clave oficial activa
-    if ((response == null || response.statusCode != 200) && apiKey != defaultServerApiKey) {
-      debugPrint('>>> Clave API personalizada falló o expiró. Reintentando de inmediato con la clave oficial activa...');
-      await resetToDefaultApiKey();
-      apiKey = defaultServerApiKey;
-      response = await callModelsWithKey(apiKey);
-    }
-
-    if (response == null || response.statusCode != 200) {
-      final localMatches = _findLocalThematicMatches(query, filteredCatalog);
-      if (localMatches.isNotEmpty) {
-        return {
-          'summary': 'Coincidencias temáticas locales (Modo sin conexión)',
-          'biblicalPassage': null,
-          'biblicalContext': 'Modo sin conexión a internet: Se aplicó coincidencia temática local directa sobre el catálogo.',
-          'spiritualTone': 'Alabanza y Fe',
-          'matches': localMatches,
-          'keywords': <String>[],
-        };
-      }
-      throw Exception('No se pudo conectar con Gemini IA. Detalle: ${errors.join(', ')}');
-    }
-
-    final data = jsonDecode(response.body);
-    final text = data['candidates'][0]['content']['parts'][0]['text'] as String;
-
-    String cleanText = text.trim();
-    if (cleanText.startsWith('```json')) {
-      cleanText = cleanText.substring(7);
-    } else if (cleanText.startsWith('```')) {
-      cleanText = cleanText.substring(3);
-    }
-    if (cleanText.endsWith('```')) {
-      cleanText = cleanText.substring(0, cleanText.length - 3);
-    }
-
-    final parsed = jsonDecode(cleanText.trim()) as Map<String, dynamic>;
-    final rawResults = (parsed['results'] as List?) ?? [];
-    final summary = parsed['summary']?.toString() ??
-        'Resultados conceptuales encontrados por Gemini IA';
-    final biblicalPassage = parsed['biblicalPassage']?.toString();
-    final biblicalContext = parsed['biblicalContext']?.toString();
-    final spiritualTone = parsed['spiritualTone']?.toString();
-    final keywords = (parsed['keywords'] as List?)
+  static Map<String, dynamic> _mapV2PayloadToResult({
+    required Map rawPayload,
+    required List<Hymn> filteredCatalog,
+    required List<String> orderedCols,
+    required bool fromCache,
+  }) {
+    final summary = rawPayload['summary']?.toString() ??
+        'Resultados identificados por el Asistente Bíblico';
+    final biblicalPassage = rawPayload['biblicalPassage']?.toString();
+    final biblicalContext = rawPayload['biblicalContext']?.toString();
+    final spiritualTone = rawPayload['spiritualTone']?.toString();
+    final keywords = (rawPayload['keywords'] as List?)
             ?.map((e) => e.toString())
             .toList() ??
-        [];
+        <String>[];
 
-    final finalMatches = _mapRawResultsToHymns(rawResults, filteredCatalog);
+    final catalogByColAndId = <String, Hymn>{
+      for (final h in filteredCatalog) '${h.collection}-${h.id}': h,
+    };
+
+    final rawCollections = rawPayload['collections'];
+    final mappedCollections = <String, Map<String, dynamic>>{};
+    final flatMatches = <Map<String, dynamic>>[];
+
+    if (rawCollections is Map) {
+      for (final col in orderedCols) {
+        final colRaw = rawCollections[col];
+        final rawMatches = (colRaw is Map && colRaw['matches'] is List)
+            ? colRaw['matches'] as List
+            : const [];
+        final resolved = _resolveMatchesForCollection(
+          rawList: rawMatches,
+          targetCollection: col,
+          catalogByColAndId: catalogByColAndId,
+          filteredCatalog: filteredCatalog,
+        );
+
+        final aiReason = (colRaw is Map ? colRaw['noMoreReason']?.toString().trim() : null) ?? '';
+        final noMoreReason = resolved.length >= HymnSemanticRetriever.maxResultsPerCollection
+            ? HymnSemanticRetriever.buildDefaultNoMoreReason(
+                collection: col,
+                foundCount: resolved.length,
+              )
+            : (aiReason.length >= 12
+                ? aiReason
+                : HymnSemanticRetriever.buildDefaultNoMoreReason(
+                    collection: col,
+                    foundCount: resolved.length,
+                  ));
+
+        mappedCollections[col] = {
+          'matches': resolved,
+          'noMoreReason': noMoreReason,
+        };
+        flatMatches.addAll(resolved);
+      }
+    } else {
+      final rawFlat = (rawPayload['results'] as List?) ?? const [];
+      for (final col in orderedCols) {
+        final filteredRaw = rawFlat
+            .where((item) =>
+                item is Map &&
+                item['collection']?.toString().toLowerCase().trim() == col)
+            .toList();
+        final resolved = _resolveMatchesForCollection(
+          rawList: filteredRaw,
+          targetCollection: col,
+          catalogByColAndId: catalogByColAndId,
+          filteredCatalog: filteredCatalog,
+        );
+        mappedCollections[col] = {
+          'matches': resolved,
+          'noMoreReason': HymnSemanticRetriever.buildDefaultNoMoreReason(
+            collection: col,
+            foundCount: resolved.length,
+          ),
+        };
+        flatMatches.addAll(resolved);
+      }
+    }
 
     return {
       'summary': summary,
       'biblicalPassage': biblicalPassage,
       'biblicalContext': biblicalContext,
       'spiritualTone': spiritualTone,
-      'matches': finalMatches,
       'keywords': keywords,
+      'collections': mappedCollections,
+      'matches': flatMatches,
+      'fromCache': fromCache,
+      'isLocalFallback': false,
+      'quotaReached': false,
     };
   }
 
-  static List<Map<String, dynamic>> _mapRawResultsToHymns(
-    List rawResults,
-    List<Hymn> filteredCatalog,
-  ) {
-    final List<Map<String, dynamic>> finalMatches = [];
-    final catalogMap = {
-      for (var h in filteredCatalog) '${h.collection}-${h.id}': h
-    };
+  static List<Map<String, dynamic>> _resolveMatchesForCollection({
+    required List rawList,
+    required String targetCollection,
+    required Map<String, Hymn> catalogByColAndId,
+    required List<Hymn> filteredCatalog,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    final seenKeys = <String>{};
 
-    for (final item in rawResults) {
-      final col = item['collection']?.toString().toLowerCase().trim() ?? 'iump';
+    for (final item in rawList) {
+      if (item is! Map) continue;
       final id = int.tryParse(item['id']?.toString() ?? '') ?? 0;
       final title = item['title']?.toString() ?? '';
       final reason =
-          item['relevanceReason']?.toString() ?? 'Coincidencia conceptual';
-      final moment = item['worshipMoment']?.toString() ?? 'Sellar la Predicación';
+          item['relevanceReason']?.toString().trim() ?? 'Coincidencia espiritual con la búsqueda.';
+      final moment = item['worshipMoment']?.toString().trim() ?? 'Sellar la Predicación';
+      final level = item['relevanceLevel']?.toString().toLowerCase().trim() ?? 'alta';
 
-      Hymn? matchedHymn = catalogMap['$col-$id'];
-
-      // Fallback por si la colección o ID varían levemente
-      if (matchedHymn == null) {
+      Hymn? matchedHymn = catalogByColAndId['$targetCollection-$id'];
+      if (matchedHymn == null && title.isNotEmpty) {
         final normTitle = Hymn.normalizeString(title);
         matchedHymn = filteredCatalog.cast<Hymn?>().firstWhere(
-          (h) => h != null && h.normalizedTitle == normTitle,
+          (h) => h != null && h.collection == targetCollection && h.normalizedTitle == normTitle,
           orElse: () => null,
         );
       }
 
-      if (matchedHymn != null) {
-        finalMatches.add({
+      if (matchedHymn != null && seenKeys.add('${matchedHymn.collection}-${matchedHymn.id}')) {
+        out.add({
           'hymn': matchedHymn,
           'relevanceReason': reason,
           'worshipMoment': moment,
+          'relevanceLevel': level,
         });
+        if (out.length >= HymnSemanticRetriever.maxResultsPerCollection) break;
       }
     }
-    return finalMatches;
-  }
 
-
-  static List<Map<String, dynamic>> _findLocalThematicMatches(
-    String query,
-    List<Hymn> catalog,
-  ) {
-    final normQuery = Hymn.normalizeString(query);
-    final rawWords =
-        normQuery.split(' ').where((w) => w.length >= 4).toList();
-    if (rawWords.isEmpty) return [];
-
-    final scored = <Map<String, dynamic>>[];
-    for (final h in catalog) {
-      int score = 0;
-      final matchedTerms = <String>[];
-      for (final w in rawWords) {
-        if (h.normalizedTitle.contains(w)) {
-          score += 30;
-          matchedTerms.add(w);
-        } else if (h.normalizedSearchableText.contains(w)) {
-          score += 10;
-          matchedTerms.add(w);
-        }
-      }
-      if (score > 0) {
-        scored.add({
-          'hymn': h,
-          'relevanceReason':
-              'Coincidencia con los términos: ${matchedTerms.join(', ')}',
-          'score': score,
-        });
-      }
-    }
-    scored.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
-    return scored.take(6).toList();
+    return out;
   }
 }

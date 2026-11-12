@@ -40,23 +40,6 @@ class _HymnScannerScreenState extends State<HymnScannerScreen> {
   Future<void> _processImage() async {
     if (_imageFile == null) return;
 
-    String apiKey = await GeminiAiService.getApiKey();
-    if (apiKey.isEmpty) {
-      if (!mounted) return;
-      final newKey = await GeminiAiService.showApiKeyInputDialog(context);
-      if (newKey != null && newKey.isNotEmpty) {
-        await GeminiAiService.saveApiKey(newKey);
-        apiKey = newKey;
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Necesitas una Clave API de Gemini para usar esta función.')),
-          );
-        }
-        return;
-      }
-    }
-
     setState(() {
       _isProcessing = true;
     });

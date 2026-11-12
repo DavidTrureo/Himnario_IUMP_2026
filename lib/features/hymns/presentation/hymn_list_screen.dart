@@ -3266,21 +3266,25 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
       // Intentar llamar a los modelos en v1 o v1beta
       http.Response? response;
       final modelsToTry = [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-2.5-pro',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-flash-lite-latest',
       ];
 
       for (final model in modelsToTry) {
         try {
           final url = Uri.parse(
-            'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
+            'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
           );
           final res = await http
               .post(
                 url,
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': apiKey,
+                },
                 body: requestBody,
               )
               .timeout(const Duration(seconds: 15));
@@ -3294,12 +3298,15 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         if (response == null) {
           try {
             final url = Uri.parse(
-              'https://generativelanguage.googleapis.com/v1/models/$model:generateContent?key=$apiKey',
+              'https://generativelanguage.googleapis.com/v1/models/$model:generateContent',
             );
             final res = await http
                 .post(
                   url,
-                  headers: {'Content-Type': 'application/json'},
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': apiKey,
+                  },
                   body: requestBody,
                 )
                 .timeout(const Duration(seconds: 15));
@@ -3506,33 +3513,24 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
         geminiKey = key;
         keyController.text = geminiKey;
         isLoadingKey = false;
-      });
-      if (geminiKey.isNotEmpty) {
         searchTitleController.text = query;
-      }
+      });
     }
   }
 
   Future<void> _performSearch() async {
-    if (geminiKey.trim().isEmpty) {
-      setState(() {
-        errorMessage = 'Por favor ingresa una API Key de Gemini válida.';
-      });
-      return;
-    }
-
     setState(() {
       isSearching = true;
       errorMessage = '';
       hasSearched = false;
     });
 
-    // 1. Intentar primero a través de Cloud Function
+    // 1. Intentar primero a través de Cloud Function (usa la clave oficial del servidor)
     try {
       final callable = FirebaseFunctions.instance.httpsCallable('searchOnlineHymnWithAi');
       final cfRes = await callable.call({
         'query': '${searchTitleController.text} ${searchAuthorController.text}'.trim(),
-        'apiKey': geminiKey,
+        if (geminiKey.trim().isNotEmpty) 'apiKey': geminiKey.trim(),
       }).timeout(const Duration(seconds: 25));
 
       final cfData = cfRes.data;
@@ -3553,6 +3551,18 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
       }
     } catch (cfErr) {
       debugPrint('searchOnlineHymnWithAi Cloud Function falló: $cfErr. Probando llamada directa...');
+    }
+
+    if (geminiKey.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          isSearching = false;
+          hasSearched = true;
+          errorMessage =
+              'No se pudo conectar con el servicio en la nube. Verifica tu conexión o configura una API Key personal.';
+        });
+      }
+      return;
     }
 
     List<String> errors = [];
@@ -3579,10 +3589,11 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
         ],
       });
       final modelsToTry = [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-2.5-pro',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-flash-lite-latest',
       ];
 
       for (final model in modelsToTry) {
@@ -3590,12 +3601,15 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
         // Intentar v1beta
         try {
           final url = Uri.parse(
-            'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$geminiKey',
+            'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent',
           );
           final res = await http
               .post(
                 url,
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-goog-api-key': geminiKey,
+                },
                 body: requestBody,
               )
               .timeout(const Duration(seconds: 10));
@@ -3613,12 +3627,15 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
         if (response == null) {
           try {
             final url = Uri.parse(
-              'https://generativelanguage.googleapis.com/v1/models/$model:generateContent?key=$geminiKey',
+              'https://generativelanguage.googleapis.com/v1/models/$model:generateContent',
             );
             final res = await http
                 .post(
                   url,
-                  headers: {'Content-Type': 'application/json'},
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': geminiKey,
+                  },
                   body: requestBody,
                 )
                 .timeout(const Duration(seconds: 10));
@@ -3769,12 +3786,19 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
             ),
             IconButton(
               icon: const Icon(Icons.vpn_key_rounded, size: 20),
-              tooltip: 'Cambiar API Key',
-              onPressed: () {
-                setState(() {
-                  geminiKey = '';
-                  hasSearched = false;
-                });
+              tooltip: 'Configurar API Key personal',
+              onPressed: () async {
+                final newKey = await GeminiAiService.showApiKeyInputDialog(
+                  context,
+                  reason:
+                      'Opcional: configura tu propia Clave API de Gemini (la app ya usa el servidor oficial por defecto).',
+                );
+                if (newKey != null && mounted) {
+                  setState(() {
+                    geminiKey = newKey.trim();
+                    errorMessage = '';
+                  });
+                }
               },
             ),
           ],
@@ -3854,51 +3878,8 @@ class _OnlineSearchDialogState extends ConsumerState<OnlineSearchDialog> {
       );
     }
 
-    // Vista 1: Ingreso de API Key (si no hay guardada)
-    if (geminiKey.trim().isEmpty && !hasSearched) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
-          'Clave de API Requerida',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Para buscar letras de manera inteligente en internet, la app utiliza Gemini. Por favor configura tu API Key.',
-          style: GoogleFonts.nunito(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar', style: GoogleFonts.nunito()),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () async {
-              final newKey = await GeminiAiService.showApiKeyInputDialog(
-                context,
-                reason:
-                    'Para buscar letras de manera inteligente en internet, la app utiliza la Inteligencia Artificial (Gemini API).',
-              );
-              if (newKey != null && newKey.isNotEmpty) {
-                setState(() {
-                  geminiKey = newKey;
-                  errorMessage = '';
-                  searchTitleController.text = query;
-                });
-              }
-            },
-            child: Text(
-              'Configurar Clave',
-              style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      );
-    }
+    // Vista 1 eliminada: La Cloud Function ya cuenta con clave oficial del servidor;
+    // el botón de llave en la cabecera sigue permitiendo configurar una clave personal opcional.
 
     // Vista 2: Error o sin resultados
     if (errorMessage.isNotEmpty || (hasSearched && foundTitle.isEmpty)) {
