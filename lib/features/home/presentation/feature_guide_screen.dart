@@ -64,6 +64,19 @@ const List<_GuideSlide> _kGuideSlides = [
     accentColor: Color(0xFF10B981),
   ),
   _GuideSlide(
+    audience: 'Compartir e Imprimir',
+    title: 'Hermoso diseño PDF: con o sin acordes',
+    description:
+        'Comparte por WhatsApp o imprime cantos y repertorios con diagramación editorial impecable.',
+    bullets: [
+      'Comparte cantos individuales en PDF con acordes y notas musicales o en modo "Solo letra".',
+      'Desde Listas, imprime el programa completo con 1 y hasta 2 cantos por página.',
+      'Diseño limpio, elegante y autoajustado sin cortar estrofas ni desbordar la hoja.',
+    ],
+    icon: Icons.picture_as_pdf_rounded,
+    accentColor: Color(0xFFF43F5E),
+  ),
+  _GuideSlide(
     audience: 'Culto en Vivo',
     title: 'Listas de culto sincronizadas por QR',
     description:
@@ -85,6 +98,7 @@ const List<_GuideSlide> _kGuideSlides = [
       'Usa Pantalla de Proyección en una TV o computador como receptor remoto.',
       'Transcribe un canto impreso tomando una foto con el Escáner Inteligente.',
       'Comparte el Himnario Web para abrirlo desde cualquier navegador.',
+      'Revisa periódicamente Google Play para recibir nuevas mejoras y cantos actualizados.',
     ],
     icon: Icons.tv_rounded,
     accentColor: Color(0xFFEC4899),

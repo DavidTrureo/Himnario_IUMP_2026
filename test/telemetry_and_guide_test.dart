@@ -126,6 +126,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Desliza y fija el canto en pantalla'), findsOneWidget);
 
+      await tester.tap(find.text('Siguiente'));
+      await tester.pumpAndSettle();
+      expect(find.text('Acordes, tono ajustable y partituras'), findsOneWidget);
+
+      await tester.tap(find.text('Siguiente'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hermoso diseño PDF: con o sin acordes'), findsOneWidget);
+
       await tester.tap(find.text('Cerrar'));
       await tester.pumpAndSettle();
 
