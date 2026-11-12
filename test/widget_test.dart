@@ -950,5 +950,64 @@ void main() {
         expect(find.text('Himno 2 - CASTILLO FUERTE'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'Swipe entre cantos con YouTube muestra la miniatura propia de cada canto y su botón Play visible',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({'local_setlists': '[]'});
+        final catalog = [
+          Hymn(
+            id: 1,
+            title: 'A A CANTO UNO',
+            toneNote: 'DO',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics: 'Letra del canto uno',
+            collection: 'especiales',
+            audioUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          ),
+          Hymn(
+            id: 2,
+            title: 'A B CANTO DOS',
+            toneNote: 'RE',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics: 'Letra del canto dos',
+            collection: 'especiales',
+            audioUrl: 'https://youtu.be/M7lc1UVf-VE',
+          ),
+          Hymn(
+            id: 3,
+            title: 'A C CANTO TRES',
+            toneNote: 'MI',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics: 'Letra del canto tres',
+            collection: 'especiales',
+            audioUrl: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+          ),
+        ];
+
+        await tester.pumpWidget(wrapDetailScreen(catalog, 'especiales-1'));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('yt_thumb_especiales_1_dQw4w9WgXcQ')), findsOneWidget);
+        expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+
+        await tester.fling(find.byType(PageView), const Offset(-260, 0), 1100);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('yt_thumb_especiales_2_M7lc1UVf-VE')), findsOneWidget);
+        expect(find.byKey(const ValueKey('yt_thumb_especiales_1_dQw4w9WgXcQ')), findsNothing);
+        expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+
+        await tester.fling(find.byType(PageView), const Offset(-260, 0), 1100);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('yt_thumb_especiales_3_aqz-KE-bpKQ')), findsOneWidget);
+        expect(find.byKey(const ValueKey('yt_thumb_especiales_2_M7lc1UVf-VE')), findsNothing);
+        expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+      },
+    );
   });
 }

@@ -102,6 +102,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _showPlayerCard = false;
 
   YoutubePlayerController? _youtubeController;
+  String? _activeYoutubeKey;
   final Map<int, ScrollController> _pageScrollControllers = {};
   bool _lockSwipe = false;
   bool _isVerticalDragging = false;
@@ -144,33 +145,43 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
 
 
-  void _updateYoutubePlayer(Hymn hymn) {
+  String _youtubeKeyFor(Hymn hymn, String videoId) =>
+      '${hymn.collection}-${hymn.id}:$videoId';
+
+  void _disposeYoutubePlayer({bool notify = true}) {
+    final controller = _youtubeController;
+    final hadActive = controller != null || _activeYoutubeKey != null;
+    _youtubeController = null;
+    _activeYoutubeKey = null;
+    if (controller != null) {
+      try {
+        controller.close();
+      } catch (_) {}
+    }
+    if (notify && hadActive && mounted) {
+      setState(() {});
+    }
+  }
+
+  void _activateYoutubePlayer(Hymn hymn, String videoId) {
+    final targetKey = _youtubeKeyFor(hymn, videoId);
+    if (_activeYoutubeKey == targetKey && _youtubeController != null) {
+      return;
+    }
+    _disposeYoutubePlayer(notify: false);
     try {
-      final audioUrl = hymn.audioUrl;
-      if (audioUrl.isNotEmpty && (audioUrl.contains('youtube.com') || audioUrl.contains('youtu.be'))) {
-        final videoId = YoutubePlayerController.convertUrlToId(audioUrl);
-        if (videoId != null) {
-          if (_youtubeController == null) {
-            _youtubeController = YoutubePlayerController.fromVideoId(
-              videoId: videoId,
-              autoPlay: false,
-              params: const YoutubePlayerParams(showControls: true, mute: false),
-            );
-            if (mounted) {
-              setState(() {});
-            }
-          } else {
-            _youtubeController!.loadVideoById(videoId: videoId).catchError((_) {});
-            _youtubeController!.pauseVideo().catchError((_) {});
-            if (mounted) {
-              setState(() {});
-            }
-          }
-        }
-      } else {
-        _youtubeController?.pauseVideo().catchError((_) {});
+      _youtubeController = YoutubePlayerController.fromVideoId(
+        videoId: videoId,
+        autoPlay: true,
+        params: const YoutubePlayerParams(showControls: true, mute: false),
+      );
+      _activeYoutubeKey = targetKey;
+      if (mounted) {
+        setState(() {});
       }
-    } catch (_) {}
+    } catch (_) {
+      _disposeYoutubePlayer(notify: false);
+    }
   }
 
   String? _lastLyricsForBlocks;
@@ -258,7 +269,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     _pageController?.dispose();
     _audioPlayer?.dispose();
-    _youtubeController?.close();
+    _disposeYoutubePlayer(notify: false);
     super.dispose();
   }
 
@@ -455,7 +466,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       _saveLastViewedHymn(currentH);
       if (wasDifferent) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _updateYoutubePlayer(currentH);
+          _disposeYoutubePlayer();
         });
       }
     }
@@ -963,7 +974,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                 _showPlayerCard = false;
                               });
                               _audioPlayer?.stop(); // Detener el audio al cambiar de canto
-                              _updateYoutubePlayer(_sortedHymns[index]);
+                              _disposeYoutubePlayer();
                               _saveLastViewedHymn(_sortedHymns[index]);
                               _prunePageScrollControllers(index);
                             },
@@ -1975,6 +1986,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           Builder(
             builder: (context) {
               final videoId = YoutubePlayerController.convertUrlToId(hymn.audioUrl);
+              if (videoId == null || videoId.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              final isThisYoutubeActive = _youtubeController != null &&
+                  _activeYoutubeKey == _youtubeKeyFor(hymn, videoId) &&
+                  pageIndex == _currentIndex;
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
@@ -1987,32 +2004,65 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   borderRadius: BorderRadius.circular(16),
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: _youtubeController != null
+                    child: isThisYoutubeActive
                         ? YoutubePlayer(
+                            key: ValueKey('yt_${hymn.collection}_${hymn.id}_$videoId'),
                             controller: _youtubeController!,
                           )
-                        : (videoId != null
-                            ? Stack(
+                        : Material(
+                            key: ValueKey('yt_thumb_${hymn.collection}_${hymn.id}_$videoId'),
+                            color: Colors.black,
+                            child: InkWell(
+                              onTap: () => _activateYoutubePlayer(hymn, videoId),
+                              child: Stack(
                                 fit: StackFit.expand,
                                 children: [
                                   Image.network(
                                     'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(color: Colors.black26),
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: Colors.black26,
+                                      alignment: Alignment.center,
+                                      child: const Icon(
+                                        Icons.ondemand_video_rounded,
+                                        color: Colors.white54,
+                                        size: 40,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.black.withValues(alpha: 0.10),
+                                          Colors.black.withValues(alpha: 0.35),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                   Center(
                                     child: Container(
-                                      padding: const EdgeInsets.all(12),
+                                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.65),
-                                        shape: BoxShape.circle,
+                                        color: Colors.redAccent.withValues(alpha: 0.92),
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.4),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
                                       ),
                                       child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
                                     ),
                                   ),
                                 ],
-                              )
-                            : const SizedBox()),
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               );
