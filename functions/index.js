@@ -35,10 +35,61 @@ const SEARCH_GEMINI_MODELS = [
 const COLLECTION_ORDER = ["iump", "especiales", "coros"];
 const MAX_RESULTS_PER_COLLECTION = 10;
 
+const ADMIN_EMAIL = "admin@himnario.com";
+const MAX_QUERY_LENGTH = 500;
+const MAX_TITLE_LENGTH = 300;
+const MAX_LYRICS_LENGTH = 25000;
+const MAX_URL_LENGTH = 500;
+const MAX_MIME_TYPE_LENGTH = 64;
+const MAX_BASE64_IMAGE_LENGTH = 16 * 1024 * 1024;
+
 let cachedDigestsMap = null;
 let cachedEmbeddingsLoaded = false;
 let cachedEmbeddingsMeta = null;
 let cachedEmbeddingsBuffer = null;
+
+function assertAdminRequest(request) {
+  const email = request.auth && request.auth.token ? request.auth.token.email : null;
+  if (!request.auth || email !== ADMIN_EMAIL) {
+    throw new HttpsError(
+      "permission-denied",
+      "Esta función requiere autenticación de administrador."
+    );
+  }
+}
+
+function readValidatedText(value, maxLength, fieldName) {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") {
+    throw new HttpsError(
+      "invalid-argument",
+      `El campo ${fieldName} debe ser texto.`
+    );
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > maxLength) {
+    throw new HttpsError(
+      "invalid-argument",
+      `El campo ${fieldName} excede el límite de ${maxLength} caracteres.`
+    );
+  }
+  return trimmed;
+}
+
+function assertStringWithinLimit(value, maxLength, fieldName) {
+  if (value !== undefined && value !== null && typeof value !== "string") {
+    throw new HttpsError(
+      "invalid-argument",
+      `El campo ${fieldName} tiene un formato inválido.`
+    );
+  }
+  if (typeof value === "string" && value.length > maxLength) {
+    throw new HttpsError(
+      "invalid-argument",
+      `El campo ${fieldName} excede el tamaño máximo permitido.`
+    );
+  }
+}
 
 function isRetiredSharedKey(key) {
   if (!key) return false;
@@ -279,9 +330,12 @@ async function callGeminiApi({
 exports.extractAudio = onCall({
   timeoutSeconds: 300,
   memory: "512MiB",
+  maxInstances: 3,
 }, async (request) => {
-  const data = request.data;
+  assertAdminRequest(request);
+  const data = request.data || {};
   const youtubeUrl = data.url;
+  assertStringWithinLimit(youtubeUrl, MAX_URL_LENGTH, "url");
 
   if (!youtubeUrl) {
     throw new HttpsError("invalid-argument", "The function must be called with a 'url' argument.");
@@ -400,9 +454,10 @@ function buildDefaultNoMoreReason(col, count) {
 exports.searchHymnsWithAi = onCall({
   timeoutSeconds: 60,
   memory: "512MiB",
+  maxInstances: 15,
 }, async (request) => {
   const data = request.data || {};
-  const query = (data.query || "").trim();
+  const query = readValidatedText(data.query, MAX_QUERY_LENGTH, "query");
   const searchMode = data.searchMode || "biblical"; // 'biblical' o 'conceptual'
   const schemaVersion = Number(data.schemaVersion || 1);
   const userApiKey = (data.apiKey || "").trim();
@@ -783,10 +838,16 @@ RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO (sin bloques de código markd
 exports.scanHymnWithAi = onCall({
   timeoutSeconds: 60,
   memory: "512MiB",
+  maxInstances: 10,
 }, async (request) => {
   const data = request.data || {};
   const base64Image = data.base64Image;
-  const mimeType = data.mimeType || "image/jpeg";
+  assertStringWithinLimit(base64Image, MAX_BASE64_IMAGE_LENGTH, "base64Image");
+  const mimeType = typeof data.mimeType === "string" &&
+      data.mimeType.trim().length > 0 &&
+      data.mimeType.trim().length <= MAX_MIME_TYPE_LENGTH
+    ? data.mimeType.trim()
+    : "image/jpeg";
   const userApiKey = (data.apiKey || "").trim();
 
   if (!base64Image) {
@@ -837,9 +898,10 @@ JSON esperado:
 exports.searchOnlineHymnWithAi = onCall({
   timeoutSeconds: 45,
   memory: "256MiB",
+  maxInstances: 10,
 }, async (request) => {
   const data = request.data || {};
-  const query = (data.query || "").trim();
+  const query = readValidatedText(data.query, MAX_QUERY_LENGTH, "query");
   const userApiKey = (data.apiKey || "").trim();
 
   if (!query) {
@@ -881,10 +943,11 @@ Devuelve ÚNICAMENTE un JSON con:
 exports.correctGrammarWithAi = onCall({
   timeoutSeconds: 60,
   memory: "256MiB",
+  maxInstances: 10,
 }, async (request) => {
   const data = request.data || {};
-  const title = (data.title || "").trim();
-  const lyrics = (data.lyrics || "").trim();
+  const title = readValidatedText(data.title, MAX_TITLE_LENGTH, "title");
+  const lyrics = readValidatedText(data.lyrics, MAX_LYRICS_LENGTH, "lyrics");
   const userApiKey = (data.apiKey || "").trim();
 
   if (!lyrics) {

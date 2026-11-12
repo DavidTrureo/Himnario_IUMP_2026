@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -24,7 +25,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Type;
 import '../../favorites/domain/favorites_notifier.dart';
 import '../../setlists/presentation/setlists_provider.dart';
 import '../../../core/services/chord_transposer_service.dart';
@@ -101,7 +102,45 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _showPlayerCard = false;
 
   YoutubePlayerController? _youtubeController;
-  final ScrollController _scrollController = ScrollController();
+  final Map<int, ScrollController> _pageScrollControllers = {};
+  bool _lockSwipe = false;
+  bool _isVerticalDragging = false;
+  int _lastVerticalDragAtMs = 0;
+  Drag? _pageDrag;
+  ScrollHoldController? _pageHold;
+
+  ScrollController _scrollControllerForIndex(int index) {
+    return _pageScrollControllers.putIfAbsent(index, ScrollController.new);
+  }
+
+  ScrollController? get _activeScrollController {
+    final idx = _currentIndex;
+    if (idx == null) return null;
+    return _pageScrollControllers[idx];
+  }
+
+  void _prunePageScrollControllers(int activeIndex) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final toRemove = <int>[];
+      _pageScrollControllers.forEach((index, controller) {
+        if ((index - activeIndex).abs() > 3 && !controller.hasClients) {
+          controller.dispose();
+          toRemove.add(index);
+        }
+      });
+      for (final idx in toRemove) {
+        _pageScrollControllers.remove(idx);
+      }
+    });
+  }
+
+  void _resetPageScrollControllers() {
+    for (final controller in _pageScrollControllers.values) {
+      controller.dispose();
+    }
+    _pageScrollControllers.clear();
+  }
 
 
 
@@ -178,9 +217,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _showChords = prefs.getBool('pref_show_chords') ?? true;
       _notation = prefs.getString('pref_chords_notation') ?? 'spanish';
+      _lockSwipe = prefs.getBool('pref_lock_hymn_swipe') ?? false;
     });
   }
 
@@ -188,6 +229,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('pref_show_chords', _showChords);
     await prefs.setString('pref_chords_notation', _notation);
+    await prefs.setBool('pref_lock_hymn_swipe', _lockSwipe);
   }
 
   Future<void> _saveLastViewedHymn(Hymn hymn) async {
@@ -208,7 +250,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _pageHold?.cancel();
+    _pageHold = null;
+    _pageDrag?.cancel();
+    _pageDrag = null;
+    _resetPageScrollControllers();
 
     _pageController?.dispose();
     _audioPlayer?.dispose();
@@ -217,11 +263,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   void _scrollDownByHalfPage() {
-    if (_scrollController.hasClients) {
-      final viewportHeight = _scrollController.position.viewportDimension;
-      final offset = _scrollController.offset + (viewportHeight * 0.85); // 85% de la pantalla
-      _scrollController.animateTo(
-        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+    final controller = _activeScrollController;
+    if (controller != null && controller.hasClients) {
+      final viewportHeight = controller.position.viewportDimension;
+      final offset = controller.offset + (viewportHeight * 0.85); // 85% de la pantalla
+      controller.animateTo(
+        offset.clamp(0.0, controller.position.maxScrollExtent),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
       );
@@ -229,21 +276,103 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   void _scrollUpByHalfPage() {
-    if (_scrollController.hasClients) {
-      final viewportHeight = _scrollController.position.viewportDimension;
-      final offset = _scrollController.offset - (viewportHeight * 0.85);
-      _scrollController.animateTo(
-        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
+    final controller = _activeScrollController;
+    if (controller != null && controller.hasClients) {
+      final viewportHeight = controller.position.viewportDimension;
+      final offset = controller.offset - (viewportHeight * 0.85);
+      controller.animateTo(
+        offset.clamp(0.0, controller.position.maxScrollExtent),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
       );
     }
   }
 
+  void _goToAdjacentHymn(int delta) {
+    final idx = _currentIndex;
+    final controller = _pageController;
+    if (idx == null || controller == null || !controller.hasClients) return;
+    final target = (idx + delta).clamp(0, _sortedHymns.length - 1);
+    if (target == idx) return;
+    controller.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis == Axis.vertical) {
+      if (notification is ScrollStartNotification) {
+        if (notification.dragDetails != null) {
+          _isVerticalDragging = true;
+          _lastVerticalDragAtMs = DateTime.now().millisecondsSinceEpoch;
+        }
+      } else if (notification is ScrollUpdateNotification) {
+        if (notification.dragDetails != null) {
+          _isVerticalDragging = true;
+          _lastVerticalDragAtMs = DateTime.now().millisecondsSinceEpoch;
+        } else if (_isVerticalDragging) {
+          _isVerticalDragging = false;
+          _lastVerticalDragAtMs = DateTime.now().millisecondsSinceEpoch;
+        }
+      } else if (notification is ScrollEndNotification) {
+        if (_isVerticalDragging) {
+          _isVerticalDragging = false;
+          _lastVerticalDragAtMs = DateTime.now().millisecondsSinceEpoch;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool _canStartHorizontalSwipe() {
+    if (_lockSwipe || _sortedHymns.length <= 1) return false;
+    if (_isVerticalDragging) return false;
+    final elapsed = DateTime.now().millisecondsSinceEpoch - _lastVerticalDragAtMs;
+    return elapsed > 200;
+  }
+
+  void _handlePageDragDown(DragDownDetails details) {
+    if (_pageController == null || !_pageController!.hasClients) return;
+    _pageDrag = null;
+    _pageHold = _pageController!.position.hold(() {
+      _pageHold = null;
+    });
+  }
+
+  void _handlePageDragStart(DragStartDetails details) {
+    if (_pageController == null || !_pageController!.hasClients) return;
+    _pageDrag = _pageController!.position.drag(details, () {
+      _pageDrag = null;
+    });
+    _pageHold = null;
+  }
+
+  void _handlePageDragUpdate(DragUpdateDetails details) {
+    _pageDrag?.update(details);
+  }
+
+  void _handlePageDragEnd(DragEndDetails details) {
+    _pageDrag?.end(details);
+    _pageDrag = null;
+  }
+
+  void _handlePageDragCancel() {
+    _pageHold?.cancel();
+    _pageHold = null;
+    _pageDrag?.cancel();
+    _pageDrag = null;
+  }
+
   @override
   void didUpdateWidget(covariant HymnDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.hymnId != widget.hymnId) {
+      _pageHold?.cancel();
+      _pageHold = null;
+      _pageDrag?.cancel();
+      _pageDrag = null;
       _initialized = false;
       final allHymnsAsync = ref.read(allHymnsGlobalProvider);
       final hymns = allHymnsAsync.whenOrNull(data: (d) => d);
@@ -254,6 +383,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   void _initializeHymns(List<Hymn> hymns) {
+    if (_initialized) return;
     final parts = widget.hymnId.split('-');
     final collectionParam = parts.length > 1 ? parts[0] : 'iump';
     final idString = parts.length > 1 ? parts.sublist(1).join('-') : widget.hymnId;
@@ -371,6 +501,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         if (updated != null && updated != old) {
           _sortedHymns[i] = updated;
         }
+      }
+      if (_currentIndex != null &&
+          _sortedHymns.isNotEmpty &&
+          _currentIndex! >= _sortedHymns.length) {
+        _currentIndex = _sortedHymns.length - 1;
       }
     }
 
@@ -795,23 +930,58 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 900),
                     child: ClipRect(
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: _sortedHymns.length,
-                        onPageChanged: (index) {
-                          setState(() {
-                            _currentIndex = index;
-                            _transposeOffset = 0; // Resetear transposición al cambiar de himno
-                            _showPlayerCard = false;
-                            _audioPlayer?.stop(); // Detener el audio al cambiar de canto
-                            _updateYoutubePlayer(_sortedHymns[index]);
-                            _saveLastViewedHymn(_sortedHymns[index]);
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          final currentHymn = _sortedHymns[index];
-                          return _buildHymnPage(context, currentHymn, fontSize, isDark, theme);
-                        },
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: _handleScrollNotification,
+                        child: RawGestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          gestures: <Type, GestureRecognizerFactory>{
+                            _IntentionalHorizontalDragGestureRecognizer:
+                                GestureRecognizerFactoryWithHandlers<_IntentionalHorizontalDragGestureRecognizer>(
+                              () => _IntentionalHorizontalDragGestureRecognizer(
+                                canStartHorizontalSwipe: _canStartHorizontalSwipe,
+                              ),
+                              (_IntentionalHorizontalDragGestureRecognizer instance) {
+                                instance
+                                  ..onDown = _handlePageDragDown
+                                  ..onStart = _handlePageDragStart
+                                  ..onUpdate = _handlePageDragUpdate
+                                  ..onEnd = _handlePageDragEnd
+                                  ..onCancel = _handlePageDragCancel
+                                  ..minFlingVelocity = 420.0
+                                  ..minFlingDistance = 36.0;
+                              },
+                            ),
+                          },
+                          child: PageView.builder(
+                            controller: _pageController,
+                            physics: const _ManualOnlyPageScrollPhysics(),
+                            itemCount: _sortedHymns.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentIndex = index;
+                                _transposeOffset = 0; // Resetear transposición al cambiar de himno
+                                _showPlayerCard = false;
+                              });
+                              _audioPlayer?.stop(); // Detener el audio al cambiar de canto
+                              _updateYoutubePlayer(_sortedHymns[index]);
+                              _saveLastViewedHymn(_sortedHymns[index]);
+                              _prunePageScrollControllers(index);
+                            },
+                            itemBuilder: (context, index) {
+                              final currentHymn = _sortedHymns[index];
+                              final pageScrollController = _scrollControllerForIndex(index);
+                              return _buildHymnPage(
+                                context,
+                                currentHymn,
+                                index,
+                                pageScrollController,
+                                fontSize,
+                                isDark,
+                                theme,
+                              );
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1066,6 +1236,49 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                               ),
                             ],
                           ),
+                          const Divider(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    _lockSwipe ? Icons.lock_rounded : Icons.swipe_rounded,
+                                    size: 18,
+                                    color: _lockSwipe
+                                        ? theme.colorScheme.primary
+                                        : (isDark ? Colors.white60 : Colors.black45),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Fijar canto (bloquear hojear)',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.white70 : Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(
+                                height: 20,
+                                width: 32,
+                                child: Transform.scale(
+                                  scale: 0.75,
+                                  child: Switch(
+                                    value: _lockSwipe,
+                                    activeThumbColor: theme.colorScheme.primary,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _lockSwipe = val;
+                                        _savePreferences();
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           ],
                         ),
                       ),
@@ -1103,7 +1316,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 Positioned(
                   left: 20,
                   right: 20,
-                  bottom: (_showControlPanel ? (hymn.lyrics.contains('[') ? 250 : 150) : 20) + MediaQuery.of(context).padding.bottom,
+                  bottom: (_showControlPanel ? (hymn.lyrics.contains('[') ? 295 : 195) : 20) + MediaQuery.of(context).padding.bottom,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(
@@ -1573,7 +1786,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     );
   }
 
-  Widget _buildHymnHeader(Hymn hymn, double fontSize, bool isDark, ThemeData theme, String displayedTone) {
+  Widget _buildHymnHeader(Hymn hymn, int pageIndex, double fontSize, bool isDark, ThemeData theme, String displayedTone) {
     return Column(
       children: [
         // Alerta inteligente de duplicados / similitud
@@ -1650,52 +1863,93 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           },
         ),
         
-        // Icono / Número Hero
-        Hero(
-          tag: 'hymn_icon_${hymn.collection}-${hymn.id}',
-          child: hymn.collection == 'iump'
-            ? Container(
-                width: 60,
-                height: 60,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
-                      theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+        // Icono / Número Hero con flechas discretas para hojear sin deslizar
+        Builder(
+          builder: (context) {
+            final hasMultiple = _sortedHymns.length > 1;
+            final hasPrev = pageIndex > 0;
+            final hasNext = pageIndex < _sortedHymns.length - 1;
+            final badgeHero = Hero(
+              tag: 'hymn_icon_${hymn.collection}-${hymn.id}',
+              child: hymn.collection == 'iump'
+                  ? Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
+                            theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        hymn.id.toString(),
+                        style: GoogleFonts.outfit(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 22,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Icon(
+                        hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded,
+                        color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981),
+                        size: 32,
+                      ),
+                    ),
+            );
+
+            if (!hasMultiple) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: badgeHero,
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left_rounded, size: 28),
+                    tooltip: 'Canto anterior',
+                    color: hasPrev
+                        ? (isDark ? Colors.white70 : theme.colorScheme.primary)
+                        : (isDark ? Colors.white12 : Colors.black12),
+                    onPressed: hasPrev ? () => _goToAdjacentHymn(-1) : null,
                   ),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
+                  const SizedBox(width: 8),
+                  badgeHero,
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right_rounded, size: 28),
+                    tooltip: 'Siguiente canto',
+                    color: hasNext
+                        ? (isDark ? Colors.white70 : theme.colorScheme.primary)
+                        : (isDark ? Colors.white12 : Colors.black12),
+                    onPressed: hasNext ? () => _goToAdjacentHymn(1) : null,
                   ),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  hymn.id.toString(),
-                  style: GoogleFonts.outfit(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                  ),
-                ),
-              )
-            : Container(
-                width: 60,
-                height: 60,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(
-                  hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded, 
-                  color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981), 
-                  size: 32
-                ),
+                ],
               ),
+            );
+          },
         ),
 
         // Título Elegante
@@ -1811,10 +2065,18 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     );
   }
 
-  Widget _buildHymnPage(BuildContext context, Hymn hymn, double fontSize, bool isDark, ThemeData theme) {
+  Widget _buildHymnPage(
+    BuildContext context,
+    Hymn hymn,
+    int pageIndex,
+    ScrollController pageScrollController,
+    double fontSize,
+    bool isDark,
+    ThemeData theme,
+  ) {
     final hasChords = hymn.lyrics.contains('[');
     final displayedTone = _getTransposedTone(hymn.tone, _transposeOffset);
-    final header = _buildHymnHeader(hymn, fontSize, isDark, theme, displayedTone);
+    final header = _buildHymnHeader(hymn, pageIndex, fontSize, isDark, theme, displayedTone);
 
     return SizedBox.expand(
       child: SafeArea(
@@ -1822,10 +2084,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         bottom: false,
         child: _viewMode == 'texto'
             ? Scrollbar(
-                controller: _scrollController,
+                controller: pageScrollController,
                 interactive: true,
                 child: SingleChildScrollView(
-                controller: _scrollController,
+                controller: pageScrollController,
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
                   20.0, 
@@ -1848,13 +2110,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         ..._getMergedBlocksCached(hymn.lyrics, _transposeOffset).map(
                           (block) => _buildLyricsBlock(context, hymn, block, fontSize, isDark, theme)
                         ),
+                        if (_sortedHymns.length > 1)
+                          _buildBottomHymnNavigator(pageIndex, isDark, theme),
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           curve: Curves.easeOutCubic,
                           height: (_showControlPanel && _showPlayerCard)
-                              ? 320.0
+                              ? 360.0
                               : (_showControlPanel
-                                  ? 220.0
+                                  ? 260.0
                                   : (_showPlayerCard ? 160.0 : 0.0)),
                         ),
                       ],
@@ -1899,6 +2163,93 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ),
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildBottomHymnNavigator(int pageIndex, bool isDark, ThemeData theme) {
+    final hasPrev = pageIndex > 0;
+    final hasNext = pageIndex < _sortedHymns.length - 1;
+    final cardBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.78);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 28, bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          TextButton.icon(
+            onPressed: hasPrev ? () => _goToAdjacentHymn(-1) : null,
+            icon: const Icon(Icons.chevron_left_rounded, size: 20),
+            label: Text(
+              'Anterior',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              disabledForegroundColor: isDark ? Colors.white24 : Colors.black26,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+          ),
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              setState(() {
+                _lockSwipe = !_lockSwipe;
+                _savePreferences();
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _lockSwipe ? Icons.lock_rounded : Icons.swipe_rounded,
+                    size: 15,
+                    color: _lockSwipe
+                        ? theme.colorScheme.primary
+                        : (isDark ? Colors.white54 : Colors.black45),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${pageIndex + 1} / ${_sortedHymns.length}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: hasNext ? () => _goToAdjacentHymn(1) : null,
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              disabledForegroundColor: isDark ? Colors.white24 : Colors.black26,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Siguiente',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded, size: 20),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -4961,8 +5312,6 @@ class _AutoScrollingAppBarTitleState extends State<AutoScrollingAppBarTitle> {
   @override
   void dispose() {
     _scrollController.dispose();
-
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -4993,5 +5342,127 @@ class _AutoScrollingAppBarTitleState extends State<AutoScrollingAppBarTitle> {
         ],
       ),
     );
+  }
+}
+
+/// Física para PageView que desactiva el deslizamiento horizontal directo de
+/// [Scrollable] manteniendo intactas la inercia y el encaje por página para que
+/// el desplazamiento esté gobernado por [_IntentionalHorizontalDragGestureRecognizer].
+class _ManualOnlyPageScrollPhysics extends PageScrollPhysics {
+  const _ManualOnlyPageScrollPhysics({super.parent});
+
+  @override
+  _ManualOnlyPageScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _ManualOnlyPageScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  bool shouldAcceptUserOffset(ScrollMetrics position) => false;
+}
+
+/// Reconocedor horizontal que prioriza el scroll vertical de la letra y solo
+/// inicia el cambio de página tras un desplazamiento claramente horizontal.
+class _IntentionalHorizontalDragGestureRecognizer extends HorizontalDragGestureRecognizer {
+  _IntentionalHorizontalDragGestureRecognizer({
+    required this.canStartHorizontalSwipe,
+  }) {
+    onlyAcceptDragOnThreshold = true;
+  }
+
+  final bool Function() canStartHorizontalSwipe;
+  final Map<int, Offset> _pointerDownOrigins = <int, Offset>{};
+  final Set<int> _panZoomPointers = <int>{};
+  double _cumulativeAbsDx = 0.0;
+  double _cumulativeAbsDy = 0.0;
+  bool _thresholdMet = false;
+
+  @override
+  bool isPointerAllowed(PointerEvent event) {
+    if (!canStartHorizontalSwipe()) {
+      return false;
+    }
+    return super.isPointerAllowed(event);
+  }
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _pointerDownOrigins[event.pointer] = event.position;
+    _cumulativeAbsDx = 0.0;
+    _cumulativeAbsDy = 0.0;
+    _thresholdMet = false;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void addAllowedPointerPanZoom(PointerPanZoomStartEvent event) {
+    _panZoomPointers.add(event.pointer);
+    _cumulativeAbsDx = 0.0;
+    _cumulativeAbsDy = 0.0;
+    _thresholdMet = false;
+    super.addAllowedPointerPanZoom(event);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) {
+      final origin = _pointerDownOrigins[event.pointer];
+      if (origin != null) {
+        final delta = event.position - origin;
+        _cumulativeAbsDx = delta.dx.abs();
+        _cumulativeAbsDy = delta.dy.abs();
+
+        // Si el usuario desliza verticalmente o en diagonal vertical antes de
+        // comprometer el swipe horizontal, cedemos el gesto de inmediato.
+        if (!_thresholdMet &&
+            (_cumulativeAbsDy > 10.0 && _cumulativeAbsDy >= _cumulativeAbsDx * 0.55 ||
+                !canStartHorizontalSwipe())) {
+          _pointerDownOrigins.remove(event.pointer);
+          rejectGesture(event.pointer);
+          return;
+        }
+      }
+    } else if (event is PointerPanZoomUpdateEvent) {
+      if (_panZoomPointers.contains(event.pointer)) {
+        _cumulativeAbsDx = event.pan.dx.abs();
+        _cumulativeAbsDy = event.pan.dy.abs();
+        if (!_thresholdMet &&
+            (_cumulativeAbsDy > 10.0 && _cumulativeAbsDy >= _cumulativeAbsDx * 0.55 ||
+                !canStartHorizontalSwipe())) {
+          _panZoomPointers.remove(event.pointer);
+          rejectGesture(event.pointer);
+          return;
+        }
+      }
+    } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _pointerDownOrigins.remove(event.pointer);
+    } else if (event is PointerPanZoomEndEvent) {
+      _panZoomPointers.remove(event.pointer);
+    }
+    super.handleEvent(event);
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    _thresholdMet = false;
+    _pointerDownOrigins.clear();
+    _panZoomPointers.clear();
+    super.didStopTrackingLastPointer(pointer);
+  }
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) {
+    if (!canStartHorizontalSwipe()) return false;
+    final minHorizontalSlop = (deviceTouchSlop ?? kTouchSlop) * 2.1;
+    final isIntentionalHorizontal =
+        _cumulativeAbsDx >= minHorizontalSlop &&
+        _cumulativeAbsDx > _cumulativeAbsDy * 2.2 &&
+        super.hasSufficientGlobalDistanceToAccept(pointerDeviceKind, deviceTouchSlop);
+    if (isIntentionalHorizontal) {
+      _thresholdMet = true;
+    }
+    return isIntentionalHorizontal;
   }
 }

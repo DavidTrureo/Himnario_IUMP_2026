@@ -1320,11 +1320,9 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: Hero(
-                                    tag: 'search-bar',
-                                    child: Material(
-                                      type: MaterialType.transparency,
-                                      child: SearchBar(
+                                  child: Material(
+                                    type: MaterialType.transparency,
+                                    child: SearchBar(
                                         controller: _searchBarController,
                                         autoFocus: widget.autoFocusSearch,
                                         hintText:
@@ -1408,7 +1406,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               .updateQuery(value);
                                         },
                                       ),
-                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),

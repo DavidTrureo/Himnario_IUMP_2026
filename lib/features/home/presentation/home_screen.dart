@@ -223,14 +223,12 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 
-                // Buscador Rápido (Navegación Hero a Listado)
+                // Buscador Rápido (sin Hero en StatefulShellRoute para que nunca quede oculto)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 24.0),
-                  child: Hero(
-                    tag: 'search-bar',
-                    child: Material(
-                      type: MaterialType.transparency,
-                      child: Container(
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: Container(
                         decoration: BoxDecoration(
                           boxShadow: [
                             BoxShadow(
@@ -278,10 +276,9 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      ),
                     ),
                   ),
-                ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1),
+                ),
 
                 // Lista de Opciones
                 Expanded(

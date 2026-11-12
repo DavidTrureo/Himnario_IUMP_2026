@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:himnario_iump/core/services/hymn_semantic_retriever.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
 import 'package:himnario_iump/features/hymns/presentation/add_hymn_screen.dart';
+import 'package:himnario_iump/features/hymns/presentation/hymn_detail_screen.dart';
 import 'package:himnario_iump/features/hymns/presentation/hymn_list_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:himnario_iump/features/hymns/presentation/scanner_result_screen.dart';
 import 'package:himnario_iump/features/hymns/presentation/widgets/semantic_search_dialog.dart';
 import 'package:himnario_iump/core/services/spanish_accent_engine.dart';
@@ -792,6 +794,160 @@ void main() {
           await HymnSemanticRetriever.ensureEmbeddingsLoaded();
         });
         expect(HymnSemanticRetriever.hasEmbeddingsLoaded, isTrue);
+      },
+    );
+  });
+
+  group('HymnDetailScreen Swipe & Scroll Tests', () {
+    List<Hymn> buildLongCatalog() {
+      final longLyrics = List.generate(
+        35,
+        (i) => 'Verso largo número ${i + 1} alabando al Señor con todo el corazón',
+      ).join('\n');
+      return [
+        Hymn(
+          id: 1,
+          title: 'SANTO SANTO',
+          toneNote: 'DO',
+          beats: '4 TIEMPOS',
+          timeSignature: '4/4',
+          lyrics: longLyrics,
+          collection: 'iump',
+        ),
+        Hymn(
+          id: 2,
+          title: 'CASTILLO FUERTE',
+          toneNote: 'RE',
+          beats: '4 TIEMPOS',
+          timeSignature: '4/4',
+          lyrics: longLyrics,
+          collection: 'iump',
+        ),
+        Hymn(
+          id: 3,
+          title: 'SUBLIME GRACIA',
+          toneNote: 'SOL',
+          beats: '3 TIEMPOS',
+          timeSignature: '3/4',
+          lyrics: longLyrics,
+          collection: 'iump',
+        ),
+      ];
+    }
+
+    Widget wrapDetailScreen(List<Hymn> catalog, String hymnId) {
+      return ProviderScope(
+        overrides: [
+          adminModeProvider.overrideWith(() => _FakeAdminModeNotifier(false)),
+          allHymnsGlobalProvider.overrideWithValue(AsyncValue.data(catalog)),
+        ],
+        child: MaterialApp(
+          home: HymnDetailScreen(hymnId: hymnId),
+        ),
+      );
+    }
+
+    testWidgets(
+      'Hojear horizontalmente cambia al canto siguiente/anterior y permanece en él sin regresar',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({'local_setlists': '[]'});
+        final catalog = buildLongCatalog();
+
+        await tester.pumpWidget(wrapDetailScreen(catalog, 'iump-1'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('1 / 3'), findsWidgets);
+        expect(find.text('Himno 1 - SANTO SANTO'), findsOneWidget);
+
+        // Deslizar claramente a la izquierda -> avanza al himno 2 y se queda ahí
+        await tester.fling(
+          find.byType(PageView),
+          const Offset(-260, 0),
+          1100,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('2 / 3'), findsWidgets);
+        expect(find.text('Himno 2 - CASTILLO FUERTE'), findsOneWidget);
+
+        // Deslizar a la derecha -> regresa al himno 1 y se queda ahí
+        await tester.fling(
+          find.byType(PageView),
+          const Offset(260, 0),
+          1100,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('1 / 3'), findsWidgets);
+        expect(find.text('Himno 1 - SANTO SANTO'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Scroll vertical diagonal no cambia de canto accidentalmente',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({'local_setlists': '[]'});
+        final catalog = buildLongCatalog();
+
+        await tester.pumpWidget(wrapDetailScreen(catalog, 'iump-1'));
+        await tester.pumpAndSettle();
+
+        final verticalScrollView = find.descendant(
+          of: find.byType(PageView),
+          matching: find.byType(SingleChildScrollView),
+        ).first;
+
+        final beforeScrollOffset =
+            tester.widget<SingleChildScrollView>(verticalScrollView).controller!.offset;
+        expect(beforeScrollOffset, 0.0);
+
+        // Arrastrar verticalmente con ligera deriva diagonal (26px horizontal > touchSlop estándar)
+        await tester.drag(
+          find.byType(PageView),
+          const Offset(-26, -240),
+        );
+        await tester.pumpAndSettle();
+
+        // Debe seguir en el mismo canto pero con la letra desplazada hacia abajo
+        expect(find.text('1 / 3'), findsWidgets);
+        expect(find.text('Himno 1 - SANTO SANTO'), findsOneWidget);
+        final afterScrollOffset =
+            tester.widget<SingleChildScrollView>(verticalScrollView).controller!.offset;
+        expect(afterScrollOffset, greaterThan(50.0));
+      },
+    );
+
+    testWidgets(
+      'Modo Fijar canto bloquea swipe táctil mientras las flechas y botones siguen cambiando de canto',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues({
+          'local_setlists': '[]',
+          'pref_lock_hymn_swipe': true,
+        });
+        final catalog = buildLongCatalog();
+
+        await tester.pumpWidget(wrapDetailScreen(catalog, 'iump-1'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('1 / 3'), findsWidgets);
+
+        // Intentar swipe horizontal mientras está bloqueado -> permanece en himno 1
+        await tester.fling(
+          find.byType(PageView),
+          const Offset(-280, 0),
+          1200,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('1 / 3'), findsWidgets);
+        expect(find.text('Himno 1 - SANTO SANTO'), findsOneWidget);
+
+        // Usar botón explícito "Siguiente canto" -> avanza limpiamente al himno 2
+        await tester.tap(find.byTooltip('Siguiente canto').first);
+        await tester.pumpAndSettle();
+
+        expect(find.text('2 / 3'), findsWidgets);
+        expect(find.text('Himno 2 - CASTILLO FUERTE'), findsOneWidget);
       },
     );
   });
