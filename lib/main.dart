@@ -1,5 +1,6 @@
-import 'package:flutter/services.dart';
+import 'dart:async';
 import 'dart:ui';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -15,6 +16,7 @@ import 'package:audio_session/audio_session.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
+import 'core/services/app_telemetry_service.dart';
 
 import 'package:google_fonts/google_fonts.dart';
 import 'features/hymns/domain/hymn.dart';
@@ -106,12 +108,21 @@ void main() async {
       );
       messaging.getToken().then((token) {
         debugPrint('FCM Token: $token');
+        unawaited(AppTelemetryService.syncDeviceRegistration(fcmToken: token));
       }).catchError((e) {
         debugPrint('Error getting FCM token: $e');
+        unawaited(AppTelemetryService.syncDeviceRegistration());
+      });
+      messaging.onTokenRefresh.listen((token) {
+        unawaited(AppTelemetryService.syncDeviceRegistration(fcmToken: token));
       });
     } catch (e) {
       debugPrint('Error initializing Firebase Messaging: $e');
+      unawaited(AppTelemetryService.syncDeviceRegistration());
     }
+
+    unawaited(AppTelemetryService.initAnalyticsSilently());
+    unawaited(AppTelemetryService.syncDeviceRegistration());
 
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,

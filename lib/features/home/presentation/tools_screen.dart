@@ -153,7 +153,27 @@ class ToolsScreen extends ConsumerWidget {
               },
             ),
             const SizedBox(height: 16),
+            _ToolCard(
+              title: 'Dispositivos e Instalaciones (Admin)',
+              subtitle: 'Conteo por plataforma, actividad y bajas FCM',
+              icon: Icons.devices_other_rounded,
+              iconColor: const Color(0xFF0EA5E9),
+              onTap: () {
+                context.push('/admin-devices');
+              },
+            ),
+            const SizedBox(height: 16),
           ],
+          _ToolCard(
+            title: 'Guía Rápida de Funciones',
+            subtitle: 'Descubre todo lo que puedes hacer con la app',
+            icon: Icons.tips_and_updates_rounded,
+            iconColor: const Color(0xFF10B981),
+            onTap: () {
+              context.push('/guide');
+            },
+          ),
+          const SizedBox(height: 16),
           _ToolCard(
             title: 'Himnario Web (PC y iPhone)',
             subtitle: 'Enlace interactivo para usuarios sin la app instalada',

@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../hymns/presentation/widgets/metronome_audio_synth.dart';
+import 'feature_guide_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -52,6 +53,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       if (mounted && !_hasRedirected) {
         try {
           final prefs = await SharedPreferences.getInstance();
+          if (!mounted) return;
           final lastHymnId = prefs.getString('last_hymn_id');
           final lastHymnTime = prefs.getInt('last_hymn_time') ?? 0;
           final elapsed = DateTime.now().millisecondsSinceEpoch - lastHymnTime;
@@ -60,7 +62,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             context.go('/home/hymn/$lastHymnId');
             return;
           }
+          final seenGuide = prefs.getBool(kFeatureGuideSeenKey) ?? false;
+          if (!seenGuide) {
+            context.go('/guide?onboarding=1');
+            return;
+          }
         } catch (_) {}
+        if (!mounted) return;
         context.go('/home');
       }
     });

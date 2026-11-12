@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getStorage } = require("firebase-admin/storage");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 const admin = require("firebase-admin");
 const youtubedl = require("youtube-dl-exec");
 const path = require("path");
@@ -1020,4 +1021,103 @@ JSON esperado:
     console.error("Error en correctGrammarWithAi:", error);
     throw new HttpsError("internal", error.message);
   }
+});
+
+const UNREGISTERED_FCM_CODES = new Set([
+  "messaging/registration-token-not-registered",
+  "messaging/invalid-registration-token",
+]);
+
+/**
+ * Verificación bajo demanda (dryRun) para detectar tokens FCM de apps desinstaladas.
+ * No envía notificaciones reales ni ejecuta tareas programadas diarias.
+ */
+exports.checkInactiveDeviceUninstalls = onCall({
+  timeoutSeconds: 60,
+  memory: "256MiB",
+  maxInstances: 3,
+}, async (request) => {
+  assertAdminRequest(request);
+
+  const data = request.data || {};
+  const rawMax = Number(data.maxToCheck);
+  const maxToCheck = Number.isFinite(rawMax)
+    ? Math.max(1, Math.min(500, Math.floor(rawMax)))
+    : 500;
+
+  const db = getFirestore();
+  const installsRef = db.collection("device_installs");
+  const messaging = getMessaging();
+
+  const snapshot = await installsRef
+    .where("installStatus", "==", "active")
+    .where("hasFcmToken", "==", true)
+    .orderBy("lastSeenAt", "asc")
+    .limit(maxToCheck)
+    .get();
+
+  const candidates = [];
+  for (const doc of snapshot.docs) {
+    const token = doc.get("fcmToken");
+    if (typeof token === "string" && token.trim().length > 10) {
+      candidates.push({ ref: doc.ref, token: token.trim() });
+    }
+  }
+
+  let activeVerified = 0;
+  let newlyDetectedUninstalled = 0;
+  let transientErrors = 0;
+
+  if (candidates.length > 0) {
+    const messages = candidates.map((item) => ({
+      token: item.token,
+      data: { ping: "dry_run_health_check" },
+    }));
+
+    const batchResponse = await messaging.sendEach(messages, true);
+    const writeBatch = db.batch();
+    let pendingWrites = 0;
+
+    batchResponse.responses.forEach((resp, idx) => {
+      const target = candidates[idx];
+      if (resp.success) {
+        activeVerified += 1;
+        return;
+      }
+
+      const errCode = resp.error && resp.error.code ? String(resp.error.code) : "";
+      if (UNREGISTERED_FCM_CODES.has(errCode)) {
+        newlyDetectedUninstalled += 1;
+        writeBatch.update(target.ref, {
+          installStatus: "uninstalled_fcm",
+          uninstalledDetectedAt: FieldValue.serverTimestamp(),
+          lastTokenCheckAt: FieldValue.serverTimestamp(),
+        });
+        pendingWrites += 1;
+      } else {
+        transientErrors += 1;
+      }
+    });
+
+    if (pendingWrites > 0) {
+      await writeBatch.commit();
+    }
+  }
+
+  const [totalSnap, activeSnap, uninstalledSnap] = await Promise.all([
+    installsRef.count().get(),
+    installsRef.where("installStatus", "==", "active").count().get(),
+    installsRef.where("installStatus", "==", "uninstalled_fcm").count().get(),
+  ]);
+
+  return {
+    success: true,
+    checked: candidates.length,
+    activeVerified,
+    newlyDetectedUninstalled,
+    transientErrors,
+    totalRegistered: totalSnap.data().count || 0,
+    totalActive: activeSnap.data().count || 0,
+    totalUninstalledFcm: uninstalledSnap.data().count || 0,
+  };
 });

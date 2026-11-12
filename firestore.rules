@@ -49,6 +49,28 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // ── Registro de dispositivos / instalaciones (solo lectura Admin) ───────
+    function isValidDeviceInstall(deviceId) {
+      let data = request.resource.data;
+      return data.keys().hasAll(['deviceId', 'platform', 'appVersion', 'installStatus'])
+        && data.keys().hasOnly([
+          'deviceId', 'platform', 'appVersion', 'installStatus',
+          'hasFcmToken', 'fcmToken', 'firstSeenAt', 'lastSeenAt', 'fcmUpdatedAt'
+        ])
+        && data.deviceId == deviceId
+        && deviceId is string && deviceId.size() >= 6 && deviceId.size() <= 120
+        && data.platform in ['android', 'ios', 'web', 'macos', 'windows', 'linux', 'other']
+        && data.appVersion is string && data.appVersion.size() >= 1 && data.appVersion.size() <= 40
+        && data.installStatus == 'active'
+        && (!('hasFcmToken' in data) || data.hasFcmToken is bool)
+        && (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() <= 512));
+    }
+
+    match /device_installs/{deviceId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isValidDeviceInstall(deviceId);
+    }
+
     // ── Sugerencias de Himnos ──────────────────────────────────────────────
     match /cantos_sugeridos/{docId} {
       // Cualquiera puede crear una sugerencia

@@ -13,8 +13,10 @@ import '../../features/hymns/presentation/detached_projector_screen.dart';
 import '../widgets/main_layout_screen.dart';
 import '../../features/home/presentation/tools_screen.dart';
 import '../../features/home/presentation/church_about_screen.dart';
+import '../../features/home/presentation/feature_guide_screen.dart';
 import '../../features/hymns/presentation/hymn_scanner_screen.dart';
 import '../../features/hymns/presentation/admin_suggestions_screen.dart';
+import '../../features/hymns/presentation/admin_devices_screen.dart';
 import '../../features/hymns/presentation/hymn_tv_receiver_screen.dart';
 import '../../features/hymns/presentation/tv_remote_control_screen.dart';
 import '../../features/hymns/domain/hymn.dart';
@@ -223,6 +225,19 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/admin-suggestions',
       builder: (context, state) => AdminSuggestionsScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/admin-devices',
+      builder: (context, state) => const AdminDevicesScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/guide',
+      builder: (context, state) {
+        final isOnboarding = state.uri.queryParameters['onboarding'] == '1';
+        return FeatureGuideScreen(isOnboarding: isOnboarding);
+      },
     ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,

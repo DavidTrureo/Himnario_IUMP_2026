@@ -13,6 +13,38 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "device_installs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "installStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastSeenAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "device_installs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "installStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "hasFcmToken",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastSeenAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
