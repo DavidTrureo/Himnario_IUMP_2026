@@ -195,12 +195,31 @@ class HomeScreen extends ConsumerWidget {
                                 ),
                                 if (ref.watch(adminModeProvider)) ...[
                                   const SizedBox(width: 8),
-                                  const Tooltip(
-                                    message: 'Modo Administrador Activo',
-                                    child: Icon(
-                                      Icons.admin_panel_settings_rounded, 
-                                      color: Colors.amber, 
-                                      size: 22
+                                  InkWell(
+                                    onTap: () => context.push('/admin-dashboard'),
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.15),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: Colors.amber, width: 1.2),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.shield_rounded, color: Colors.amber, size: 16),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Panel Admin',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.amber,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ).animate().shake(delay: 200.ms),
                                 ],

@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:himnario_iump/core/services/app_telemetry_service.dart';
 import 'package:himnario_iump/features/home/presentation/feature_guide_screen.dart';
+import 'package:himnario_iump/features/hymns/domain/hymn.dart';
+import 'package:himnario_iump/features/hymns/presentation/admin_dashboard_screen.dart';
+
+class _MockAdminModeNotifier extends AdminModeNotifier {
+  final bool initial;
+  _MockAdminModeNotifier(this.initial);
+
+  @override
+  bool build() => initial;
+}
 
 void main() {
   group('AppTelemetryService Tests', () {
@@ -139,6 +150,51 @@ void main() {
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool(kFeatureGuideSeenKey), isTrue);
+    });
+  });
+
+  group('AdminDashboardScreen Tests', () {
+    testWidgets('Muestra Acceso Restringido cuando no es admin', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            adminModeProvider.overrideWith(() => _MockAdminModeNotifier(false)),
+          ],
+          child: const MaterialApp(
+            home: AdminDashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Acceso Restringido'), findsOneWidget);
+      expect(find.text('Volver al Inicio'), findsOneWidget);
+    });
+
+    testWidgets('Muestra Panel de Control Oficial cuando es admin', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            adminModeProvider.overrideWith(() => _MockAdminModeNotifier(true)),
+          ],
+          child: const MaterialApp(
+            home: AdminDashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Panel de Control Oficial'), findsOneWidget);
+      expect(find.text('Administrador Oficial'), findsOneWidget);
+      expect(find.text('Pulso del Himnario en Tiempo Real'), findsOneWidget);
+      expect(find.text('Gestión de Contenido y Cantos'), findsOneWidget);
     });
   });
 }

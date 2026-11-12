@@ -141,25 +141,15 @@ class ToolsScreen extends ConsumerWidget {
                 }
                 
                 return _ToolCard(
-                  title: 'Sugerencias de Cantos (Admin)',
-                  subtitle: 'Revisa y aprueba los cantos sugeridos por IA',
-                  icon: Icons.admin_panel_settings_rounded,
+                  title: 'Centro de Control Oficial (Admin)',
+                  subtitle: 'Métricas en vivo, cantos sugeridos, dispositivos y gestión',
+                  icon: Icons.shield_rounded,
                   iconColor: const Color(0xFFF59E0B),
                   badgeCount: count,
                   onTap: () {
-                    context.push('/admin-suggestions');
+                    context.push('/admin-dashboard');
                   },
                 );
-              },
-            ),
-            const SizedBox(height: 16),
-            _ToolCard(
-              title: 'Dispositivos e Instalaciones (Admin)',
-              subtitle: 'Conteo por plataforma, actividad y bajas FCM',
-              icon: Icons.devices_other_rounded,
-              iconColor: const Color(0xFF0EA5E9),
-              onTap: () {
-                context.push('/admin-devices');
               },
             ),
             const SizedBox(height: 16),

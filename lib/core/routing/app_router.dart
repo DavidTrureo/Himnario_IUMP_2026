@@ -17,6 +17,7 @@ import '../../features/home/presentation/feature_guide_screen.dart';
 import '../../features/hymns/presentation/hymn_scanner_screen.dart';
 import '../../features/hymns/presentation/admin_suggestions_screen.dart';
 import '../../features/hymns/presentation/admin_devices_screen.dart';
+import '../../features/hymns/presentation/admin_dashboard_screen.dart';
 import '../../features/hymns/presentation/hymn_tv_receiver_screen.dart';
 import '../../features/hymns/presentation/tv_remote_control_screen.dart';
 import '../../features/hymns/domain/hymn.dart';
@@ -221,6 +222,11 @@ final GoRouter appRouter = GoRouter(
       },
     ),
 
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/admin-dashboard',
+      builder: (context, state) => const AdminDashboardScreen(),
+    ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/admin-suggestions',
