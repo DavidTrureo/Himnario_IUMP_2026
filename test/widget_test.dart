@@ -784,5 +784,15 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'ensureEmbeddingsLoaded carga el índice vectorial de los 2995 cantos desde assets',
+      (WidgetTester tester) async {
+        await tester.runAsync(() async {
+          await HymnSemanticRetriever.ensureEmbeddingsLoaded();
+        });
+        expect(HymnSemanticRetriever.hasEmbeddingsLoaded, isTrue);
+      },
+    );
   });
 }

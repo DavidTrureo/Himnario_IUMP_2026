@@ -93,6 +93,8 @@ flutter:
     - assets/json/hymns.json
     - assets/json/special_hymns.json
     - assets/json/coros.json
+    - assets/json/hymn_embeddings.bin
+    - assets/json/hymn_embeddings_meta.json
     - assets/images/church_logo_v3.png
     - assets/images/mission_logo_v3.png
     - assets/audio/
