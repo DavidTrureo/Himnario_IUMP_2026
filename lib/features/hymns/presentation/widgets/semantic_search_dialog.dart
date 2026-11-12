@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -49,6 +51,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
   String? _spiritualTone;
   List<Map<String, dynamic>> _results = [];
   Map<String, Map<String, dynamic>> _collectionResults = {};
+  Map<String, AdditionalMatchesPool> _extraPools = {};
+  Map<String, int> _extraLoadedCountByCol = {};
+  Map<String, int> _extraBatchesByCol = {};
   String _activeResultCollection = 'iump';
   List<String> _keywords = [];
   final Set<String> _selectedCollections = {'iump', 'especiales', 'coros'};
@@ -200,6 +205,58 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     return ordered.isNotEmpty ? ordered.first : 'iump';
   }
 
+  List<Map<String, dynamic>> _displayedMatchesFor(String col) {
+    final base = List<Map<String, dynamic>>.from(
+      (_collectionResults[col]?['matches'] as List?) ?? const [],
+    );
+    final loadedExtra = _extraLoadedCountByCol[col] ?? 0;
+    if (loadedExtra <= 0) return base;
+    final pool = _extraPools[col];
+    if (pool == null || pool.candidates.isEmpty) return base;
+    return [
+      ...base,
+      ...pool.candidates.take(loadedExtra),
+    ];
+  }
+
+  int _remainingExtraCountFor(String col) {
+    final pool = _extraPools[col];
+    if (pool == null || pool.candidates.isEmpty) return 0;
+    final batches = _extraBatchesByCol[col] ?? 0;
+    if (batches >= HymnSemanticRetriever.maxAdditionalBatchesPerCollection) {
+      return 0;
+    }
+    final loaded = _extraLoadedCountByCol[col] ?? 0;
+    return math.max(0, pool.candidates.length - loaded);
+  }
+
+  void _loadMoreForCollection(String col) {
+    final pool = _extraPools[col];
+    if (pool == null) return;
+    final batches = _extraBatchesByCol[col] ?? 0;
+    if (batches >= HymnSemanticRetriever.maxAdditionalBatchesPerCollection) {
+      return;
+    }
+    final loaded = _extraLoadedCountByCol[col] ?? 0;
+    final remaining = pool.candidates.length - loaded;
+    if (remaining <= 0) return;
+
+    final step = math.min(
+      HymnSemanticRetriever.additionalBatchSize,
+      remaining,
+    );
+    setState(() {
+      _extraLoadedCountByCol = {
+        ..._extraLoadedCountByCol,
+        col: loaded + step,
+      };
+      _extraBatchesByCol = {
+        ..._extraBatchesByCol,
+        col: batches + 1,
+      };
+    });
+  }
+
   void _runKeywordSearch(String keyword) {
     final clean = keyword.trim();
     if (clean.isEmpty) return;
@@ -223,6 +280,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
         _errorMessage = null;
         _results = [];
         _collectionResults = {};
+        _extraPools = {};
+        _extraLoadedCountByCol = {};
+        _extraBatchesByCol = {};
         _summary = null;
         _biblicalPassage = null;
         _biblicalContext = null;
@@ -294,6 +354,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       _spiritualTone = null;
       _results = matches;
       _collectionResults = {};
+      _extraPools = {};
+      _extraLoadedCountByCol = {};
+      _extraBatchesByCol = {};
       _keywords = [];
     });
   }
@@ -318,6 +381,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       _errorMessage = null;
       _results = [];
       _collectionResults = {};
+      _extraPools = {};
+      _extraLoadedCountByCol = {};
+      _extraBatchesByCol = {};
       _summary = null;
       _biblicalPassage = null;
       _biblicalContext = null;
@@ -355,6 +421,28 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
       final colResults = _parseCollectionPayload(searchResponse, flatMatches);
       final initialTab = _pickInitialActiveCollection(colResults);
 
+      final excludedIdsByCol = <String, Set<int>>{};
+      for (final entry in colResults.entries) {
+        final ids = <int>{};
+        final list = entry.value['matches'] as List?;
+        if (list != null) {
+          for (final item in list) {
+            if (item is Map && item['hymn'] is Hymn) {
+              ids.add((item['hymn'] as Hymn).id);
+            }
+          }
+        }
+        excludedIdsByCol[entry.key] = ids;
+      }
+
+      final extraPools = HymnSemanticRetriever.findAdditionalMatchesByCollection(
+        query: query,
+        catalog: allHymns,
+        excludedIdsByCollection: excludedIdsByCol,
+        allowedCollections: Set<String>.from(_selectedCollections),
+        searchMode: _activeMode,
+      );
+
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -369,6 +457,9 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
           _spiritualTone = searchResponse['spiritualTone']?.toString();
           _results = flatMatches;
           _collectionResults = colResults;
+          _extraPools = extraPools;
+          _extraLoadedCountByCol = {};
+          _extraBatchesByCol = {};
           _activeResultCollection = initialTab;
           _keywords = List<String>.from(searchResponse['keywords'] ?? []);
           _errorMessage = null;
@@ -961,9 +1052,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
         ? _activeResultCollection
         : (orderedCols.isNotEmpty ? orderedCols.first : 'iump');
     final activePayload = _collectionResults[activeCol];
-    final activeMatches = List<Map<String, dynamic>>.from(
-      (activePayload?['matches'] as List?) ?? const [],
-    );
+    final activeMatches = _displayedMatchesFor(activeCol);
     final rawNoMore = activePayload?['noMoreReason']?.toString().trim() ?? '';
     final noMoreReason = rawNoMore.isNotEmpty
         ? rawNoMore
@@ -1041,9 +1130,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
             Builder(
               builder: (context) {
                 final col = orderedCols[i];
-                final count =
-                    ((_collectionResults[col]?['matches'] as List?) ?? const [])
-                        .length;
+                final count = _displayedMatchesFor(col).length;
                 final isSelected = col == activeCol;
                 final colColor = _getCollectionColor(col, theme);
                 final shortLabel = (isCompact && col == 'iump')
@@ -1127,8 +1214,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
   ) {
     return orderedCols.where((col) {
       if (col == currentCol) return false;
-      final list = _collectionResults[col]?['matches'] as List?;
-      return list != null && list.isNotEmpty;
+      return _displayedMatchesFor(col).isNotEmpty;
     }).toList();
   }
 
@@ -1142,9 +1228,51 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     List<String> orderedCols,
   ) {
     final otherWithMatches = _otherCollectionsWithMatches(col, orderedCols);
-    final isFull = count >= HymnSemanticRetriever.maxResultsPerCollection;
+    final baseCount =
+        ((_collectionResults[col]?['matches'] as List?) ?? const []).length;
+    final loadedExtra = _extraLoadedCountByCol[col] ?? 0;
+    final loadedBatches = _extraBatchesByCol[col] ?? 0;
+    final hasLoadedExtra = loadedExtra > 0;
+    final pool = _extraPools[col];
+    final remainingExtra = _remainingExtraCountFor(col);
+    final nextBatchSize = math.min(
+      HymnSemanticRetriever.additionalBatchSize,
+      remainingExtra,
+    );
+    final isFull = baseCount >= HymnSemanticRetriever.maxResultsPerCollection;
     final colColor = _getCollectionColor(col, theme);
     final colFullName = HymnSemanticRetriever.collectionDisplayName(col);
+
+    final String headerTitle;
+    if (hasLoadedExtra) {
+      final initialLabel = _isLocalFallback ? 'iniciales' : 'IA';
+      headerTitle =
+          '$count cantos mostrados en $colFullName ($baseCount $initialLabel + $loadedExtra locales)';
+    } else if (isFull) {
+      headerTitle = 'Top $count más certeros en $colFullName';
+    } else {
+      headerTitle =
+          '$count ${count == 1 ? "canto encontrado" : "cantos encontrados"} en $colFullName';
+    }
+
+    final String bodyText;
+    if (remainingExtra > 0) {
+      if (hasLoadedExtra) {
+        bodyText =
+            'Se agregaron $loadedExtra sugerencias locales verificadas. Quedan $remainingExtra más dentro del margen temático de tu búsqueda.';
+      } else {
+        bodyText =
+            'Se seleccionaron los $baseCount cantos de $colFullName con mayor fidelidad bíblica y temática a tu búsqueda. Si no conoces estas melodías, puedes explorar coincidencias locales adicionales sin gastar cuota de IA.';
+      }
+    } else if (hasLoadedExtra) {
+      bodyText = pool?.exhaustReason ?? noMoreReason;
+    } else if (isFull) {
+      bodyText = (pool != null && pool.stoppedForDrift)
+          ? 'Se seleccionaron los $count cantos de $colFullName con mayor fidelidad bíblica y temática a tu búsqueda. ${pool.exhaustReason}'
+          : 'Se seleccionaron los $count cantos de $colFullName con mayor fidelidad bíblica y temática a tu búsqueda.';
+    } else {
+      bodyText = noMoreReason;
+    }
 
     return Container(
       key: ValueKey('ai_collection_footer_$col'),
@@ -1179,9 +1307,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  isFull
-                      ? 'Top $count más certeros en $colFullName'
-                      : '$count ${count == 1 ? "canto encontrado" : "cantos encontrados"} en $colFullName',
+                  headerTitle,
                   style: GoogleFonts.outfit(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -1193,15 +1319,52 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
           ),
           const SizedBox(height: 6),
           Text(
-            isFull
-                ? 'Se seleccionaron los $count cantos de $colFullName con mayor fidelidad bíblica y temática a tu búsqueda.'
-                : noMoreReason,
+            bodyText,
             style: GoogleFonts.nunito(
               fontSize: 12.5,
               height: 1.35,
               color: isDark ? Colors.white70 : Colors.black87,
             ),
           ),
+          if (remainingExtra > 0) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: ValueKey('ai_load_more_$col'),
+                onPressed: () => _loadMoreForCollection(col),
+                icon: Icon(
+                  Icons.expand_more_rounded,
+                  size: 18,
+                  color: colColor,
+                ),
+                label: Text(
+                  'Mostrar $nextBatchSize más afines (${_getCollectionName(col)}) · $remainingExtra disp.',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colColor,
+                  side: BorderSide(color: colColor.withValues(alpha: 0.45)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Búsqueda local en el dispositivo (\$0 cuota IA) · bloque ${loadedBatches + 1} de ${HymnSemanticRetriever.maxAdditionalBatchesPerCollection}, se detiene si los cantos se alejan del tema.',
+              style: GoogleFonts.nunito(
+                fontSize: 11,
+                color: isDark ? Colors.white54 : Colors.black54,
+              ),
+            ),
+          ],
           if (!isFull && otherWithMatches.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(
@@ -1217,7 +1380,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                       color: _getCollectionColor(other, theme),
                     ),
                     label: Text(
-                      'Ver ${(_collectionResults[other]?['matches'] as List).length} en ${_getCollectionName(other)}',
+                      'Ver ${_displayedMatchesFor(other).length} en ${_getCollectionName(other)}',
                       style: GoogleFonts.nunito(
                         fontSize: 11.5,
                         fontWeight: FontWeight.bold,
@@ -1635,6 +1798,7 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
     final Hymn hymn = item['hymn'] as Hymn;
     final reason = item['relevanceReason'] as String? ?? '';
     final moment = item['worshipMoment'] as String?;
+    final isExtraLocal = item['isExtraLocal'] == true;
     final relevanceLevel =
         (item['relevanceLevel']?.toString().toLowerCase().trim() ?? '');
     final colColor = _getCollectionColor(hymn.collection, theme);
@@ -1737,7 +1901,29 @@ class _SemanticSearchDialogState extends ConsumerState<SemanticSearchDialog> {
                   ] else ...[
                     const Spacer(),
                   ],
-                  if (relevanceLevel == 'directa' || relevanceLevel == 'alta') ...[
+                  if (isExtraLocal) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: colColor.withValues(alpha: 0.13),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: colColor.withValues(alpha: 0.30),
+                        ),
+                      ),
+                      child: Text(
+                        'Adicional local',
+                        style: GoogleFonts.nunito(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : colColor,
+                        ),
+                      ),
+                    ),
+                  ] else if (relevanceLevel == 'directa' ||
+                      relevanceLevel == 'alta') ...[
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(

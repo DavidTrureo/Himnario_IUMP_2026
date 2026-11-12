@@ -491,5 +491,298 @@ void main() {
         expect(find.textContaining('#pastor'), findsOneWidget);
       },
     );
+
+    test(
+      'findAdditionalMatchesByCollection excluye iniciales, frena desvío temático y respeta tope de 30',
+      () {
+        // Caso 1: Más de 30 coincidencias fuertes restantes -> topa en 30 (3 bloques de 10).
+        final abundantCatalog = List<Hymn>.generate(
+          45,
+          (index) {
+            final id = index + 1;
+            return Hymn(
+              id: id,
+              title: 'El Buen Pastor $id',
+              toneNote: 'G',
+              beats: '4',
+              timeSignature: '4/4',
+              lyrics: 'Jehova es mi buen pastor, nada me faltara en su rebano $id.',
+              collection: 'iump',
+            );
+          },
+        );
+
+        final abundantPools =
+            HymnSemanticRetriever.findAdditionalMatchesByCollection(
+          query: 'buen pastor',
+          catalog: abundantCatalog,
+          excludedIdsByCollection: {
+            'iump': {1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+          },
+          allowedCollections: const {'iump'},
+          searchMode: 'biblical',
+        );
+
+        final abundantPool = abundantPools['iump']!;
+        expect(abundantPool.candidates.length, 30);
+        expect(abundantPool.hitBatchCap, isTrue);
+        expect(
+          abundantPool.candidates.every(
+            (m) => (m['hymn'] as Hymn).id > 10 && m['isExtraLocal'] == true,
+          ),
+          isTrue,
+        );
+        expect(abundantPool.exhaustReason, contains('30 sugerencias adicionales'));
+
+        // Caso 2: 3 coincidencias sólidas + 1 canto débil aislado (desvío temático).
+        final driftCatalog = <Hymn>[
+          for (int i = 1; i <= 10; i++)
+            Hymn(
+              id: i,
+              title: 'Tormenta de Fe $i',
+              toneNote: 'D',
+              beats: '4',
+              timeSignature: '4/4',
+              lyrics: 'En la tormenta no tendre miedo porque tengo fe y calma.',
+              collection: 'iump',
+            ),
+          for (int i = 11; i <= 13; i++)
+            Hymn(
+              id: i,
+              title: 'Calma en la Tormenta $i',
+              toneNote: 'D',
+              beats: '4',
+              timeSignature: '4/4',
+              lyrics: 'Aunque ruge la tormenta y el miedo, tu paz calma la tempestad.',
+              collection: 'iump',
+            ),
+          // Canto #14: solo menciona una palabra aislada de la consulta (score ~14 < floor)
+          Hymn(
+            id: 14,
+            title: 'Dia Soleado',
+            toneNote: 'C',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics: 'Al pasar la tormenta todo brillara en el cielo.',
+            collection: 'iump',
+          ),
+          Hymn(
+            id: 15,
+            title: 'Canto de Gratitud',
+            toneNote: 'C',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics: 'Damos gracias al Rey eterno por su bondad infinita.',
+            collection: 'iump',
+          ),
+        ];
+
+        final driftPools =
+            HymnSemanticRetriever.findAdditionalMatchesByCollection(
+          query: 'miedo en la tormenta',
+          catalog: driftCatalog,
+          excludedIdsByCollection: {
+            'iump': {1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+          },
+          allowedCollections: const {'iump'},
+          searchMode: 'biblical',
+        );
+
+        final driftPool = driftPools['iump']!;
+        expect(driftPool.candidates.length, 3);
+        expect(
+          driftPool.candidates.map((m) => (m['hymn'] as Hymn).id).toList(),
+          equals([11, 12, 13]),
+        );
+        expect(driftPool.hitBatchCap, isFalse);
+        expect(driftPool.stoppedForDrift, isTrue);
+        expect(driftPool.exhaustReason, contains('alejan del enfoque central'));
+      },
+    );
+
+    testWidgets(
+      'SemanticSearchDialog permite cargar bloques de 10 adicionales y se detiene ante desvío temático',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(1100, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final initialTen = List<Hymn>.generate(
+          10,
+          (i) => Hymn(
+            id: i + 1,
+            title: 'Tormenta IA ${i + 1}',
+            toneNote: 'E',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics: 'En la tormenta tengo fe y no temere porque Dios es mi paz.',
+            collection: 'iump',
+          ),
+        );
+        final extraFifteen = List<Hymn>.generate(
+          15,
+          (i) => Hymn(
+            id: i + 11,
+            title: 'Calma en la Tormenta ${i + 11}',
+            toneNote: 'G',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics:
+                'Aunque venga la tormenta y sienta miedo, su paz calma la tempestad.',
+            collection: 'iump',
+          ),
+        );
+        final marginalDriftHymn = Hymn(
+          id: 200,
+          title: 'Sendero de Luces',
+          toneNote: 'A',
+          beats: '4',
+          timeSignature: '4/4',
+          lyrics: 'Despues de la tormenta saldra el sol sobre los montes.',
+          collection: 'iump',
+        );
+        final specialOne = Hymn(
+          id: 1,
+          title: 'Paz Especial',
+          toneNote: 'C',
+          beats: '4',
+          timeSignature: '4/4',
+          lyrics: 'Su paz nos guardara para siempre.',
+          collection: 'especiales',
+        );
+
+        final catalog = [
+          ...initialTen,
+          ...extraFifteen,
+          marginalDriftHymn,
+          specialOne,
+        ];
+
+        Future<Map<String, dynamic>> fakeExecutor({
+          required BuildContext context,
+          required String query,
+          required List<Hymn> catalog,
+          Set<String>? allowedCollections,
+          String searchMode = 'biblical',
+        }) async {
+          final iumpMatches = initialTen
+              .map((h) => {
+                    'hymn': h,
+                    'relevanceReason': 'Seleccionado por IA para prueba.',
+                    'worshipMoment': 'Oración de Fe',
+                    'relevanceLevel': 'directa',
+                  })
+              .toList();
+          final espMatches = [
+            {
+              'hymn': specialOne,
+              'relevanceReason': 'Único especial relacionado.',
+              'worshipMoment': 'Alabanza Congregacional',
+              'relevanceLevel': 'alta',
+            }
+          ];
+          return {
+            'summary': 'Top 10 curado por IA',
+            'biblicalPassage': 'Marcos 4:39',
+            'biblicalContext': 'Jesús calma la tempestad.',
+            'spiritualTone': 'Fe y Paz',
+            'collections': {
+              'iump': {
+                'matches': iumpMatches,
+                'noMoreReason': 'Mostrando los 10 mejores del himnario.',
+              },
+              'especiales': {
+                'matches': espMatches,
+                'noMoreReason': 'Solo 1 especial aborda este pasaje.',
+              },
+              'coros': {
+                'matches': <Map<String, dynamic>>[],
+                'noMoreReason': 'Sin coros relacionados.',
+              },
+            },
+            'matches': [...iumpMatches, ...espMatches],
+            'keywords': const ['tormenta', 'fe'],
+            'fromCache': false,
+            'isLocalFallback': false,
+            'quotaReached': false,
+          };
+        }
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              allHymnsGlobalProvider.overrideWithValue(
+                AsyncValue.data(catalog),
+              ),
+            ],
+            child: MaterialApp(
+              home: Scaffold(
+                body: SemanticSearchDialog(
+                  defaultMode: 'biblical',
+                  initialQuery: 'miedo en la tormenta',
+                  searchExecutor: fakeExecutor,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        final iumpTab = find.byKey(const ValueKey('ai_collection_tab_iump'));
+        expect(find.descendant(of: iumpTab, matching: find.text('10')),
+            findsOneWidget);
+
+        final resultsScrollable = find.descendant(
+          of: find.byKey(const ValueKey('ai_results_listview')),
+          matching: find.byType(Scrollable),
+        );
+        final loadMoreBtn = find.byKey(const ValueKey('ai_load_more_iump'));
+
+        // Bloque 1 de extras: muestra 10 más -> total 20
+        await tester.scrollUntilVisible(
+          loadMoreBtn,
+          250,
+          scrollable: resultsScrollable,
+        );
+        expect(find.textContaining('Mostrar 10 más'), findsOneWidget);
+        await tester.tap(loadMoreBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.descendant(of: iumpTab, matching: find.text('20')),
+            findsOneWidget);
+        expect(find.text('Adicional local'), findsWidgets);
+
+        // Bloque 2 de extras: quedan 5 -> muestra 5 más -> total 25
+        await tester.scrollUntilVisible(
+          loadMoreBtn,
+          250,
+          scrollable: resultsScrollable,
+        );
+        expect(find.textContaining('Mostrar 5 más'), findsOneWidget);
+        await tester.tap(loadMoreBtn);
+        await tester.pumpAndSettle();
+
+        expect(find.descendant(of: iumpTab, matching: find.text('25')),
+            findsOneWidget);
+        expect(loadMoreBtn, findsNothing);
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('ai_collection_footer_iump')),
+          250,
+          scrollable: resultsScrollable,
+        );
+        expect(find.textContaining('alejan del enfoque central'), findsOneWidget);
+        expect(find.textContaining('#200'), findsNothing);
+
+        // En Especiales no hay extras válidos -> no aparece botón
+        await tester.tap(find.byKey(const ValueKey('ai_collection_tab_especiales')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('ai_load_more_especiales')),
+          findsNothing,
+        );
+      },
+    );
   });
 }

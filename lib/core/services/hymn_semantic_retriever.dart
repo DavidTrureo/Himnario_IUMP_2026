@@ -14,6 +14,10 @@ import '../../features/hymns/domain/hymn.dart';
 class HymnSemanticRetriever {
   static const List<String> collectionOrder = ['iump', 'especiales', 'coros'];
   static const int maxResultsPerCollection = 10;
+  static const int additionalBatchSize = 10;
+  static const int maxAdditionalBatchesPerCollection = 3;
+  static const int maxAdditionalResultsPerCollection =
+      additionalBatchSize * maxAdditionalBatchesPerCollection;
 
   // Caché en memoria del índice vectorial compacto (si está empaquetado en assets)
   static bool _embeddingsLoadAttempted = false;
@@ -688,24 +692,7 @@ class HymnSemanticRetriever {
       final matches = <Map<String, dynamic>>[];
 
       for (final item in top) {
-        final reason = _buildLocalReason(item, analyzed);
-        final moment = analyzed.matchedConcepts.isNotEmpty
-            ? analyzed.matchedConcepts.first.worshipMoment
-            : (searchMode == 'biblical'
-                ? 'Sellar la Predicación'
-                : 'Alabanza Congregacional');
-        final affinity = item.score >= 40.0 ||
-                item.matchedPrimary.length >= 2 ||
-                (item.vectorSimilarity ?? 0) >= 0.72
-            ? 'alta'
-            : 'media';
-
-        final matchObj = {
-          'hymn': item.hymn,
-          'relevanceReason': reason,
-          'worshipMoment': moment,
-          'relevanceLevel': affinity,
-        };
+        final matchObj = _buildMatchMap(item, analyzed, searchMode);
         matches.add(matchObj);
         flatMatches.add(matchObj);
       }
@@ -855,6 +842,125 @@ class HymnSemanticRetriever {
     return 'Mostrando los $maxLimit cantos más acertados de $name.';
   }
 
+  static Map<String, dynamic> _buildMatchMap(
+    _HymnScore item,
+    _AnalyzedQuery analyzed,
+    String searchMode, {
+    bool isExtraLocal = false,
+  }) {
+    final reason = _buildLocalReason(item, analyzed);
+    final moment = analyzed.matchedConcepts.isNotEmpty
+        ? analyzed.matchedConcepts.first.worshipMoment
+        : (searchMode == 'biblical'
+            ? 'Sellar la Predicación'
+            : 'Alabanza Congregacional');
+    final affinity = item.score >= 40.0 ||
+            item.matchedPrimary.length >= 2 ||
+            (item.vectorSimilarity ?? 0) >= 0.72
+        ? 'alta'
+        : 'media';
+
+    return {
+      'hymn': item.hymn,
+      'relevanceReason': reason,
+      'worshipMoment': moment,
+      'relevanceLevel': affinity,
+      if (isExtraLocal) 'isExtraLocal': true,
+    };
+  }
+
+  /// Busca coincidencias locales adicionales (#11+) por colección excluyendo
+  /// los cantos ya mostrados inicialmente, aplicando un filtro más estricto
+  /// contra el desvío temático y un tope máximo de 3 bloques de 10 (30 extras).
+  static Map<String, AdditionalMatchesPool> findAdditionalMatchesByCollection({
+    required String query,
+    required List<Hymn> catalog,
+    required Map<String, Set<int>> excludedIdsByCollection,
+    required Set<String> allowedCollections,
+    required String searchMode,
+    List<double>? queryVector,
+  }) {
+    final analyzed = _analyzeQuery(query);
+    final double extraMinFloor =
+        analyzed.matchedConcepts.isNotEmpty ? 20.0 : 24.0;
+    final pools = <String, AdditionalMatchesPool>{};
+
+    for (final col in collectionOrder) {
+      if (!allowedCollections.contains(col)) continue;
+
+      final excludedIds = excludedIdsByCollection[col] ?? const <int>{};
+      final colHymns = catalog.where((h) => h.collection == col).toList();
+      final scoredAll = colHymns
+          .map((h) => _scoreHymn(h, analyzed, queryVector: queryVector))
+          .toList()
+        ..sort((a, b) => b.score.compareTo(a.score));
+
+      final double anchorScore =
+          scoredAll.isNotEmpty ? scoredAll.first.score : 0.0;
+      final double driftFloor = math.max(
+        extraMinFloor,
+        math.min(anchorScore, 75.0) * 0.34,
+      );
+
+      final passing = <Map<String, dynamic>>[];
+      bool hasMarginalDriftCandidates = false;
+
+      for (final item in scoredAll) {
+        if (excludedIds.contains(item.hymn.id)) continue;
+
+        final bool hasSolidSignal = item.titleHit ||
+            item.matchedPrimary.length >= 2 ||
+            (item.matchedPrimary.isNotEmpty &&
+                item.matchedExpanded.isNotEmpty) ||
+            item.matchedExpanded.length >= 3 ||
+            (item.vectorSimilarity ?? 0) >= 0.58 ||
+            item.score >= 30.0;
+
+        if (item.score >= driftFloor && hasSolidSignal) {
+          passing.add(
+            _buildMatchMap(
+              item,
+              analyzed,
+              searchMode,
+              isExtraLocal: true,
+            ),
+          );
+        } else if (item.score >= 12.0) {
+          hasMarginalDriftCandidates = true;
+        }
+      }
+
+      final bool hitBatchCap =
+          passing.length > maxAdditionalResultsPerCollection;
+      final cappedCandidates = hitBatchCap
+          ? passing.take(maxAdditionalResultsPerCollection).toList()
+          : passing;
+
+      final colName = collectionDisplayName(col);
+      final String exhaustReason;
+      if (hitBatchCap) {
+        exhaustReason =
+            'Se alcanzó el máximo recomendado de $maxAdditionalResultsPerCollection sugerencias adicionales en $colName (hasta $maxAdditionalBatchesPerCollection bloques de $additionalBatchSize) para mantener la lista enfocada en la predicación.';
+      } else if (hasMarginalDriftCandidates) {
+        exhaustReason = cappedCandidates.isEmpty
+            ? 'No hay más sugerencias locales en $colName con afinidad sólida; los demás cantos del catálogo se alejan del tema central o solo coinciden en palabras aisladas.'
+            : 'La expansión en $colName se detuvo aquí porque los siguientes cantos del catálogo se alejan del enfoque central o solo comparten palabras sueltas.';
+      } else {
+        exhaustReason =
+            'Ya exploramos todo $colName y no quedan más cantos con relación directa a esta enseñanza.';
+      }
+
+      pools[col] = AdditionalMatchesPool(
+        candidates: cappedCandidates,
+        stoppedForDrift: hasMarginalDriftCandidates,
+        hitBatchCap: hitBatchCap,
+        exhaustReason: exhaustReason,
+      );
+    }
+
+    return pools;
+  }
+
   static String collectionDisplayName(String collection) {
     switch (collection) {
       case 'iump':
@@ -867,6 +973,21 @@ class HymnSemanticRetriever {
         return collection.toUpperCase();
     }
   }
+}
+
+/// Resultado de expansión local adicional (#11+) con control de desvío temático.
+class AdditionalMatchesPool {
+  final List<Map<String, dynamic>> candidates;
+  final bool stoppedForDrift;
+  final bool hitBatchCap;
+  final String exhaustReason;
+
+  const AdditionalMatchesPool({
+    required this.candidates,
+    required this.stoppedForDrift,
+    required this.hitBatchCap,
+    required this.exhaustReason,
+  });
 }
 
 class _BiblicalConcept {
