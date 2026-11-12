@@ -8,6 +8,7 @@ import 'package:himnario_iump/features/home/presentation/feature_guide_screen.da
 import 'package:himnario_iump/features/home/presentation/tools_screen.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
 import 'package:himnario_iump/features/hymns/presentation/admin_dashboard_screen.dart';
+import 'package:himnario_iump/features/hymns/presentation/hymn_detail_screen.dart';
 
 class _MockAdminModeNotifier extends AdminModeNotifier {
   final bool initial;
@@ -215,6 +216,12 @@ void main() {
 
       expect(find.text('Centro de Control Oficial (Admin)'), findsNothing);
       expect(find.text('Guía Rápida de Funciones'), findsOneWidget);
+    });
+  });
+
+  group('HymnDetailScreen Audio Management Tests', () {
+    test('stopGlobalAudio limpia sin arrojar excepciones incluso si no hay reproductor activo', () {
+      expect(() => HymnDetailScreen.stopGlobalAudio(), returnsNormally);
     });
   });
 }

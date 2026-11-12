@@ -71,6 +71,20 @@ class HymnDetailScreen extends ConsumerStatefulWidget {
 
   const HymnDetailScreen({super.key, required this.hymnId});
 
+  static AudioPlayer? _activeGlobalAudioPlayer;
+
+  /// Detiene y limpia cualquier reproducción de audio activa en la aplicación.
+  static void stopGlobalAudio() {
+    final player = _activeGlobalAudioPlayer;
+    if (player != null) {
+      try {
+        player.stop();
+        player.dispose();
+      } catch (_) {}
+      _activeGlobalAudioPlayer = null;
+    }
+  }
+
   @override
   ConsumerState<HymnDetailScreen> createState() => _HymnDetailScreenState();
 }
@@ -100,6 +114,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _isLoadingAudio = false;
   String? _currentAudioUrl;
   bool _showPlayerCard = false;
+  StreamSubscription? _playerStateSubscription;
+  StreamSubscription? _durationSubscription;
+  StreamSubscription? _positionSubscription;
 
   YoutubePlayerController? _youtubeController;
   String? _activeYoutubeKey;
@@ -259,6 +276,28 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     } catch (_) {}
   }
 
+  void _stopAndDisposeAudio() {
+    _playerStateSubscription?.cancel();
+    _playerStateSubscription = null;
+    _durationSubscription?.cancel();
+    _durationSubscription = null;
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+
+    final player = _audioPlayer;
+    if (player != null) {
+      try {
+        player.stop();
+        player.dispose();
+      } catch (_) {}
+    }
+    if (identical(HymnDetailScreen._activeGlobalAudioPlayer, _audioPlayer)) {
+      HymnDetailScreen._activeGlobalAudioPlayer = null;
+    }
+    _audioPlayer = null;
+    _isPlaying = false;
+  }
+
   @override
   void dispose() {
     _pageHold?.cancel();
@@ -268,7 +307,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     _resetPageScrollControllers();
 
     _pageController?.dispose();
-    _audioPlayer?.dispose();
+    _stopAndDisposeAudio();
     _disposeYoutubePlayer(notify: false);
     super.dispose();
   }
@@ -527,6 +566,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () {
+              _stopAndDisposeAudio();
               if (context.canPop()) {
                 context.pop();
               } else {
@@ -577,6 +617,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
+          _stopAndDisposeAudio();
           _clearLastViewedHymn();
         }
       },
@@ -619,6 +660,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
               onPressed: () {
+                _stopAndDisposeAudio();
                 _clearLastViewedHymn();
                 if (context.canPop()) {
                   context.pop();
@@ -973,7 +1015,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                 _transposeOffset = 0; // Resetear transposición al cambiar de himno
                                 _showPlayerCard = false;
                               });
-                              _audioPlayer?.stop(); // Detener el audio al cambiar de canto
+                              _stopAndDisposeAudio(); // Detener el audio al cambiar de canto
                               _disposeYoutubePlayer();
                               _saveLastViewedHymn(_sortedHymns[index]);
                               _prunePageScrollControllers(index);
@@ -1624,12 +1666,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     });
 
     try {
-      if (_audioPlayer != null) {
-        await _audioPlayer!.dispose();
-      }
+      HymnDetailScreen.stopGlobalAudio();
+      _stopAndDisposeAudio();
 
       final player = AudioPlayer();
       _audioPlayer = player;
+      HymnDetailScreen._activeGlobalAudioPlayer = player;
       _currentAudioUrl = url;
 
       if (_isLooping) {
@@ -1655,7 +1697,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         }
       }
 
-      player.playerStateStream.listen((state) {
+      _playerStateSubscription = player.playerStateStream.listen((state) {
         if (mounted) {
           setState(() {
             _isPlaying = state.playing;
@@ -1677,7 +1719,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         }
       });
 
-      player.durationStream.listen((d) {
+      _durationSubscription = player.durationStream.listen((d) {
         if (mounted && d != null) {
           setState(() {
             _duration = d;
@@ -1685,7 +1727,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         }
       });
 
-      player.positionStream.listen((p) {
+      _positionSubscription = player.positionStream.listen((p) {
         if (mounted) {
           setState(() {
             _position = p;
@@ -1701,6 +1743,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       await player.play();
     } catch (e) {
       debugPrint('>>> Error al inicializar audio: $e');
+      _stopAndDisposeAudio();
       if (mounted) {
         setState(() {
           _isLoadingAudio = false;

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../features/hymns/presentation/hymn_detail_screen.dart';
 
 class MainLayoutScreen extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -12,6 +13,7 @@ class MainLayoutScreen extends StatelessWidget {
   });
 
   void _goBranch(int index) {
+    HymnDetailScreen.stopGlobalAudio();
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -26,6 +28,7 @@ class MainLayoutScreen extends StatelessWidget {
       canPop: navigationShell.currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && navigationShell.currentIndex != 0) {
+          HymnDetailScreen.stopGlobalAudio();
           _goBranch(0);
         }
       },
