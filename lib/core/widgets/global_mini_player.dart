@@ -24,10 +24,16 @@ class GlobalMiniPlayer extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    // Si ya estamos dentro del visor del canto, ocultar el mini-reproductor
-    // para no duplicar controles con la vista de detalle
-    final currentPath = GoRouterState.of(context).uri.path;
-    if (currentPath.contains('/hymn/')) {
+    // En tablets (iPad), la pantalla del canto muestra la tarjeta de estudio expandida (680px),
+    // por lo que ocultamos el mini reproductor únicamente en tablet dentro de /hymn/.
+    // En teléfonos móviles permanece siempre visible y esbelto sobre la barra de navegación.
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
+    String currentPath = '';
+    try {
+      currentPath = GoRouterState.of(context).uri.path;
+    } catch (_) {}
+    if (isTablet && currentPath.contains('/hymn/')) {
       return const SizedBox.shrink();
     }
 
@@ -67,9 +73,13 @@ class GlobalMiniPlayer extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: () {
-            // Regresar al canto en reproducción
+            // Regresar al canto en reproducción si estamos en otra pantalla
             final hymnKey = '${hymn.collection}-${hymn.id}';
-            context.go('/home/hymn/$hymnKey');
+            if (!currentPath.endsWith(hymnKey)) {
+              try {
+                context.go('/home/hymn/$hymnKey');
+              } catch (_) {}
+            }
           },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(22),
@@ -171,65 +181,70 @@ class GlobalMiniPlayer extends ConsumerWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 5,
-                                        vertical: 1.5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: accentColor.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: accentColor.withValues(alpha: 0.3),
-                                          width: 0.8,
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 5,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: accentColor.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: accentColor.withValues(alpha: 0.3),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          collectionLabel,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: accentColor,
+                                          ),
                                         ),
                                       ),
-                                      child: Text(
-                                        collectionLabel,
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${_formatDuration(audioState.position)} / ${_formatDuration(audioState.duration)}',
                                         style: GoogleFonts.outfit(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: accentColor,
+                                          fontSize: 10.5,
+                                          color: isDark
+                                              ? Colors.white60
+                                              : Colors.black54,
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '${_formatDuration(audioState.position)} / ${_formatDuration(audioState.duration)}',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 10.5,
-                                        color: isDark
-                                            ? Colors.white60
-                                            : Colors.black54,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    // Botón interactivo de repetición continua (Loop)
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(10),
-                                      onTap: () {
-                                        ref
-                                            .read(globalAudioProvider.notifier)
-                                            .toggleLoop();
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(2.0),
-                                        child: Icon(
-                                          audioState.isLooping
-                                              ? Icons.repeat_one_rounded
-                                              : Icons.repeat_rounded,
-                                          size: 14,
-                                          color: audioState.isLooping
-                                              ? accentColor
-                                              : (isDark
-                                                  ? Colors.white38
-                                                  : Colors.black38),
+                                      const SizedBox(width: 4),
+                                      // Botón interactivo de repetición continua (Loop)
+                                      InkWell(
+                                        borderRadius: BorderRadius.circular(10),
+                                        onTap: () {
+                                          ref
+                                              .read(globalAudioProvider.notifier)
+                                              .toggleLoop();
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(2.0),
+                                          child: Icon(
+                                            audioState.isLooping
+                                                ? Icons.repeat_one_rounded
+                                                : Icons.repeat_rounded,
+                                            size: 14,
+                                            color: audioState.isLooping
+                                                ? accentColor
+                                                : (isDark
+                                                    ? Colors.white38
+                                                    : Colors.black38),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),

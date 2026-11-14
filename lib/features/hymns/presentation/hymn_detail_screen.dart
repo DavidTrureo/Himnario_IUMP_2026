@@ -203,9 +203,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     // Pausar audio global inmediatamente para evitar colisión sonora
     // y sincronizar el estado del botón a Play (▶) de inmediato
     try {
-      if (ref.read(globalAudioProvider).isPlaying) {
-        ref.read(globalAudioProvider.notifier).pause();
-      }
+      ref.read(globalAudioProvider.notifier).pause();
     } catch (_) {}
 
     _disposeYoutubePlayer(notify: false);
@@ -223,9 +221,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       _youtubeSubscription = controller.stream.listen((value) {
         if (value.playerState == PlayerState.playing) {
           try {
-            if (ref.read(globalAudioProvider).isPlaying) {
-              ref.read(globalAudioProvider.notifier).pause();
-            }
+            ref.read(globalAudioProvider.notifier).pause();
           } catch (_) {}
         }
       });
@@ -833,6 +829,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       onPressed: () {
                         final isYoutube = hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be');
                         if (isYoutube) {
+                          ref.read(globalAudioProvider.notifier).pause();
                           final uri = Uri.parse(hymn.audioUrl.trim());
                           launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) {
                             return launchUrl(uri, mode: LaunchMode.platformDefault);
@@ -922,6 +919,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       _showConnectToTvDialog(context, hymn);
                       break;
                     case 'youtube':
+                      ref.read(globalAudioProvider.notifier).pause();
                       _launchYouTubeSearch(hymn.title);
                       break;
                     case 'edit':
@@ -1497,23 +1495,39 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
               // Botón flotante para abrir los Ajustes de Lectura
               if (!_isAtrilMode && !_showControlPanel)
-                Positioned(
-                  right: 20,
-                  bottom: (_showPlayerCard ? 150 : 20) + MediaQuery.of(context).padding.bottom,
-                  child: FloatingActionButton.small(
-                    heroTag: 'show-tools-fab',
-                    elevation: 4,
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    foregroundColor: theme.colorScheme.onPrimaryContainer,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    onPressed: () {
-                      setState(() {
-                        _showControlPanel = true;
-                      });
-                    },
-                    child: const Icon(Icons.tune_rounded),
-                  ),
-                ).animate().fadeIn(delay: 200.ms).scale(),
+                Builder(
+                  builder: (context) {
+                    final globalAudio = ref.watch(globalAudioProvider);
+                    final isAudioActive = globalAudio.isVisible && globalAudio.hymn != null;
+                    final isTablet = MediaQuery.of(context).size.width >= 600;
+
+                    final double bottomPos;
+                    if (isTablet) {
+                      bottomPos = (isAudioActive ? 150.0 : 20.0) + MediaQuery.of(context).padding.bottom;
+                    } else {
+                      // En móvil, la barra de navegación mide ~96px; si hay mini reproductor añade ~64px
+                      bottomPos = (isAudioActive ? 170.0 : 100.0) + MediaQuery.of(context).padding.bottom;
+                    }
+
+                    return Positioned(
+                      right: 20,
+                      bottom: bottomPos,
+                      child: FloatingActionButton.small(
+                        heroTag: 'show-tools-fab',
+                        elevation: 4,
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        foregroundColor: theme.colorScheme.onPrimaryContainer,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        onPressed: () {
+                          setState(() {
+                            _showControlPanel = true;
+                          });
+                        },
+                        child: const Icon(Icons.tune_rounded),
+                      ),
+                    ).animate().fadeIn(delay: 200.ms).scale();
+                  },
+                ),
 
 
 
@@ -1531,6 +1545,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               // Reproductor de Audio Flotante (Glassmorphic Adaptativo: Compacto en teléfonos, Estudio en tablets)
               Builder(
                 builder: (context) {
+                  final screenWidth = MediaQuery.of(context).size.width;
+                  final isTablet = screenWidth >= 600;
+
+                  // En teléfonos móviles, el GlobalMiniPlayer persistente se encarga
+                  // de reproducir de forma esbelta y compacta sobre la barra de navegación,
+                  // evitando tarjetas grandes duplicadas que tapen la letra del canto.
+                  if (!isTablet) {
+                    return const SizedBox.shrink();
+                  }
+
                   final globalAudio = ref.watch(globalAudioProvider);
                   final isCurrentHymnAudio = globalAudio.hymn?.id == hymn.id && globalAudio.hymn?.collection == hymn.collection;
                   final shouldShowCard = (_showPlayerCard && isCurrentHymnAudio) || (globalAudio.isVisible && globalAudio.hymn != null);
@@ -1555,8 +1579,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       ? '${activeHymn.id}. ${activeHymn.title}'
                       : activeHymn.title;
 
-                  final screenWidth = MediaQuery.of(context).size.width;
-                  final isTablet = screenWidth >= 600;
                   final isCompact = !isTablet && !_isDetailPlayerExpanded;
 
                   final double bottomPos;
@@ -2983,11 +3005,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           curve: Curves.easeOutCubic,
-                          height: (_showControlPanel && _showPlayerCard)
-                              ? 360.0
-                              : (_showControlPanel
-                                  ? 260.0
-                                  : (_showPlayerCard ? 160.0 : 0.0)),
+                          height: _showControlPanel
+                              ? (hymn.lyrics.contains('[') ? 280.0 : 200.0)
+                              : (ref.watch(globalAudioProvider).isVisible && ref.watch(globalAudioProvider).hymn != null
+                                  ? (MediaQuery.of(context).size.width >= 600 ? 160.0 : 180.0)
+                                  : (MediaQuery.of(context).size.width >= 600 ? 40.0 : 110.0)),
                         ),
                       ],
                     ),

@@ -12,6 +12,7 @@ import 'package:himnario_iump/features/hymns/presentation/widgets/semantic_searc
 import 'package:himnario_iump/core/services/spanish_accent_engine.dart';
 import 'package:himnario_iump/core/services/spanish_grammar_corrector.dart';
 import 'package:himnario_iump/core/services/global_audio_service.dart';
+import 'package:himnario_iump/core/widgets/global_mini_player.dart';
 
 class _FakeAdminModeNotifier extends AdminModeNotifier {
   final bool initialValue;
@@ -1043,7 +1044,10 @@ void main() {
               globalAudioProvider.overrideWith(() => GlobalAudioNotifier()),
             ],
             child: const MaterialApp(
-              home: HymnDetailScreen(hymnId: 'especiales-10'),
+              home: Scaffold(
+                bottomNavigationBar: GlobalMiniPlayer(),
+                body: HymnDetailScreen(hymnId: 'especiales-10'),
+              ),
             ),
           ),
         );
@@ -1053,8 +1057,9 @@ void main() {
         await tester.tap(find.byTooltip('Escuchar audio (Streaming)'));
         await tester.pump(const Duration(milliseconds: 300));
 
-        // En teléfono (< 600) se debe mostrar la barra compacta con botón 'Expandir controles'
-        expect(find.byTooltip('Expandir controles'), findsOneWidget);
+        // En teléfono (< 600) se debe mostrar el mini reproductor compacto persistente
+        expect(find.byType(GlobalMiniPlayer), findsOneWidget);
+        expect(find.byIcon(Icons.replay_10_rounded), findsOneWidget);
 
         // 2. Cambiar a pantalla de tablet (ancho 834 >= 600)
         tester.view.physicalSize = const Size(834 * 2, 1194 * 2);
@@ -1063,7 +1068,6 @@ void main() {
 
         // En tablet (>= 600) se muestra el Slider Theme completo del reproductor de estudio
         expect(find.byType(Slider), findsOneWidget);
-        expect(find.byTooltip('Expandir controles'), findsNothing);
 
         // Desmontar el widget y avanzar el timer pendiente del AppBar marquee
         await tester.pumpWidget(const SizedBox());

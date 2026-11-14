@@ -204,8 +204,8 @@ class GlobalAudioNotifier extends Notifier<GlobalAudioState> {
   Future<void> pause() async {
     try {
       await _player?.pause();
-      state = state.copyWith(isPlaying: false);
     } catch (_) {}
+    state = state.copyWith(isPlaying: false);
   }
 
   Future<void> resume() async {
