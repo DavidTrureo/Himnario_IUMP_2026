@@ -995,9 +995,19 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Se quitaron $count cantos de tus favoritos'),
+            backgroundColor: const Color(0xFF1E293B),
+            content: Text(
+              'Se quitaron $count cantos de tus favoritos',
+              style: GoogleFonts.nunito(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xFF334155), width: 1),
+            ),
           ),
         );
       }
@@ -1129,6 +1139,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     scaffoldMessenger.hideCurrentSnackBar();
     scaffoldMessenger.showSnackBar(
       SnackBar(
+        backgroundColor: const Color(0xFF1E293B),
         content: Row(
           children: [
             const SizedBox(
@@ -1136,7 +1147,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
               ),
             ),
             const SizedBox(width: 14),
@@ -1145,14 +1156,20 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                 categoryToAssign.isEmpty
                     ? 'Removiendo categoría de ${keys.length} cantos...'
                     : 'Asignando categoría "$categoryToAssign" a ${keys.length} cantos...',
-                style: GoogleFonts.nunito(),
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
         ),
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF334155), width: 1),
+        ),
       ),
     );
 
@@ -1196,14 +1213,21 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
       scaffoldMessenger.hideCurrentSnackBar();
       scaffoldMessenger.showSnackBar(
         SnackBar(
+          backgroundColor: const Color(0xFF1E293B),
           content: Text(
             categoryToAssign.isEmpty
                 ? 'Se removió la categoría a $updatedCount cantos'
                 : 'Categoría "$categoryToAssign" asignada con éxito a $updatedCount cantos',
-            style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+            style: GoogleFonts.nunito(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF334155), width: 1),
+          ),
         ),
       );
     } catch (e) {
@@ -2423,16 +2447,23 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                   ScaffoldMessenger.of(context).hideCurrentSnackBar();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
+                                      backgroundColor: const Color(0xFF1E293B),
                                       content: Text(
                                         'Se quitó "${hymn.title}" de Favoritos',
-                                        style: GoogleFonts.nunito(),
+                                        style: GoogleFonts.nunito(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                       duration: const Duration(seconds: 4),
                                       behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        side: const BorderSide(color: Color(0xFF334155), width: 1),
+                                      ),
                                       action: SnackBarAction(
-                                        label: 'Deshacer',
-                                        textColor: Colors.amberAccent,
+                                        label: 'DESHACER',
+                                        textColor: const Color(0xFF38BDF8),
                                         onPressed: () {
                                           ref.read(favoritesProvider.notifier).toggleFavorite(key);
                                         },
