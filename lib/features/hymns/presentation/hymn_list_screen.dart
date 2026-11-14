@@ -22,6 +22,7 @@ import 'notation_provider.dart';
 import 'widgets/duplicate_pairs_dialog.dart';
 import 'widgets/semantic_search_dialog.dart';
 import 'add_hymn_screen.dart';
+import '../../setlists/presentation/add_to_setlist_dialog.dart';
 import 'package:flutter/services.dart';
 
 class UpperCaseTextFormatter extends TextInputFormatter {
@@ -1117,20 +1118,46 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     if (!mounted) return;
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-    BuildContext? loaderContext;
-    showDialog(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: false,
-      builder: (dContext) {
-        loaderContext = dContext;
-        return const Center(child: CircularProgressIndicator());
-      },
+    // Salir del modo de selección múltiple de inmediato para dar respuesta instantánea al usuario
+    final List<String> keys = _selectedKeys.toList();
+    setState(() {
+      _selectedKeys.clear();
+      _isMultiSelectMode = false;
+    });
+
+    // Mostrar feedback visual no bloqueante (evita para siempre pantallas negras o bloqueos de UI)
+    scaffoldMessenger.hideCurrentSnackBar();
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                categoryToAssign.isEmpty
+                    ? 'Removiendo categoría de ${keys.length} cantos...'
+                    : 'Asignando categoría "$categoryToAssign" a ${keys.length} cantos...',
+                style: GoogleFonts.nunito(),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
 
     int updatedCount = 0;
     try {
-      final List<String> keys = _selectedKeys.toList();
       final allHymns = ref.read(allHymnsGlobalProvider).value ?? [];
 
       for (final key in keys) {
@@ -1160,32 +1187,35 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                 isNew: false,
                 audioUrl: existingHymn.audioUrl,
                 category: categoryToAssign,
-              );
+              )
+              .timeout(const Duration(seconds: 8));
           updatedCount++;
         }
       }
-    } catch (e) {
-      debugPrint('>>> Error al asignar categoría: $e');
-    } finally {
-      if (loaderContext != null && Navigator.canPop(loaderContext!)) {
-        Navigator.pop(loaderContext!);
-      }
-    }
 
-    if (mounted) {
-      setState(() {
-        _selectedKeys.clear();
-        _isMultiSelectMode = false;
-      });
-
+      scaffoldMessenger.hideCurrentSnackBar();
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
             categoryToAssign.isEmpty
                 ? 'Se removió la categoría a $updatedCount cantos'
-                : 'Categoría "$categoryToAssign" asignada a $updatedCount cantos',
+                : 'Categoría "$categoryToAssign" asignada con éxito a $updatedCount cantos',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      debugPrint('>>> Error al asignar categoría: $e');
+      scaffoldMessenger.hideCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error al asignar categoría: $e',
             style: GoogleFonts.nunito(),
           ),
+          backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
@@ -1913,8 +1943,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                         )
                                       : defaultCardColor);
 
-                            return Container(
-                              key: ValueKey(key),
+                            final cardWidget = Container(
                               margin: const EdgeInsets.only(bottom: 12.0),
                               decoration: BoxDecoration(
                                 color: cardColor,
@@ -2365,6 +2394,112 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                   ),
                                 ),
                               ),
+                            );
+
+                            if (_isMultiSelectMode || isSuggestion) {
+                              return KeyedSubtree(
+                                key: ValueKey(key),
+                                child: cardWidget,
+                              );
+                            }
+
+                            final canSwipeLeft = widget.isFavoritesTab || showFavorites || isFavorite;
+
+                            return Dismissible(
+                              key: ValueKey('swipe_$key'),
+                              direction: canSwipeLeft
+                                  ? DismissDirection.horizontal
+                                  : DismissDirection.startToEnd,
+                              confirmDismiss: (direction) async {
+                                if (direction == DismissDirection.startToEnd) {
+                                  showAddToSetlistDialog(context, ref, hymn);
+                                  return false; // Rebota suavemente a su posición
+                                }
+                                return true; // Permite el deslizamiento hacia la izquierda
+                              },
+                              onDismissed: (direction) {
+                                if (direction == DismissDirection.endToStart) {
+                                  ref.read(favoritesProvider.notifier).toggleFavorite(key);
+                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Se quitó "${hymn.title}" de Favoritos',
+                                        style: GoogleFonts.nunito(),
+                                      ),
+                                      duration: const Duration(seconds: 4),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      action: SnackBarAction(
+                                        label: 'Deshacer',
+                                        textColor: Colors.amberAccent,
+                                        onPressed: () {
+                                          ref.read(favoritesProvider.notifier).toggleFavorite(key);
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              background: Container(
+                                margin: const EdgeInsets.only(bottom: 12.0),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0284C7), Color(0xFF0EA5E9)],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                alignment: Alignment.centerLeft,
+                                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.playlist_add_rounded, color: Colors.white, size: 26),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Añadir a Repertorio',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              secondaryBackground: canSwipeLeft
+                                  ? Container(
+                                      margin: const EdgeInsets.only(bottom: 12.0),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                      alignment: Alignment.centerRight,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Quitar de Favoritos',
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(Icons.heart_broken_rounded, color: Colors.white, size: 24),
+                                        ],
+                                      ),
+                                    )
+                                  : null,
+                              child: cardWidget,
                             );
                           }
 
