@@ -1361,8 +1361,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                   ),
                                 ] else if (adminMode) ...[
                                   IconButton(
-                                    icon: const Icon(Icons.select_all_rounded),
-                                    tooltip: 'Selección múltiple',
+                                    icon: const Icon(Icons.checklist_rounded),
+                                    tooltip: 'Selección múltiple (borrar o mover)',
                                     onPressed: () {
                                       setState(() {
                                         _isMultiSelectMode = true;
@@ -1505,44 +1505,46 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                     ),
                                   ),
                                 if (showFilterBar) const SizedBox(width: 8),
-                                IconButton(
-                                  onPressed: () {
-                                    ref
-                                        .read(showFavoritesProvider.notifier)
-                                        .toggle();
-                                  },
-                                  tooltip: showFavorites
-                                      ? 'Mostrar todos'
-                                      : 'Mostrar guardados',
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: showFavorites
-                                        ? theme.colorScheme.primary.withValues(
-                                            alpha: 0.12,
-                                          )
-                                        : (isDark
-                                              ? Colors.white.withValues(
-                                                  alpha: 0.04,
-                                                )
-                                              : theme
-                                                    .colorScheme
-                                                    .surfaceContainerHighest
-                                                    .withValues(alpha: 0.4)),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                if (!widget.isFavoritesTab) ...[
+                                  IconButton(
+                                    onPressed: () {
+                                      ref
+                                          .read(showFavoritesProvider.notifier)
+                                          .toggle();
+                                    },
+                                    tooltip: showFavorites
+                                        ? 'Mostrar todos'
+                                        : 'Mostrar guardados',
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: showFavorites
+                                          ? theme.colorScheme.primary.withValues(
+                                              alpha: 0.12,
+                                            )
+                                          : (isDark
+                                                ? Colors.white.withValues(
+                                                    alpha: 0.04,
+                                                  )
+                                                : theme
+                                                      .colorScheme
+                                                      .surfaceContainerHighest
+                                                      .withValues(alpha: 0.4)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      minimumSize: const Size(50, 50),
                                     ),
-                                    minimumSize: const Size(50, 50),
+                                    icon: Icon(
+                                      showFavorites
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      color: showFavorites
+                                          ? theme.colorScheme.primary
+                                          : (isDark
+                                                ? Colors.white70
+                                                : Colors.black54),
+                                    ),
                                   ),
-                                  icon: Icon(
-                                    showFavorites
-                                        ? Icons.favorite_rounded
-                                        : Icons.favorite_border_rounded,
-                                    color: showFavorites
-                                        ? theme.colorScheme.primary
-                                        : (isDark
-                                              ? Colors.white70
-                                              : Colors.black54),
-                                  ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
@@ -1665,7 +1667,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                   children: [
                                     Icon(
                                       showFavorites
-                                          ? Icons.heart_broken_rounded
+                                          ? Icons.favorite_border_rounded
                                           : Icons.search_off_rounded,
                                       size: 64,
                                       color: isDark
@@ -1679,13 +1681,51 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               ? 'No se encontraron cantos con "$query"'
                                               : 'Aún no tienes cantos en tus favoritos')
                                           : 'No se encontraron himnos locales',
-                                      style: GoogleFonts.nunito(
-                                        fontSize: 16,
-                                        color: Colors.grey,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 18,
+                                        color: isDark ? Colors.white70 : Colors.black87,
                                         fontWeight: FontWeight.bold,
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
+                                    if (showFavorites && query.isEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Busca cualquier canto arriba o explora el himnario para guardarlos aquí con el corazón ♡',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 14,
+                                          color: Colors.grey,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 20),
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: theme.colorScheme.primary,
+                                          foregroundColor: theme.colorScheme.onPrimary,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 20,
+                                            vertical: 12,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.menu_book_rounded, size: 20),
+                                        label: Text(
+                                          'Explorar Himnario',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                                          ref.read(activeCollectionProvider.notifier).setCollection('all');
+                                          ref.read(searchQueryProvider.notifier).updateQueryImmediately('');
+                                          context.go('/home/hymns');
+                                        },
+                                      ),
+                                    ],
                                     if (query.isNotEmpty) ...[
                                       const SizedBox(height: 18),
                                       ElevatedButton.icon(
@@ -2261,6 +2301,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                               controller: _scrollController,
                               child: ListView.builder(
                                 controller: _scrollController,
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
                                 physics: const BouncingScrollPhysics(),
                                 padding: const EdgeInsets.fromLTRB(
                                   16.0,
@@ -2297,25 +2339,72 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                       return Padding(
                                         padding: const EdgeInsets.only(
                                           top: 16.0,
-                                          bottom: 8.0,
+                                          bottom: 10.0,
                                         ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.add_circle_outline_rounded,
-                                              size: 16,
-                                              color: Colors.amber.shade700,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: (isDark
+                                                    ? Colors.amber.shade900
+                                                    : Colors.amber.shade50)
+                                                .withValues(alpha: 0.25),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: Colors.amber.shade700
+                                                  .withValues(alpha: 0.3),
                                             ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Del Himnario (toca ♡ para añadir al instante):',
-                                              style: GoogleFonts.outfit(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.travel_explore_rounded,
+                                                size: 18,
                                                 color: Colors.amber.shade700,
                                               ),
-                                            ),
-                                          ],
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'Del Himnario general',
+                                                  style: GoogleFonts.outfit(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                    color: isDark
+                                                        ? Colors.amber.shade200
+                                                        : Colors.amber.shade900,
+                                                  ),
+                                                ),
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  'Toca ♡ para guardar',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: theme
+                                                        .colorScheme
+                                                        .primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       );
                                     }
@@ -2332,39 +2421,70 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                           bottom: 12.0,
                                           top: 4.0,
                                         ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'No está en tus favoritos aún',
-                                              style: GoogleFonts.outfit(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                                color: Colors.grey,
-                                              ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: (isDark
+                                                    ? Colors.amber.shade900
+                                                    : Colors.amber.shade50)
+                                                .withValues(alpha: 0.25),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: Colors.amber.shade700
+                                                  .withValues(alpha: 0.3),
                                             ),
-                                            const SizedBox(height: 2),
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.auto_awesome_rounded,
-                                                  size: 16,
-                                                  color: Colors.amber.shade700,
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  'Encontrado en el Himnario (toca ♡ para añadir):',
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.travel_explore_rounded,
+                                                size: 18,
+                                                color: Colors.amber.shade700,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'Encontrado en el Himnario general',
                                                   style: GoogleFonts.outfit(
                                                     fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                    color:
-                                                        Colors.amber.shade700,
+                                                    fontSize: 13,
+                                                    color: isDark
+                                                        ? Colors.amber.shade200
+                                                        : Colors.amber.shade900,
                                                   ),
                                                 ),
-                                              ],
-                                            ),
-                                          ],
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  'Toca ♡ para guardar',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: theme
+                                                        .colorScheme
+                                                        .primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       );
                                     }
@@ -2387,6 +2507,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                               controller: _scrollController,
                               child: ReorderableListView.builder(
                                 scrollController: _scrollController,
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
                                 buildDefaultDragHandles: false,
                                 physics: const BouncingScrollPhysics(),
                                 padding: const EdgeInsets.fromLTRB(
@@ -2411,6 +2533,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             controller: _scrollController,
                             child: ListView.builder(
                               controller: _scrollController,
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
                               physics: const BouncingScrollPhysics(),
                               padding: const EdgeInsets.fromLTRB(
                                 16.0,
@@ -2435,25 +2559,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         ],
       ),
       floatingActionButton: widget.isFavoritesTab
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 120.0),
-              child: FloatingActionButton.extended(
-                tooltip: 'Explorar Himnario',
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                icon: const Icon(Icons.travel_explore_rounded),
-                label: Text(
-                  'Explorar Himnario',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-                ),
-                onPressed: () {
-                  ref.read(showFavoritesProvider.notifier).setFavorites(false);
-                  ref.read(activeCollectionProvider.notifier).setCollection('all');
-                  ref.read(searchQueryProvider.notifier).updateQueryImmediately('');
-                  context.go('/home/hymns');
-                },
-              ),
-            )
+          ? null
           : ((kIsWeb && !adminMode)
               ? null
               : Padding(
