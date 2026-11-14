@@ -729,13 +729,17 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
     if (confirmed == true) {
       if (!mounted) return;
-      final navigator = Navigator.of(context);
       final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+      BuildContext? loaderContext;
       showDialog(
         context: context,
+        useRootNavigator: true,
         barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+        builder: (dContext) {
+          loaderContext = dContext;
+          return const Center(child: CircularProgressIndicator());
+        },
       );
 
       try {
@@ -748,7 +752,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         }
 
         if (mounted) {
-          navigator.pop(); // Cerrar loader
           setState(() {
             _selectedKeys.clear();
             _isMultiSelectMode = false;
@@ -768,7 +771,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         }
       } catch (e) {
         if (mounted) {
-          navigator.pop(); // Cerrar loader
           scaffoldMessenger.showSnackBar(
             SnackBar(
               content: Text(
@@ -782,6 +784,10 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
               ),
             ),
           );
+        }
+      } finally {
+        if (loaderContext != null && Navigator.canPop(loaderContext!)) {
+          Navigator.pop(loaderContext!);
         }
       }
     }
@@ -877,13 +883,17 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
     if (targetCollection != null) {
       if (!mounted) return;
-      final navigator = Navigator.of(context);
       final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+      BuildContext? loaderContext;
       showDialog(
         context: context,
+        useRootNavigator: true,
         barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+        builder: (dContext) {
+          loaderContext = dContext;
+          return const Center(child: CircularProgressIndicator());
+        },
       );
 
       try {
@@ -906,7 +916,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         }
 
         if (mounted) {
-          navigator.pop(); // Cerrar loader
           setState(() {
             _selectedKeys.clear();
             _isMultiSelectMode = false;
@@ -926,7 +935,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         }
       } catch (e) {
         if (mounted) {
-          navigator.pop(); // Cerrar loader
           scaffoldMessenger.showSnackBar(
             SnackBar(
               content: Text(
@@ -941,6 +949,56 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
             ),
           );
         }
+      } finally {
+        if (loaderContext != null && Navigator.canPop(loaderContext!)) {
+          Navigator.pop(loaderContext!);
+        }
+      }
+    }
+  }
+
+  Future<void> _removeSelectedFromFavorites(BuildContext context) async {
+    final count = _selectedKeys.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Quitar de Favoritos', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text('¿Deseas quitar los $count cantos seleccionados de tus favoritos?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar', style: GoogleFonts.nunito()),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Quitar', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      for (final key in _selectedKeys) {
+        await ref.read(favoritesProvider.notifier).toggleFavorite(key);
+      }
+      if (mounted) {
+        setState(() {
+          _selectedKeys.clear();
+          _isMultiSelectMode = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Se quitaron $count cantos de tus favoritos'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
       }
     }
   }
@@ -1059,25 +1117,37 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     if (!mounted) return;
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+    BuildContext? loaderContext;
     showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (dContext) {
+        loaderContext = dContext;
+        return const Center(child: CircularProgressIndicator());
+      },
     );
 
     int updatedCount = 0;
     try {
       final List<String> keys = _selectedKeys.toList();
+      final allHymns = ref.read(allHymnsGlobalProvider).value ?? [];
+
       for (final key in keys) {
         final parts = key.split('-');
         if (parts.length < 2) continue;
         final coll = parts[0];
         final id = int.parse(parts[1]);
 
-        final hymns = ref.read(hymnsProvider(coll)).value ?? [];
-        final idx = hymns.indexWhere((h) => h.id == id);
-        if (idx != -1) {
-          final existingHymn = hymns[idx];
+        Hymn? existingHymn;
+        final localHymns = ref.read(hymnsProvider(coll)).value;
+        if (localHymns != null && localHymns.isNotEmpty) {
+          final idx = localHymns.indexWhere((h) => h.id == id);
+          if (idx != -1) existingHymn = localHymns[idx];
+        }
+        existingHymn ??= allHymns.where((h) => h.collection == coll && h.id == id).firstOrNull;
+
+        if (existingHymn != null) {
           await ref
               .read(hymnsProvider(coll).notifier)
               .saveHymn(
@@ -1094,29 +1164,33 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
           updatedCount++;
         }
       }
+    } catch (e) {
+      debugPrint('>>> Error al asignar categoría: $e');
     } finally {
-      if (mounted) {
-        Navigator.pop(context); // cerrar progress dialog
+      if (loaderContext != null && Navigator.canPop(loaderContext!)) {
+        Navigator.pop(loaderContext!);
       }
     }
 
-    setState(() {
-      _selectedKeys.clear();
-      _isMultiSelectMode = false;
-    });
+    if (mounted) {
+      setState(() {
+        _selectedKeys.clear();
+        _isMultiSelectMode = false;
+      });
 
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          categoryToAssign.isEmpty
-              ? 'Se removió la categoría a $updatedCount cantos'
-              : 'Categoría "$categoryToAssign" asignada a $updatedCount cantos',
-          style: GoogleFonts.nunito(),
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            categoryToAssign.isEmpty
+                ? 'Se removió la categoría a $updatedCount cantos'
+                : 'Categoría "$categoryToAssign" asignada a $updatedCount cantos',
+            style: GoogleFonts.nunito(),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -1328,41 +1402,58 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                   ),
                                 ],
                                 if (_isMultiSelectMode) ...[
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.category_rounded,
-                                      color: Colors.amber,
+                                  if (widget.isFavoritesTab) ...[
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.heart_broken_rounded,
+                                        color: Colors.redAccent,
+                                      ),
+                                      tooltip: 'Quitar de Favoritos',
+                                      onPressed: _selectedKeys.isEmpty
+                                          ? null
+                                          : () => _removeSelectedFromFavorites(
+                                              context,
+                                            ),
                                     ),
-                                    tooltip: 'Asignar Categoría',
-                                    onPressed: _selectedKeys.isEmpty
-                                        ? null
-                                        : () => _assignCategoryToSelectedHymns(
-                                            context,
-                                          ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete_rounded,
-                                      color: Colors.redAccent,
+                                  ] else ...[
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.category_rounded,
+                                        color: Colors.amber,
+                                      ),
+                                      tooltip: 'Asignar Categoría',
+                                      onPressed: _selectedKeys.isEmpty
+                                          ? null
+                                          : () => _assignCategoryToSelectedHymns(
+                                              context,
+                                            ),
                                     ),
-                                    tooltip: 'Eliminar seleccionados',
-                                    onPressed: _selectedKeys.isEmpty
-                                        ? null
-                                        : () => _deleteSelectedHymns(context),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.drive_file_move_rounded,
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_rounded,
+                                        color: Colors.redAccent,
+                                      ),
+                                      tooltip: 'Eliminar seleccionados',
+                                      onPressed: _selectedKeys.isEmpty
+                                          ? null
+                                          : () => _deleteSelectedHymns(context),
                                     ),
-                                    tooltip: 'Trasladar seleccionados',
-                                    onPressed: _selectedKeys.isEmpty
-                                        ? null
-                                        : () => _moveSelectedHymns(context),
-                                  ),
-                                ] else if (adminMode) ...[
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.drive_file_move_rounded,
+                                      ),
+                                      tooltip: 'Trasladar seleccionados',
+                                      onPressed: _selectedKeys.isEmpty
+                                          ? null
+                                          : () => _moveSelectedHymns(context),
+                                    ),
+                                  ],
+                                ] else if (adminMode || widget.isFavoritesTab) ...[
                                   IconButton(
                                     icon: const Icon(Icons.checklist_rounded),
-                                    tooltip: 'Selección múltiple (borrar o mover)',
+                                    tooltip: widget.isFavoritesTab
+                                        ? 'Selección múltiple (quitar de favoritos)'
+                                        : 'Selección múltiple (administrar)',
                                     onPressed: () {
                                       setState(() {
                                         _isMultiSelectMode = true;
