@@ -504,11 +504,7 @@ class SetlistExportService {
   /// Abrir la ventana nativa de compartir PDF (WhatsApp, Mail, etc.) sin guardar archivos intermedios
   static Future<void> shareSetlistPdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
     final pdfBytes = await generateSetlistPdf(setlist, hymns, mode: mode);
-    String filenameMode = '';
-    if (mode == ExportMode.fullHymns1PerPage) filenameMode = '_1xPagina';
-    if (mode == ExportMode.fullHymns2PerPage) filenameMode = '_2xPagina';
-    
-    final filename = 'Programa_Culto_${setlist.title.replaceAll(' ', '_')}$filenameMode.pdf';
+    final filename = buildSetlistFilename(setlist, mode);
     
     await Printing.sharePdf(
       bytes: pdfBytes,
@@ -519,17 +515,27 @@ class SetlistExportService {
   /// Abrir la cola de impresión nativa (impresora física)
   static Future<void> printSetlistPdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
     final pdfBytes = await generateSetlistPdf(setlist, hymns, mode: mode);
-    String filenameMode = '';
-    if (mode == ExportMode.fullHymns1PerPage) filenameMode = '_1xPagina';
-    if (mode == ExportMode.fullHymns2PerPage) filenameMode = '_2xPagina';
-    
-    final filename = 'Programa_Culto_${setlist.title.replaceAll(' ', '_')}$filenameMode.pdf';
+    final filename = buildSetlistFilename(setlist, mode);
     
     await Printing.layoutPdf(
       onLayout: (format) async => pdfBytes,
       name: filename,
       format: PdfPageFormat.letter,
     );
+  }
+
+  /// Genera un nombre de archivo limpio, elegante y descriptivo para el programa del culto
+  static String buildSetlistFilename(Setlist setlist, ExportMode mode) {
+    String filenameMode = '';
+    if (mode == ExportMode.fullHymns1PerPage) filenameMode = ' (1 por página)';
+    if (mode == ExportMode.fullHymns2PerPage) filenameMode = ' (2 por página)';
+
+    final cleanTitle = setlist.title
+        .replaceAll(RegExp(r'[/\\:*?"<>|]'), '-')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    return 'Programa Culto - $cleanTitle$filenameMode.pdf';
   }
 
   /// Abrir la vista de impresión / exportar PDF (por defecto comparte directo en móviles y descarga en Web)

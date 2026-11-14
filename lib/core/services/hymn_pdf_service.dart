@@ -668,9 +668,7 @@ class HymnPdfService {
     String notation = 'spanish',
   }) async {
     try {
-      final String variant = includeChords ? 'completo' : 'letra';
-      final int timestamp = DateTime.now().millisecondsSinceEpoch;
-      final String filename = '${hymn.collection}_${hymn.id}_${_cleanFilename(hymn.title)}_${variant}_$timestamp.pdf';
+      final String filename = buildPdfFilename(hymn, includeChords);
 
       final pdfBytes = await generateHymnPdf(
         hymn,
@@ -698,9 +696,7 @@ class HymnPdfService {
     String notation = 'spanish',
   }) async {
     try {
-      final String variant = includeChords ? 'completo' : 'letra';
-      final int timestamp = DateTime.now().millisecondsSinceEpoch;
-      final String filename = '${hymn.collection}_${hymn.id}_${_cleanFilename(hymn.title)}_${variant}_$timestamp.pdf';
+      final String filename = buildPdfFilename(hymn, includeChords);
 
       final pdfBytes = await generateHymnPdf(
         hymn,
@@ -721,11 +717,20 @@ class HymnPdfService {
     }
   }
 
-  static String _cleanFilename(String text) {
-    return text
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^\w\s-]'), '')
-        .trim()
-        .replaceAll(RegExp(r'\s+'), '_');
+  /// Genera un nombre de archivo limpio, elegante y descriptivo para compartir e imprimir
+  static String buildPdfFilename(Hymn hymn, bool includeChords) {
+    final String variant = includeChords ? 'Acordes' : 'Letra';
+    // Sanitizar caracteres inválidos en sistemas de archivos (/, \, :, *, ?, ", <, >, |)
+    final cleanTitle = hymn.title
+        .replaceAll(RegExp(r'[/\\:*?"<>|]'), '-')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (hymn.collection == 'iump') {
+      return 'Himno ${hymn.id} - $cleanTitle ($variant).pdf';
+    } else if (hymn.collection == 'coros') {
+      return 'Coro - $cleanTitle ($variant).pdf';
+    }
+    return '$cleanTitle ($variant).pdf';
   }
 }
