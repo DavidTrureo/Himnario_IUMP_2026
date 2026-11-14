@@ -17,6 +17,8 @@ import '../../favorites/domain/favorites_notifier.dart';
 import '../../setlists/presentation/setlists_provider.dart';
 import '../../hymns/presentation/admin_suggestions_screen.dart';
 import '../../../core/widgets/app_music_icons.dart';
+import '../../history/presentation/recent_hymns_provider.dart';
+import '../../history/presentation/widgets/recent_hymns_section.dart';
 
 class AdminTapCountNotifier extends Notifier<int> {
   @override
@@ -350,6 +352,10 @@ class HomeScreen extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: 120),
                         physics: const BouncingScrollPhysics(),
                         children: [
+                          if (ref.watch(recentHymnsWithHymnProvider).isNotEmpty) ...[
+                            const RecentHymnsSection(),
+                            const SizedBox(height: 20),
+                          ],
                           _buildMenuItem(
                             context,
                             ref: ref,

@@ -41,6 +41,7 @@ import '../../../core/utils/web_window_helper.dart';
 import 'widgets/sheet_music_viewer.dart';
 import 'spinning_vinyl.dart';
 import 'obs_remote_screen.dart';
+import '../../history/presentation/recent_hymns_provider.dart';
 // Notifier para controlar el tamaño de la letra
 class FontSizeNotifier extends Notifier<double> {
   @override
@@ -302,6 +303,35 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     } catch (_) {}
   }
 
+  // ── Historial Inteligente de Cantados Recientemente ──
+  Timer? _engagementTimer;
+  bool _recordedInHistory = false;
+
+  void _startEngagementTracking(Hymn hymn) {
+    _engagementTimer?.cancel();
+    _recordedInHistory = false;
+    // Si el usuario permanece más de 25 segundos leyendo o cantando, se registra inteligentemente
+    _engagementTimer = Timer(const Duration(seconds: 25), () {
+      _recordCurrentHymnEngagement(hymn);
+    });
+  }
+
+  void _recordCurrentHymnEngagement(Hymn hymn) {
+    if (_recordedInHistory) return;
+    _recordedInHistory = true;
+    _engagementTimer?.cancel();
+
+    final key = '${hymn.collection}-${hymn.id}';
+    String tone = hymn.toneNote;
+    if (_transposeOffset != 0 && tone.isNotEmpty) {
+      try {
+        tone = Hymn.transposeLyrics(tone, _transposeOffset).trim();
+      } catch (_) {}
+    }
+
+    ref.read(recentHymnsProvider.notifier).recordHymn(key, tone: tone);
+  }
+
   Future<void> _clearLastViewedHymn() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -341,6 +371,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     _resetPageScrollControllers();
 
     _stopAtrilAutoScroll();
+    _engagementTimer?.cancel();
     if (_isAtrilMode) {
       try {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -358,6 +389,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       if (_isAtrilMode) {
         _showControlPanel = false;
         _isAtrilControlsMinimized = false;
+        if (_currentIndex != null && _currentIndex! < _sortedHymns.length) {
+          _recordCurrentHymnEngagement(_sortedHymns[_currentIndex!]);
+        }
         try {
           WakelockPlus.enable();
         } catch (_) {}
@@ -386,6 +420,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   void _startAtrilAutoScroll() {
+    if (_currentIndex != null && _currentIndex! < _sortedHymns.length) {
+      _recordCurrentHymnEngagement(_sortedHymns[_currentIndex!]);
+    }
     _atrilAutoScrollTimer?.cancel();
     _atrilAutoScrollTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       final controller = _activeScrollController;
@@ -597,6 +634,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       _initialized = true;
       final currentH = _sortedHymns[targetIndex];
       _saveLastViewedHymn(currentH);
+      _startEngagementTracking(currentH);
       if (wasDifferent) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _disposeYoutubePlayer();
@@ -828,6 +866,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           ? 'Ver en YouTube (Enlace Oficial)'
                           : (isPlayingThis ? 'Pausar audio' : 'Escuchar audio (Streaming)'),
                       onPressed: () {
+                        _recordCurrentHymnEngagement(hymn);
                         final isYoutube = hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be');
                         if (isYoutube) {
                           ref.read(globalAudioProvider.notifier).pause();
@@ -1139,6 +1178,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                               _stopAndDisposeAudio(); // Detener el audio al cambiar de canto
                               _disposeYoutubePlayer();
                               _saveLastViewedHymn(_sortedHymns[index]);
+                              _startEngagementTracking(_sortedHymns[index]);
                               _prunePageScrollControllers(index);
                             },
                             itemBuilder: (context, index) {
