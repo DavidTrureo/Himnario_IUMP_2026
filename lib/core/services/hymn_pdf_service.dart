@@ -582,6 +582,7 @@ class HymnPdfService {
     int transposeOffset,
     String notation,
   ) {
+    line = ChordTransposerService.normalizeEmbeddedChords(line);
     final RegExp regExp = RegExp(r'\[([^\]]+)\]');
     final matchesList = regExp.allMatches(line).toList();
 

@@ -10,6 +10,7 @@ import 'package:himnario_iump/core/services/local_hymn_storage_service.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/services/chord_transposer_service.dart';
 import '../../../core/services/gemini_ai_service.dart';
 import 'hymn_list_screen.dart';
 
@@ -231,7 +232,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
 
   Future<void> _saveHymn({required bool isLocal, required bool isAdmin}) async {
     final title = _titleController.text.trim();
-    final lyrics = _lyricsController.text.trim();
+    final lyrics = ChordTransposerService.normalizeLyrics(_lyricsController.text.trim());
     final messenger = ScaffoldMessenger.of(context);
 
     if (title.isEmpty || lyrics.isEmpty) {

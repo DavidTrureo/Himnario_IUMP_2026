@@ -71,4 +71,64 @@ class ChordTransposerService {
     final scale = useFlats ? _notesFlat : _notesSharp;
     return scale[newIndex];
   }
+
+  /// Normaliza acordes que hayan sido insertados accidentalmente dentro de una palabra
+  /// (por ejemplo `f[DOADD9]irm[LAM7]e` -> `[DOADD9] [LAM7] firme`, o `d[RE]e` -> `[RE]de`),
+  /// garantizando que las palabras de la letra nunca se rompan ni dejen espacios vacíos.
+  static String normalizeEmbeddedChords(String line) {
+    if (!line.contains('[')) return line;
+
+    // Divide respetando y preservando los espacios
+    final tokens = line.split(RegExp(r'(?<=\s)|(?=\s)'));
+    final newTokens = <String>[];
+
+    for (final token in tokens) {
+      if (token.contains('[') && token.contains(']')) {
+        final parts = token.split(RegExp(r'(?=\[)|(?<=\])'));
+        final chords = <String>[];
+        final nonChords = <String>[];
+
+        for (final p in parts) {
+          if (p.startsWith('[') && p.endsWith(']')) {
+            chords.add(p);
+          } else if (p.isNotEmpty) {
+            nonChords.add(p);
+          }
+        }
+
+        final textLetters = nonChords.join();
+        final firstChordPos = token.indexOf('[');
+        final hasLettersBeforeChord = firstChordPos > 0 &&
+            token.substring(0, firstChordPos).contains(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]'));
+
+        if (hasLettersBeforeChord && textLetters.contains(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]'))) {
+          final matchLeading = RegExp(r'^([¡¿"\(]+)(.*)$').firstMatch(textLetters);
+          String leadingPunct = '';
+          String coreText = textLetters;
+          if (matchLeading != null) {
+            leadingPunct = matchLeading.group(1)!;
+            coreText = matchLeading.group(2)!;
+          }
+
+          if (chords.length == 1) {
+            newTokens.add('$leadingPunct${chords.first}$coreText');
+          } else {
+            newTokens.add('$leadingPunct${chords.join(' ')} $coreText');
+          }
+        } else {
+          newTokens.add(token);
+        }
+      } else {
+        newTokens.add(token);
+      }
+    }
+
+    return newTokens.join();
+  }
+
+  /// Normaliza todas las líneas de una letra musical
+  static String normalizeLyrics(String lyrics) {
+    if (!lyrics.contains('[')) return lyrics;
+    return lyrics.split('\n').map(normalizeEmbeddedChords).join('\n');
+  }
 }

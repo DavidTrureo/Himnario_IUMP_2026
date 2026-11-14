@@ -601,6 +601,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
   }
 
   List<Widget> _buildLineWithChords(String line, double fontSize, bool isDark, ThemeData theme, bool showChords) {
+    line = ChordTransposerService.normalizeEmbeddedChords(line);
     final RegExp regExp = RegExp(r'\[([^\]]+)\]');
     final matchesList = regExp.allMatches(line).toList();
 

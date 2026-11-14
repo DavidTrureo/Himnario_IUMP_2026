@@ -3530,6 +3530,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   List<Widget> _buildLineWithChords(String line, double fontSize, bool isDark, ThemeData theme, {bool isItalic = false}) {
+    line = ChordTransposerService.normalizeEmbeddedChords(line);
     final RegExp regExp = RegExp(r'\[([^\]]+)\]');
 
     // IMPORTANTE: materializar el iterable en una lista para evitar
