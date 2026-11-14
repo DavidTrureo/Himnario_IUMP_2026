@@ -20,11 +20,13 @@ class SetlistDetailScreen extends ConsumerStatefulWidget {
 
 class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _modalScrollController = ScrollController();
   String _searchQuery = '';
 
   @override
   void dispose() {
     _searchController.dispose();
+    _modalScrollController.dispose();
     super.dispose();
   }
 
@@ -559,6 +561,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                                   _searchController.clear();
                                   setModalState(() {
                                     _searchQuery = '';
+                                    if (_modalScrollController.hasClients) {
+                                      _modalScrollController.jumpTo(0.0);
+                                    }
                                   });
                                 },
                               )
@@ -567,12 +572,16 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         onChanged: (val) {
                           setModalState(() {
                             _searchQuery = val;
+                            if (_modalScrollController.hasClients) {
+                              _modalScrollController.jumpTo(0.0);
+                            }
                           });
                         },
                       ),
                       const SizedBox(height: 12),
                       Expanded(
                         child: ListView.builder(
+                          controller: _modalScrollController,
                           physics: const BouncingScrollPhysics(),
                           itemCount: filteredList.length,
                           itemBuilder: (context, idx) {

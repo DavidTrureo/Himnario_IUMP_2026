@@ -4,11 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:himnario_iump/core/services/app_telemetry_service.dart';
+import 'package:himnario_iump/features/favorites/domain/favorites_notifier.dart';
 import 'package:himnario_iump/features/home/presentation/feature_guide_screen.dart';
 import 'package:himnario_iump/features/home/presentation/tools_screen.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
 import 'package:himnario_iump/features/hymns/presentation/admin_dashboard_screen.dart';
 import 'package:himnario_iump/features/hymns/presentation/hymn_detail_screen.dart';
+import 'package:himnario_iump/features/hymns/presentation/hymn_list_screen.dart';
 
 class _MockAdminModeNotifier extends AdminModeNotifier {
   final bool initial;
@@ -222,6 +224,71 @@ void main() {
   group('HymnDetailScreen Audio Management Tests', () {
     test('stopGlobalAudio limpia sin arrojar excepciones incluso si no hay reproductor activo', () {
       expect(() => HymnDetailScreen.stopGlobalAudio(), returnsNormally);
+    });
+  });
+
+  group('Search & Favorites UX Tests', () {
+    test('favoritesSearchQueryProvider es independiente de searchQueryProvider', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(searchQueryProvider), isEmpty);
+      expect(container.read(favoritesSearchQueryProvider), isEmpty);
+
+      container.read(searchQueryProvider.notifier).updateQueryImmediately('gracia');
+      expect(container.read(searchQueryProvider), 'gracia');
+      expect(container.read(favoritesSearchQueryProvider), isEmpty);
+
+      container.read(favoritesSearchQueryProvider.notifier).updateQueryImmediately('250');
+      expect(container.read(searchQueryProvider), 'gracia');
+      expect(container.read(favoritesSearchQueryProvider), '250');
+    });
+
+    test('suggestedFavoritesHymnsProvider excluye cantos que ya están en favoritos', () async {
+      final container = ProviderContainer(
+        overrides: [
+          favoritesProvider.overrideWith(() => FavoritesNotifier()),
+          allHymnsGlobalProvider.overrideWith(
+            (ref) => AsyncValue.data([
+              Hymn(
+                id: 1,
+                title: 'Canto Uno',
+                lyrics: 'letra uno',
+                toneNote: 'DO',
+                beats: '80',
+                timeSignature: '4/4',
+                category: 'Alabanza',
+                collection: 'iump',
+              ),
+              Hymn(
+                id: 2,
+                title: 'Canto Dos',
+                lyrics: 'letra dos',
+                toneNote: 'RE',
+                beats: '90',
+                timeSignature: '3/4',
+                category: 'Adoración',
+                collection: 'iump',
+              ),
+            ]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      // Si query está vacía, no sugiere nada
+      expect(container.read(suggestedFavoritesHymnsProvider), isEmpty);
+
+      // Añadimos 'iump-1' a favoritos
+      await container.read(favoritesProvider.notifier).toggleFavorite('iump-1');
+
+      // Buscamos 'Canto'
+      container.read(favoritesSearchQueryProvider.notifier).updateQueryImmediately('Canto');
+
+      final suggestions = container.read(suggestedFavoritesHymnsProvider);
+      // Solo debe sugerir 'Canto Dos' porque 'Canto Uno' ya está en favoritos
+      expect(suggestions.length, 1);
+      expect(suggestions.first.id, 2);
     });
   });
 }

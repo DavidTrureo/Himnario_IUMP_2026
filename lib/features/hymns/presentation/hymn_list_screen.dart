@@ -220,6 +220,11 @@ final searchQueryProvider = NotifierProvider<SearchQueryNotifier, String>(() {
   return SearchQueryNotifier();
 });
 
+final favoritesSearchQueryProvider =
+    NotifierProvider<SearchQueryNotifier, String>(() {
+      return SearchQueryNotifier();
+    });
+
 // Notifier para el toggle de favoritos
 class ShowFavoritesNotifier extends Notifier<bool> {
   @override
@@ -299,7 +304,9 @@ final filteredHymnsProvider = Provider.family<AsyncValue<List<Hymn>>, bool>((
       ? ref.watch(allHymnsGlobalProvider)
       : ref.watch(allHymnsProvider);
 
-  final query = ref.watch(searchQueryProvider);
+  final query = isFavoritesTab
+      ? ref.watch(favoritesSearchQueryProvider)
+      : ref.watch(searchQueryProvider);
   final favorites = ref.watch(favoritesProvider);
   final activeCategory = ref.watch(activeCategoryProvider);
   final selectedTone = ref.watch(selectedToneFilterProvider);
@@ -568,6 +575,48 @@ final filteredHymnsProvider = Provider.family<AsyncValue<List<Hymn>>, bool>((
   });
 });
 
+final suggestedFavoritesHymnsProvider = Provider<List<Hymn>>((ref) {
+  final query = ref.watch(favoritesSearchQueryProvider);
+  if (query.trim().isEmpty) return const [];
+
+  final allHymnsAsync = ref.watch(allHymnsGlobalProvider);
+  final favorites = ref.watch(favoritesProvider);
+
+  return allHymnsAsync.maybeWhen(
+    data: (allHymns) {
+      final cleanQuery = query.trim().toLowerCase();
+      final normQuery = Hymn.normalizeString(cleanQuery);
+
+      var suggestions = allHymns.where((hymn) {
+        final key = '${hymn.collection}-${hymn.id}';
+        if (favorites.contains(key)) return false;
+        return hymn.matchesSearch(query);
+      }).toList();
+
+      if (normQuery.isNotEmpty) {
+        suggestions.sort((a, b) {
+          final aIdMatch = a.id.toString() == cleanQuery ? 1 : 0;
+          final bIdMatch = b.id.toString() == cleanQuery ? 1 : 0;
+          if (aIdMatch != bIdMatch) return bIdMatch.compareTo(aIdMatch);
+
+          final aTitleMatch = a.normalizedTitle.contains(normQuery) ? 1 : 0;
+          final bTitleMatch = b.normalizedTitle.contains(normQuery) ? 1 : 0;
+          if (aTitleMatch != bTitleMatch) return bTitleMatch.compareTo(aTitleMatch);
+
+          final priorityA = a.collection == 'iump' ? 1 : (a.collection == 'especiales' ? 2 : 3);
+          final priorityB = b.collection == 'iump' ? 1 : (b.collection == 'especiales' ? 2 : 3);
+          if (priorityA != priorityB) return priorityA.compareTo(priorityB);
+
+          return a.id.compareTo(b.id);
+        });
+      }
+
+      return suggestions.take(30).toList();
+    },
+    orElse: () => const [],
+  );
+});
+
 class HymnListScreen extends ConsumerStatefulWidget {
   final bool isFavoritesTab;
   final bool autoFocusSearch;
@@ -582,19 +631,34 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
   bool _isMultiSelectMode = false;
   String _notation = 'spanish';
   late final TextEditingController _searchBarController;
+  late final ScrollController _scrollController;
+
+  NotifierProvider<SearchQueryNotifier, String> get _activeSearchProvider =>
+      widget.isFavoritesTab ? favoritesSearchQueryProvider : searchQueryProvider;
+
+  void _resetScrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0.0);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
     _searchBarController = TextEditingController(
-      text: ref.read(searchQueryProvider),
+      text: ref.read(_activeSearchProvider),
     );
+    _searchBarController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadPreferences();
   }
 
   @override
   void dispose() {
     _searchBarController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -1355,7 +1419,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                             ),
                                             tooltip: 'Asistente Bíblico e IA ✨',
                                             onPressed: () {
-                                              final currentQuery = ref.read(searchQueryProvider);
+                                              final currentQuery = ref.read(_activeSearchProvider);
                                               _showSemanticSearchDialog(
                                                 context,
                                                 ref,
@@ -1363,9 +1427,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               );
                                             },
                                           ),
-                                          if (ref
-                                              .watch(searchQueryProvider)
-                                              .isNotEmpty)
+                                          if (_searchBarController.text.isNotEmpty)
                                             IconButton(
                                               icon: Icon(
                                                 Icons.close_rounded,
@@ -1378,10 +1440,11 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                 _searchBarController.clear();
                                                 ref
                                                     .read(
-                                                      searchQueryProvider
+                                                      _activeSearchProvider
                                                           .notifier,
                                                     )
                                                     .updateQueryImmediately('');
+                                                _resetScrollToTop();
                                               },
                                             ),
                                         ],
@@ -1401,9 +1464,10 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                         onChanged: (value) {
                                           ref
                                               .read(
-                                                searchQueryProvider.notifier,
+                                                _activeSearchProvider.notifier,
                                               )
                                               .updateQuery(value);
+                                          _resetScrollToTop();
                                         },
                                       ),
                                   ),
@@ -1584,8 +1648,13 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                     Expanded(
                       child: filteredHymnsAsync.when(
                         data: (hymns) {
-                          if (hymns.isEmpty) {
-                            final query = ref.watch(searchQueryProvider);
+                          final query = ref.watch(_activeSearchProvider);
+                          final isSearchingFavorites = showFavorites && query.trim().isNotEmpty;
+                          final suggestions = isSearchingFavorites
+                              ? ref.watch(suggestedFavoritesHymnsProvider)
+                              : const <Hymn>[];
+
+                          if (hymns.isEmpty && suggestions.isEmpty) {
                             return Center(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -1607,8 +1676,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                     Text(
                                       showFavorites
                                           ? (query.isNotEmpty
-                                              ? 'No tienes cantos en tus favoritos con "$query"'
-                                              : 'No tienes cantos en tus favoritos')
+                                              ? 'No se encontraron cantos con "$query"'
+                                              : 'Aún no tienes cantos en tus favoritos')
                                           : 'No se encontraron himnos locales',
                                       style: GoogleFonts.nunito(
                                         fontSize: 16,
@@ -1619,45 +1688,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                     ),
                                     if (query.isNotEmpty) ...[
                                       const SizedBox(height: 18),
-                                      if (showFavorites) ...[
-                                        ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: theme.colorScheme.primary,
-                                            foregroundColor: theme.colorScheme.onPrimary,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 20,
-                                              vertical: 12,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(16),
-                                            ),
-                                            elevation: 2,
-                                          ),
-                                          icon: const Icon(
-                                            Icons.travel_explore_rounded,
-                                            size: 20,
-                                          ),
-                                          label: Text(
-                                            'Buscar "$query" en todo el Himnario',
-                                            style: GoogleFonts.nunito(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          onPressed: () {
-                                            ref
-                                                .read(showFavoritesProvider.notifier)
-                                                .setFavorites(false);
-                                            ref
-                                                .read(activeCollectionProvider.notifier)
-                                                .setCollection('all');
-                                            if (widget.isFavoritesTab) {
-                                              context.go('/home/hymns');
-                                            }
-                                          },
-                                        ),
-                                        const SizedBox(height: 10),
-                                      ],
                                       ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.amber.shade700,
@@ -1727,11 +1757,12 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             );
                           }
 
-                          Widget buildHymnItem(
+                          Widget buildHymnCard(
                             BuildContext context,
-                            int index,
-                          ) {
-                            final hymn = hymns[index];
+                            Hymn hymn, {
+                            int? reorderIndex,
+                            bool isSuggestion = false,
+                          }) {
                             final key = '${hymn.collection}-${hymn.id}';
                             final isSelected = _selectedKeys.contains(key);
                             final isFavorite = favorites.contains(key);
@@ -2138,14 +2169,17 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                           .favorite_border_rounded,
                                                 color: isFavorite
                                                     ? theme.colorScheme.primary
-                                                    : theme
-                                                          .colorScheme
-                                                          .onSurfaceVariant
-                                                          .withValues(
-                                                            alpha: 0.4,
-                                                          ),
+                                                    : (isSuggestion
+                                                          ? Colors.amber.shade700
+                                                          : theme
+                                                                .colorScheme
+                                                                .onSurfaceVariant
+                                                                .withValues(
+                                                                  alpha: 0.4,
+                                                                )),
                                                 size: 20,
                                               ),
+                                              tooltip: isFavorite ? 'En favoritos' : 'Añadir a favoritos',
                                               onPressed: () {
                                                 ref
                                                     .read(
@@ -2153,15 +2187,30 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                           .notifier,
                                                     )
                                                     .toggleFavorite(key);
+                                                if (isSuggestion && !isFavorite) {
+                                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        '¡${hymn.title} añadido a Favoritos! ✨',
+                                                        style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+                                                      ),
+                                                      duration: const Duration(seconds: 2),
+                                                      behavior: SnackBarBehavior.floating,
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                    ),
+                                                  );
+                                                }
                                               },
                                             ),
                                             if (showFavorites &&
                                                 !_isMultiSelectMode &&
                                                 ref
-                                                    .watch(searchQueryProvider)
-                                                    .isEmpty)
+                                                    .watch(_activeSearchProvider)
+                                                    .isEmpty &&
+                                                reorderIndex != null)
                                               ReorderableDragStartListener(
-                                                index: index,
+                                                index: reorderIndex,
                                                 child: Icon(
                                                   Icons.drag_handle_rounded,
                                                   color: theme
@@ -2188,12 +2237,156 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             );
                           }
 
-                          if (showFavorites &&
-                              !_isMultiSelectMode &&
-                              ref.watch(searchQueryProvider).isEmpty) {
+                          Widget buildHymnItem(
+                            BuildContext context,
+                            int index,
+                          ) {
+                            return buildHymnCard(
+                              context,
+                              hymns[index],
+                              reorderIndex: index,
+                            );
+                          }
+
+                          if (isSearchingFavorites && suggestions.isNotEmpty) {
+                            final hasFavs = hymns.isNotEmpty;
+                            final favCount = hymns.length;
+                            final sugCount = suggestions.length;
+                            final totalCount = hasFavs
+                                ? (1 + favCount + 1 + sugCount)
+                                : (1 + sugCount);
+
                             return Scrollbar(
                               interactive: true,
+                              controller: _scrollController,
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                physics: const BouncingScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16.0,
+                                  8.0,
+                                  16.0,
+                                  180.0,
+                                ),
+                                itemCount: totalCount,
+                                itemBuilder: (context, index) {
+                                  if (hasFavs) {
+                                    if (index == 0) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8.0,
+                                          top: 4.0,
+                                        ),
+                                        child: Text(
+                                          '⭐ En tus Favoritos ($favCount)',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    if (index <= favCount) {
+                                      return buildHymnCard(
+                                        context,
+                                        hymns[index - 1],
+                                      );
+                                    }
+                                    if (index == favCount + 1) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 16.0,
+                                          bottom: 8.0,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.add_circle_outline_rounded,
+                                              size: 16,
+                                              color: Colors.amber.shade700,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Del Himnario (toca ♡ para añadir al instante):',
+                                              style: GoogleFonts.outfit(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                                color: Colors.amber.shade700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                    final sugIndex = index - favCount - 2;
+                                    return buildHymnCard(
+                                      context,
+                                      suggestions[sugIndex],
+                                      isSuggestion: true,
+                                    );
+                                  } else {
+                                    if (index == 0) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12.0,
+                                          top: 4.0,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'No está en tus favoritos aún',
+                                              style: GoogleFonts.outfit(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.auto_awesome_rounded,
+                                                  size: 16,
+                                                  color: Colors.amber.shade700,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  'Encontrado en el Himnario (toca ♡ para añadir):',
+                                                  style: GoogleFonts.outfit(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                    color:
+                                                        Colors.amber.shade700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                    return buildHymnCard(
+                                      context,
+                                      suggestions[index - 1],
+                                      isSuggestion: true,
+                                    );
+                                  }
+                                },
+                              ),
+                            );
+                          }
+
+                          if (showFavorites &&
+                              !_isMultiSelectMode &&
+                              ref.watch(_activeSearchProvider).isEmpty) {
+                            return Scrollbar(
+                              interactive: true,
+                              controller: _scrollController,
                               child: ReorderableListView.builder(
+                                scrollController: _scrollController,
                                 buildDefaultDragHandles: false,
                                 physics: const BouncingScrollPhysics(),
                                 padding: const EdgeInsets.fromLTRB(
@@ -2215,7 +2408,9 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
                           return Scrollbar(
                             interactive: true,
+                            controller: _scrollController,
                             child: ListView.builder(
+                              controller: _scrollController,
                               physics: const BouncingScrollPhysics(),
                               padding: const EdgeInsets.fromLTRB(
                                 16.0,
@@ -2239,23 +2434,43 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
             ),
         ],
       ),
-      floatingActionButton: (widget.isFavoritesTab || (kIsWeb && !adminMode))
-          ? null
-          : Padding(
-              padding: const EdgeInsets.only(bottom: 140.0),
-              child: FloatingActionButton(
-                tooltip: adminMode ? 'Publicar Canto' : 'Añadir Canto',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AddHymnScreen(
-                      initialCollection: activeCollection,
-                    ),
-                  ),
+      floatingActionButton: widget.isFavoritesTab
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 120.0),
+              child: FloatingActionButton.extended(
+                tooltip: 'Explorar Himnario',
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+                icon: const Icon(Icons.travel_explore_rounded),
+                label: Text(
+                  'Explorar Himnario',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
                 ),
-                child: const Icon(Icons.add),
+                onPressed: () {
+                  ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                  ref.read(activeCollectionProvider.notifier).setCollection('all');
+                  ref.read(searchQueryProvider.notifier).updateQueryImmediately('');
+                  context.go('/home/hymns');
+                },
               ),
-            ),
+            )
+          : ((kIsWeb && !adminMode)
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: 140.0),
+                  child: FloatingActionButton(
+                    tooltip: adminMode ? 'Publicar Canto' : 'Añadir Canto',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddHymnScreen(
+                          initialCollection: activeCollection,
+                        ),
+                      ),
+                    ),
+                    child: const Icon(Icons.add),
+                  ),
+                )),
     );
   }
 
@@ -2280,6 +2495,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
           } else {
             ref.read(activeCategoryProvider.notifier).setCategory('Todos');
           }
+          _resetScrollToTop();
         },
       ),
     );
