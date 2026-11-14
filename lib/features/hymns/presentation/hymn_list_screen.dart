@@ -1015,6 +1015,50 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     }
   }
 
+  void _showFavoriteRemovedSnackBar(Hymn hymn, String key) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+
+    final controller = messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF1E293B),
+        content: Text(
+          'Se quitó "${hymn.title}" de Favoritos',
+          style: GoogleFonts.nunito(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        duration: const Duration(milliseconds: 2500),
+        behavior: SnackBarBehavior.floating,
+        dismissDirection: DismissDirection.down,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF334155), width: 1),
+        ),
+        action: SnackBarAction(
+          label: 'DESHACER',
+          textColor: const Color(0xFF38BDF8),
+          onPressed: () {
+            ref.read(favoritesProvider.notifier).toggleFavorite(key);
+          },
+        ),
+      ),
+    );
+
+    // En Android (especialmente Samsung One UI), la presencia de un SnackBarAction
+    // hace que el sistema fuerce el timeout de accesibilidad a 10-15 segundos.
+    // Forzamos el cierre a los 2.5 segundos exactos para evitar que se quede pegado.
+    Timer(const Duration(milliseconds: 2500), () {
+      try {
+        controller.close();
+      } catch (_) {}
+    });
+  }
+
   Future<void> _assignCategoryToSelectedHymns(BuildContext context) async {
     final activeCollection = ref.read(activeCollectionProvider);
     final List<Map<String, String>> categories;
@@ -2439,37 +2483,25 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                   showAddToSetlistDialog(context, ref, hymn);
                                   return false; // Rebota suavemente a su posición
                                 }
-                                return true; // Permite el deslizamiento hacia la izquierda
+                                if (direction == DismissDirection.endToStart) {
+                                  if (widget.isFavoritesTab || showFavorites) {
+                                    // Pestaña o filtro exclusivo de Favoritos: SÍ se descarta visualmente de la lista de favoritos
+                                    return true;
+                                  }
+                                  // Catálogo general o buscador:
+                                  // NO se elimina el canto de la pantalla.
+                                  // Solo quitamos el favorito (el corazón pasa a estar vacío)
+                                  // y rebotamos la tarjeta suavemente a su lugar.
+                                  ref.read(favoritesProvider.notifier).toggleFavorite(key);
+                                  _showFavoriteRemovedSnackBar(hymn, key);
+                                  return false; // Rebota suavemente y permanece en la lista
+                                }
+                                return false;
                               },
                               onDismissed: (direction) {
                                 if (direction == DismissDirection.endToStart) {
                                   ref.read(favoritesProvider.notifier).toggleFavorite(key);
-                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: const Color(0xFF1E293B),
-                                      content: Text(
-                                        'Se quitó "${hymn.title}" de Favoritos',
-                                        style: GoogleFonts.nunito(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      duration: const Duration(seconds: 4),
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        side: const BorderSide(color: Color(0xFF334155), width: 1),
-                                      ),
-                                      action: SnackBarAction(
-                                        label: 'DESHACER',
-                                        textColor: const Color(0xFF38BDF8),
-                                        onPressed: () {
-                                          ref.read(favoritesProvider.notifier).toggleFavorite(key);
-                                        },
-                                      ),
-                                    ),
-                                  );
+                                  _showFavoriteRemovedSnackBar(hymn, key);
                                 }
                               },
                               background: Container(

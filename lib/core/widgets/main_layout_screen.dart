@@ -12,7 +12,10 @@ class MainLayoutScreen extends StatelessWidget {
     required this.navigationShell,
   });
 
-  void _goBranch(int index) {
+  void _goBranch(BuildContext context, int index) {
+    try {
+      ScaffoldMessenger.of(context).clearSnackBars();
+    } catch (_) {}
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -27,7 +30,7 @@ class MainLayoutScreen extends StatelessWidget {
       canPop: navigationShell.currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && navigationShell.currentIndex != 0) {
-          _goBranch(0);
+          _goBranch(context, 0);
         }
       },
       child: LayoutBuilder(
@@ -59,7 +62,7 @@ class MainLayoutScreen extends StatelessWidget {
                           activeIcon: Icons.home_rounded,
                           label: 'Inicio',
                           isSelected: navigationShell.currentIndex == 0,
-                          onTap: () => _goBranch(0),
+                          onTap: () => _goBranch(context, 0),
                           theme: theme,
                         ),
                         const SizedBox(height: 32),
@@ -68,7 +71,7 @@ class MainLayoutScreen extends StatelessWidget {
                           activeIcon: Icons.queue_music_rounded,
                           label: 'Listas',
                           isSelected: navigationShell.currentIndex == 1,
-                          onTap: () => _goBranch(1),
+                          onTap: () => _goBranch(context, 1),
                           theme: theme,
                         ),
                         const SizedBox(height: 32),
@@ -77,7 +80,7 @@ class MainLayoutScreen extends StatelessWidget {
                           activeIcon: Icons.favorite_rounded,
                           label: 'Favoritos',
                           isSelected: navigationShell.currentIndex == 2,
-                          onTap: () => _goBranch(2),
+                          onTap: () => _goBranch(context, 2),
                           theme: theme,
                         ),
                         const SizedBox(height: 32),
@@ -86,7 +89,7 @@ class MainLayoutScreen extends StatelessWidget {
                           activeIcon: Icons.apps_rounded,
                           label: 'Más',
                           isSelected: navigationShell.currentIndex == 3,
-                          onTap: () => _goBranch(3),
+                          onTap: () => _goBranch(context, 3),
                           theme: theme,
                         ),
                       ],
@@ -145,7 +148,7 @@ class MainLayoutScreen extends StatelessWidget {
                             activeIcon: Icons.home_rounded,
                             label: 'Inicio',
                             isSelected: navigationShell.currentIndex == 0,
-                            onTap: () => _goBranch(0),
+                            onTap: () => _goBranch(context, 0),
                             theme: theme,
                           ),
                           _NavBarItem(
@@ -153,7 +156,7 @@ class MainLayoutScreen extends StatelessWidget {
                             activeIcon: Icons.queue_music_rounded,
                             label: 'Listas',
                             isSelected: navigationShell.currentIndex == 1,
-                            onTap: () => _goBranch(1),
+                            onTap: () => _goBranch(context, 1),
                             theme: theme,
                           ),
                           _NavBarItem(
@@ -161,7 +164,7 @@ class MainLayoutScreen extends StatelessWidget {
                             activeIcon: Icons.favorite_rounded,
                             label: 'Favoritos',
                             isSelected: navigationShell.currentIndex == 2,
-                            onTap: () => _goBranch(2),
+                            onTap: () => _goBranch(context, 2),
                             theme: theme,
                           ),
                           _NavBarItem(
@@ -169,7 +172,7 @@ class MainLayoutScreen extends StatelessWidget {
                             activeIcon: Icons.apps_rounded,
                             label: 'Más',
                             isSelected: navigationShell.currentIndex == 3,
-                            onTap: () => _goBranch(3),
+                            onTap: () => _goBranch(context, 3),
                             theme: theme,
                           ),
                         ],
