@@ -106,4 +106,19 @@ class WebWindowHelper {
       }
     } catch (_) {}
   }
+
+  static void triggerDownload(String url, String filename) {
+    try {
+      final anchor = html.AnchorElement(href: url)
+        ..target = '_blank'
+        ..download = filename;
+      html.document.body?.children.add(anchor);
+      anchor.click();
+      anchor.remove();
+    } catch (_) {
+      try {
+        html.window.open(url, '_blank');
+      } catch (_) {}
+    }
+  }
 }

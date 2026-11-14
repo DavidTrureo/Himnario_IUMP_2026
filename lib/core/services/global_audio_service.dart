@@ -90,6 +90,7 @@ class GlobalAudioNotifier extends Notifier<GlobalAudioState> {
   }
 
   Future<String> _getLocalAudioPath(String url) async {
+    if (kIsWeb) return '';
     final dir = await getApplicationDocumentsDirectory();
     final hash = url.hashCode.toString();
     String ext = 'mp3';

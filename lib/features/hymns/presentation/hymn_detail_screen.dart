@@ -842,7 +842,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               if (hymn.audioUrl.isNotEmpty && !hymn.audioUrl.contains('youtube.com') && !hymn.audioUrl.contains('youtu.be'))
                 IconButton(
                   icon: const Icon(Icons.cloud_download_rounded),
-                  tooltip: 'Descargar audio para escuchar sin internet',
+                  tooltip: kIsWeb ? 'Descargar audio en tu navegador' : 'Descargar audio para escuchar sin internet',
                   onPressed: () => _downloadAudio(hymn),
                 ),
               if (hymn.audioUrl.isNotEmpty)
@@ -2101,6 +2101,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   }
 
   Future<String> _getLocalAudioPath(String url) async {
+    if (kIsWeb) return '';
     final dir = await getApplicationDocumentsDirectory();
     final hash = url.hashCode.toString();
     
@@ -2121,6 +2122,49 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   Future<void> _downloadAudio(Hymn hymn) async {
     if (hymn.audioUrl.isEmpty) return;
+
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Iniciando descarga de audio en tu navegador...'), behavior: SnackBarBehavior.floating),
+      );
+
+      try {
+        String ext = 'mp3';
+        try {
+          final uri = Uri.parse(hymn.audioUrl);
+          final decodedPath = Uri.decodeComponent(uri.path);
+          if (decodedPath.contains('.')) {
+            final possibleExt = decodedPath.split('.').last.toLowerCase();
+            if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'].contains(possibleExt)) {
+              ext = possibleExt;
+            }
+          }
+        } catch (_) {}
+
+        final cleanTitle = hymn.title.replaceAll('/', '-').replaceAll('\\', '-').trim();
+        final fileName = '$cleanTitle.$ext';
+
+        WebWindowHelper.triggerDownload(hymn.audioUrl, fileName);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Descargando "$fileName" en tu navegador...'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } catch (e) {
+        try {
+          final uri = Uri.parse(hymn.audioUrl);
+          // ignore: deprecated_member_use
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (_) {}
+      }
+      return;
+    }
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Descargando audio...'), behavior: SnackBarBehavior.floating),

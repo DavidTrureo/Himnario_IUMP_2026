@@ -19,4 +19,8 @@ class WebWindowHelper {
   static void setIframesPointerEvents(bool enabled) {
     // No-op en móvil
   }
+
+  static void triggerDownload(String url, String filename) {
+    // No-op en móvil
+  }
 }
