@@ -658,7 +658,9 @@ class HymnPdfService {
     );
   }
 
-  /// Abre la ventana nativa de compartir o imprimir el PDF
+  /// Abre la ventana nativa de compartir el PDF (WhatsApp, Gmail, AirDrop, etc.)
+  /// En todos los sistemas móviles (Android e iOS) abre directamente el menú nativo de compartir
+  /// con el archivo adjunto, sin obligar al usuario a buscar o guardar en carpetas del teléfono.
   static Future<void> shareHymnPdf(
     Hymn hymn, {
     int transposeOffset = 0,
@@ -678,22 +680,43 @@ class HymnPdfService {
         pageFormat: PdfPageFormat.letter,
       );
 
-      // En Android nativo usamos layoutPdf para forzar el formato Carta por defecto en la impresora
-      // En iOS y Web usamos sharePdf (en iOS evita congelamiento nativo; en Web descarga el PDF automáticamente)
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-        await Printing.layoutPdf(
-          onLayout: (PdfPageFormat format) async => pdfBytes,
-          name: filename,
-          format: PdfPageFormat.letter,
-        );
-      } else {
-        await Printing.sharePdf(
-          bytes: pdfBytes,
-          filename: filename,
-        );
-      }
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: filename,
+      );
     } catch (e, stacktrace) {
       print('ERROR in shareHymnPdf: $e');
+      print(stacktrace);
+    }
+  }
+
+  /// Abre la cola de impresión nativa (para enviar a impresora física o servicio de impresión)
+  static Future<void> printHymnPdf(
+    Hymn hymn, {
+    int transposeOffset = 0,
+    bool includeChords = true,
+    String notation = 'spanish',
+  }) async {
+    try {
+      final String variant = includeChords ? 'completo' : 'letra';
+      final int timestamp = DateTime.now().millisecondsSinceEpoch;
+      final String filename = '${hymn.collection}_${hymn.id}_${_cleanFilename(hymn.title)}_${variant}_$timestamp.pdf';
+
+      final pdfBytes = await generateHymnPdf(
+        hymn,
+        transposeOffset: transposeOffset,
+        includeChords: includeChords,
+        notation: notation,
+        pageFormat: PdfPageFormat.letter,
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdfBytes,
+        name: filename,
+        format: PdfPageFormat.letter,
+      );
+    } catch (e, stacktrace) {
+      print('ERROR in printHymnPdf: $e');
       print(stacktrace);
     }
   }

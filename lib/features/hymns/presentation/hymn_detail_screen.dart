@@ -5834,35 +5834,101 @@ https://himnario-vito-2026.web.app
                       backgroundColor: Color(0xFFEEF2FF),
                       child: Icon(Icons.music_note_rounded, color: Color(0xFF4F46E5)),
                     ),
-                    title: Text('PDF Completo (Letra y Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
+                    title: Text(
+                      'PDF Completo (Letra y Acordes)',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
                     subtitle: Text(
                       _transposeOffset != 0
                           ? 'Incluye acordes transponidos ($_transposeOffset semitono/s)'
                           : 'Tonalidad, métrica y cifrado completo',
                       style: GoogleFonts.outfit(fontSize: 11.5),
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.print_rounded, size: 20),
+                          tooltip: 'Imprimir directamente',
+                          onPressed: () async {
+                            if (ctx.mounted) ctx.pop();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  content: Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF38BDF8),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Abriendo servicio de impresión...',
+                                        style: GoogleFonts.outfit(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: const BorderSide(color: Color(0xFF334155), width: 1),
+                                  ),
+                                ),
+                              );
+                            }
+                            await HymnPdfService.printHymnPdf(
+                              hymn,
+                              transposeOffset: _transposeOffset,
+                              includeChords: true,
+                              notation: ref.read(notationProvider),
+                            );
+                          },
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF38BDF8)),
+                        ),
+                      ],
+                    ),
                     onTap: () async {
                       if (ctx.mounted) ctx.pop();
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
+                            backgroundColor: const Color(0xFF1E293B),
                             content: Row(
                               children: [
                                 const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF38BDF8),
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
-                                  kIsWeb ? 'Generando y descargando PDF...' : 'Preparando documento PDF...',
-                                  style: GoogleFonts.outfit(),
+                                  kIsWeb ? 'Generando y descargando PDF...' : 'Abriendo compartir PDF...',
+                                  style: GoogleFonts.outfit(color: Colors.white),
                                 ),
                               ],
                             ),
                             duration: const Duration(seconds: 2),
                             behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: const BorderSide(color: Color(0xFF334155), width: 1),
+                            ),
                           ),
                         );
                       }
@@ -5885,30 +5951,99 @@ https://himnario-vito-2026.web.app
                       backgroundColor: Color(0xFFF0FDF4),
                       child: Icon(Icons.description_rounded, color: Color(0xFF16A34A)),
                     ),
-                    title: Text('PDF Solo Letra (Sin Acordes)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: Text('Ideal para la congregación o imprimir folletos', style: GoogleFonts.outfit(fontSize: 11.5)),
-                    trailing: const Icon(Icons.chevron_right_rounded),
+                    title: Text(
+                      'PDF Solo Letra (Sin Acordes)',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      'Ideal para la congregación o imprimir folletos',
+                      style: GoogleFonts.outfit(fontSize: 11.5),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.print_rounded, size: 20),
+                          tooltip: 'Imprimir en papel',
+                          onPressed: () async {
+                            if (ctx.mounted) ctx.pop();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: const Color(0xFF1E293B),
+                                  content: Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF38BDF8),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Abriendo servicio de impresión...',
+                                        style: GoogleFonts.outfit(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: const BorderSide(color: Color(0xFF334155), width: 1),
+                                  ),
+                                ),
+                              );
+                            }
+                            await HymnPdfService.printHymnPdf(
+                              hymn,
+                              transposeOffset: _transposeOffset,
+                              includeChords: false,
+                              notation: ref.read(notationProvider),
+                            );
+                          },
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16A34A).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF16A34A)),
+                        ),
+                      ],
+                    ),
                     onTap: () async {
                       if (ctx.mounted) ctx.pop();
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
+                            backgroundColor: const Color(0xFF1E293B),
                             content: Row(
                               children: [
                                 const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF38BDF8),
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Text(
-                                  kIsWeb ? 'Generando y descargando PDF...' : 'Preparando documento PDF...',
-                                  style: GoogleFonts.outfit(),
+                                  kIsWeb ? 'Generando y descargando PDF...' : 'Abriendo compartir PDF...',
+                                  style: GoogleFonts.outfit(color: Colors.white),
                                 ),
                               ],
                             ),
                             duration: const Duration(seconds: 2),
                             behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: const BorderSide(color: Color(0xFF334155), width: 1),
+                            ),
                           ),
                         );
                       }

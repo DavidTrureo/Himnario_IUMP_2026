@@ -47,27 +47,51 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                 ListTile(
                   leading: const Icon(Icons.list_alt_rounded),
                   title: const Text('Solo Programa (Tabla Resumen)'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.print_rounded, size: 20),
+                    tooltip: 'Imprimir',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      SetlistExportService.printSetlistPdf(setlist, hymns, mode: ExportMode.summaryOnly);
+                    },
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    SetlistExportService.printOrSharePdf(setlist, hymns, mode: ExportMode.summaryOnly);
+                    SetlistExportService.shareSetlistPdf(setlist, hymns, mode: ExportMode.summaryOnly);
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.menu_book_rounded),
                   title: const Text('Cantos Completos (1 por página)'),
                   subtitle: const Text('Letra grande, ideal para director'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.print_rounded, size: 20),
+                    tooltip: 'Imprimir',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      SetlistExportService.printSetlistPdf(setlist, hymns, mode: ExportMode.fullHymns1PerPage);
+                    },
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    SetlistExportService.printOrSharePdf(setlist, hymns, mode: ExportMode.fullHymns1PerPage);
+                    SetlistExportService.shareSetlistPdf(setlist, hymns, mode: ExportMode.fullHymns1PerPage);
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.chrome_reader_mode_rounded),
                   title: const Text('Cantos Completos (2 por página)'),
                   subtitle: const Text('Ahorro de papel (dividido horizontalmente)'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.print_rounded, size: 20),
+                    tooltip: 'Imprimir',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      SetlistExportService.printSetlistPdf(setlist, hymns, mode: ExportMode.fullHymns2PerPage);
+                    },
+                  ),
                   onTap: () {
                     Navigator.pop(context);
-                    SetlistExportService.printOrSharePdf(setlist, hymns, mode: ExportMode.fullHymns2PerPage);
+                    SetlistExportService.shareSetlistPdf(setlist, hymns, mode: ExportMode.fullHymns2PerPage);
                   },
                 ),
               ],

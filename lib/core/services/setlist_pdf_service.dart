@@ -501,8 +501,23 @@ class SetlistExportService {
     return doc.save();
   }
 
-  /// Abrir la vista de impresión / exportar PDF
-  static Future<void> printOrSharePdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
+  /// Abrir la ventana nativa de compartir PDF (WhatsApp, Mail, etc.) sin guardar archivos intermedios
+  static Future<void> shareSetlistPdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
+    final pdfBytes = await generateSetlistPdf(setlist, hymns, mode: mode);
+    String filenameMode = '';
+    if (mode == ExportMode.fullHymns1PerPage) filenameMode = '_1xPagina';
+    if (mode == ExportMode.fullHymns2PerPage) filenameMode = '_2xPagina';
+    
+    final filename = 'Programa_Culto_${setlist.title.replaceAll(' ', '_')}$filenameMode.pdf';
+    
+    await Printing.sharePdf(
+      bytes: pdfBytes,
+      filename: filename,
+    );
+  }
+
+  /// Abrir la cola de impresión nativa (impresora física)
+  static Future<void> printSetlistPdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
     final pdfBytes = await generateSetlistPdf(setlist, hymns, mode: mode);
     String filenameMode = '';
     if (mode == ExportMode.fullHymns1PerPage) filenameMode = '_1xPagina';
@@ -515,5 +530,10 @@ class SetlistExportService {
       name: filename,
       format: PdfPageFormat.letter,
     );
+  }
+
+  /// Abrir la vista de impresión / exportar PDF (por defecto comparte directo en móviles y descarga en Web)
+  static Future<void> printOrSharePdf(Setlist setlist, List<Hymn> hymns, {ExportMode mode = ExportMode.summaryOnly}) async {
+    await shareSetlistPdf(setlist, hymns, mode: mode);
   }
 }
