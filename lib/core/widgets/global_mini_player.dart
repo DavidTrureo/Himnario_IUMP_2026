@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../features/hymns/presentation/spinning_vinyl.dart';
 import '../services/global_audio_service.dart';
 
 class GlobalMiniPlayer extends ConsumerWidget {
@@ -40,17 +41,27 @@ class GlobalMiniPlayer extends ConsumerWidget {
         ? (positionMs / durationMs).clamp(0.0, 1.0)
         : 0.0;
 
-    String collectionLabel;
+    // Paleta de color según la colección del canto
+    final Color accentColor;
+    final String collectionLabel;
     if (hymn.collection == 'especiales') {
+      accentColor = const Color(0xFFA855F7); // Púrpura especial
       collectionLabel = 'Especial';
     } else if (hymn.collection == 'coros') {
+      accentColor = const Color(0xFF10B981); // Esmeralda coro
       collectionLabel = 'Coro';
     } else {
-      collectionLabel = 'IUMP';
+      accentColor = theme.colorScheme.primary; // Azul celestial IUMP
+      collectionLabel = 'Himno IUMP';
     }
 
+    // Para Especiales y Coros, no mostrar el ID numérico interno (ej. 1164)
+    final displayTitle = hymn.collection == 'iump'
+        ? '${hymn.id}. ${hymn.title}'
+        : hymn.title;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -63,7 +74,7 @@ class GlobalMiniPlayer extends ConsumerWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(22),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -75,20 +86,25 @@ class GlobalMiniPlayer extends ConsumerWidget {
                             const Color(0xFF0F172A).withValues(alpha: 0.96),
                           ]
                         : [
-                            Colors.white.withValues(alpha: 0.95),
-                            const Color(0xFFF1F5F9).withValues(alpha: 0.95),
+                            Colors.white.withValues(alpha: 0.96),
+                            const Color(0xFFF8FAFC).withValues(alpha: 0.96),
                           ],
                   ),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                    color: accentColor.withValues(alpha: 0.35),
                     width: 1.2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+                      color: accentColor.withValues(alpha: isDark ? 0.20 : 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 5),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -96,54 +112,56 @@ class GlobalMiniPlayer extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                       child: Row(
                         children: [
-                          // Badge número / icono
+                          // Mini Carátula / Vinilo giratorio temático
                           Container(
-                            width: 42,
-                            height: 42,
+                            width: 40,
+                            height: 40,
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha: 0.15),
                               shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  accentColor.withValues(alpha: 0.25),
+                                  accentColor.withValues(alpha: 0.08),
+                                ],
+                              ),
                               border: Border.all(
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.4),
-                                width: 1,
+                                color: accentColor.withValues(alpha: 0.45),
+                                width: 1.2,
                               ),
                             ),
                             child: Center(
                               child: audioState.isLoading
                                   ? SizedBox(
-                                      width: 20,
-                                      height: 20,
+                                      width: 18,
+                                      height: 18,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         valueColor: AlwaysStoppedAnimation<Color>(
-                                          theme.colorScheme.primary,
+                                          accentColor,
                                         ),
                                       ),
                                     )
-                                  : Icon(
-                                      Icons.music_note_rounded,
+                                  : SpinningVinyl(
+                                      isPlaying: audioState.isPlaying,
+                                      color: accentColor,
                                       size: 22,
-                                      color: theme.colorScheme.primary,
                                     ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          // Título y tiempos
+                          const SizedBox(width: 10),
+                          // Título y Tiempos
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  '${hymn.id}. ${hymn.title}',
+                                  displayTitle,
                                   style: GoogleFonts.outfit(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13.5,
@@ -157,42 +175,58 @@ class GlobalMiniPlayer extends ConsumerWidget {
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
+                                        horizontal: 5,
                                         vertical: 1.5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: isDark
-                                            ? Colors.white.withValues(alpha: 0.08)
-                                            : Colors.black.withValues(alpha: 0.05),
+                                        color: accentColor.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: accentColor.withValues(alpha: 0.3),
+                                          width: 0.8,
+                                        ),
                                       ),
                                       child: Text(
                                         collectionLabel,
                                         style: GoogleFonts.outfit(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark
-                                              ? Colors.white70
-                                              : Colors.black54,
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: accentColor,
                                         ),
                                       ),
                                     ),
-                                    if (audioState.isLooping) ...[
-                                      const SizedBox(width: 6),
-                                      Icon(
-                                        Icons.repeat_one_rounded,
-                                        size: 13,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                    ],
                                     const SizedBox(width: 6),
                                     Text(
                                       '${_formatDuration(audioState.position)} / ${_formatDuration(audioState.duration)}',
                                       style: GoogleFonts.outfit(
-                                        fontSize: 11,
+                                        fontSize: 10.5,
                                         color: isDark
                                             ? Colors.white60
                                             : Colors.black54,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    // Botón interactivo de repetición continua (Loop)
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(10),
+                                      onTap: () {
+                                        ref
+                                            .read(globalAudioProvider.notifier)
+                                            .toggleLoop();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(2.0),
+                                        child: Icon(
+                                          audioState.isLooping
+                                              ? Icons.repeat_one_rounded
+                                              : Icons.repeat_rounded,
+                                          size: 14,
+                                          color: audioState.isLooping
+                                              ? accentColor
+                                              : (isDark
+                                                  ? Colors.white38
+                                                  : Colors.black38),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -200,28 +234,93 @@ class GlobalMiniPlayer extends ConsumerWidget {
                               ],
                             ),
                           ),
-                          // Botón Play / Pause
+                          // Controles: Retroceder 10s
                           IconButton(
-                            icon: Icon(
-                              audioState.isPlaying
-                                  ? Icons.pause_circle_filled_rounded
-                                  : Icons.play_circle_filled_rounded,
-                              size: 38,
-                              color: theme.colorScheme.primary,
+                            icon: const Icon(Icons.replay_10_rounded),
+                            iconSize: 22,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
                             ),
-                            tooltip: audioState.isPlaying ? 'Pausar' : 'Reanudar',
+                            color: isDark ? Colors.white70 : Colors.black87,
+                            tooltip: 'Retroceder 10s',
                             onPressed: () {
+                              ref
+                                  .read(globalAudioProvider.notifier)
+                                  .seekRelative(const Duration(seconds: -10));
+                            },
+                          ),
+                          const SizedBox(width: 2),
+                          // Botón Play / Pause hermoseado con resplandor
+                          GestureDetector(
+                            onTap: () {
                               ref
                                   .read(globalAudioProvider.notifier)
                                   .togglePlayPause();
                             },
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    accentColor,
+                                    accentColor.withValues(alpha: 0.85),
+                                  ],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accentColor.withValues(alpha: 0.45),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  audioState.isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  size: 22,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 2),
+                          // Controles: Avanzar 10s
+                          IconButton(
+                            icon: const Icon(Icons.forward_10_rounded),
+                            iconSize: 22,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            color: isDark ? Colors.white70 : Colors.black87,
+                            tooltip: 'Avanzar 10s',
+                            onPressed: () {
+                              ref
+                                  .read(globalAudioProvider.notifier)
+                                  .seekRelative(const Duration(seconds: 10));
+                            },
+                          ),
+                          const SizedBox(width: 2),
                           // Botón Cerrar (Detener)
                           IconButton(
                             icon: Icon(
                               Icons.close_rounded,
-                              size: 20,
+                              size: 19,
                               color: isDark ? Colors.white54 : Colors.black45,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 28,
+                              minHeight: 28,
                             ),
                             tooltip: 'Detener y cerrar',
                             onPressed: () {
@@ -233,20 +332,22 @@ class GlobalMiniPlayer extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    // Barra de progreso delgada al fondo
+                    // Barra de progreso delgada al fondo con color de colección
                     ClipRRect(
                       borderRadius: const BorderRadius.only(
                         bottomLeft: Radius.circular(22),
                         bottomRight: Radius.circular(22),
                       ),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 2.5,
-                        backgroundColor: isDark
-                            ? Colors.white.withValues(alpha: 0.08)
-                            : Colors.black.withValues(alpha: 0.06),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          theme.colorScheme.primary,
+                      child: SizedBox(
+                        height: 3,
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.black.withValues(alpha: 0.06),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            accentColor,
+                          ),
                         ),
                       ),
                     ),
@@ -260,4 +361,3 @@ class GlobalMiniPlayer extends ConsumerWidget {
     );
   }
 }
-

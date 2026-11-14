@@ -1378,32 +1378,53 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   final maxSlider = durationMs > 0 ? durationMs : 1.0;
                   final valueSlider = positionMs.clamp(0.0, maxSlider);
 
+                  final Color playerAccentColor = hymn.collection == 'especiales'
+                      ? const Color(0xFFA855F7)
+                      : (hymn.collection == 'coros'
+                          ? const Color(0xFF10B981)
+                          : theme.colorScheme.primary);
+
                   return Positioned(
                     left: 20,
                     right: 20,
                     bottom: (_showControlPanel ? (hymn.lyrics.contains('[') ? 295 : 195) : 20) + MediaQuery.of(context).padding.bottom,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(22),
                       child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: isDark 
-                              ? const Color(0xFF0F172A).withValues(alpha: 0.85) 
-                              : Colors.white.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(20),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: isDark 
+                                ? [
+                                    const Color(0xFF1E293B).withValues(alpha: 0.94),
+                                    const Color(0xFF0F172A).withValues(alpha: 0.98),
+                                  ]
+                                : [
+                                    Colors.white.withValues(alpha: 0.96),
+                                    const Color(0xFFF8FAFC).withValues(alpha: 0.96),
+                                  ],
+                            ),
+                            borderRadius: BorderRadius.circular(22),
                             border: Border.all(
-                              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                              color: playerAccentColor.withValues(alpha: 0.35),
                               width: 1.2,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-                                blurRadius: 10,
+                                color: playerAccentColor.withValues(alpha: isDark ? 0.20 : 0.08),
+                                blurRadius: 18,
+                                offset: const Offset(0, 5),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.08),
+                                blurRadius: 12,
                                 offset: const Offset(0, 4),
-                              )
-                            ]
+                              ),
+                            ],
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -1412,34 +1433,34 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                 children: [
                                   SpinningVinyl(
                                     isPlaying: globalAudio.isPlaying,
-                                    color: theme.colorScheme.primary,
-                                    size: 18,
+                                    color: playerAccentColor,
+                                    size: 20,
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
                                       'Reproduciendo: ${hymn.title}',
                                       style: GoogleFonts.outfit(
-                                        fontSize: 13,
+                                        fontSize: 13.5,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white70 : Colors.black87,
+                                        color: isDark ? Colors.white : Colors.black87,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   if (globalAudio.isLoading)
-                                    const SizedBox(
-                                      width: 14,
-                                      height: 14,
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+                                        valueColor: AlwaysStoppedAnimation<Color>(playerAccentColor),
                                       ),
                                     )
                                   else
                                     IconButton(
-                                      icon: const Icon(Icons.close_rounded, size: 18),
+                                      icon: const Icon(Icons.close_rounded, size: 19),
                                       constraints: const BoxConstraints(),
                                       padding: const EdgeInsets.all(4),
                                       onPressed: () {
@@ -1464,18 +1485,42 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                       ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: -10));
                                     },
                                   ),
-                                  IconButton(
-                                    icon: Icon(
-                                      globalAudio.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
-                                      size: 38,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                                    onPressed: () {
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () {
                                       ref.read(globalAudioProvider.notifier).togglePlayPause();
                                     },
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            playerAccentColor,
+                                            playerAccentColor.withValues(alpha: 0.85),
+                                          ],
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: playerAccentColor.withValues(alpha: 0.45),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          globalAudio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                          size: 24,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
                                   ),
+                                  const SizedBox(width: 4),
                                   IconButton(
                                     icon: const Icon(Icons.forward_10_rounded, size: 24),
                                     padding: EdgeInsets.zero,
@@ -1490,7 +1535,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                     icon: Icon(
                                       globalAudio.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
                                       size: 22,
-                                      color: globalAudio.isLooping ? theme.colorScheme.primary : (isDark ? Colors.white60 : Colors.black54),
+                                      color: globalAudio.isLooping ? playerAccentColor : (isDark ? Colors.white60 : Colors.black54),
                                     ),
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
@@ -1517,9 +1562,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                     child: SliderTheme(
                                       data: SliderTheme.of(context).copyWith(
                                         trackHeight: 3.0,
-                                        activeTrackColor: theme.colorScheme.primary,
+                                        activeTrackColor: playerAccentColor,
                                         inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
-                                        thumbColor: theme.colorScheme.primary,
+                                        thumbColor: playerAccentColor,
                                         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                                         overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                                       ),
