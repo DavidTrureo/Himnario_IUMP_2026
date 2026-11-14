@@ -4,8 +4,9 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:go_router/go_router.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:just_audio/just_audio.dart' hide PlayerState;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
@@ -104,6 +105,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _metronomeTop = true;
   bool _metronomeVertical = false;
 
+  // Modo Atril / Culto (Pantalla limpia sin distracciones)
+  bool _isAtrilMode = false;
+  bool _isAtrilControlsMinimized = false;
+  Timer? _atrilAutoScrollTimer;
+  bool _isAtrilAutoScrolling = false;
+  double _atrilScrollSpeed = 1.0;
+
   // Modo de vista: 'texto' o 'partitura'
   String _viewMode = 'texto';
 
@@ -122,6 +130,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   YoutubePlayerController? _youtubeController;
   String? _activeYoutubeKey;
+  StreamSubscription? _youtubeSubscription;
+  bool _isDetailPlayerExpanded = false;
   final Map<int, ScrollController> _pageScrollControllers = {};
   bool _lockSwipe = false;
   bool _isVerticalDragging = false;
@@ -168,6 +178,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       '${hymn.collection}-${hymn.id}:$videoId';
 
   void _disposeYoutubePlayer({bool notify = true}) {
+    _youtubeSubscription?.cancel();
+    _youtubeSubscription = null;
     final controller = _youtubeController;
     final hadActive = controller != null || _activeYoutubeKey != null;
     _youtubeController = null;
@@ -187,14 +199,37 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     if (_activeYoutubeKey == targetKey && _youtubeController != null) {
       return;
     }
+
+    // Pausar audio global inmediatamente para evitar colisión sonora
+    // y sincronizar el estado del botón a Play (▶) de inmediato
+    try {
+      if (ref.read(globalAudioProvider).isPlaying) {
+        ref.read(globalAudioProvider.notifier).pause();
+      }
+    } catch (_) {}
+
     _disposeYoutubePlayer(notify: false);
     try {
-      _youtubeController = YoutubePlayerController.fromVideoId(
+      final controller = YoutubePlayerController.fromVideoId(
         videoId: videoId,
         autoPlay: true,
         params: const YoutubePlayerParams(showControls: true, mute: false),
       );
+      _youtubeController = controller;
       _activeYoutubeKey = targetKey;
+
+      // Suscripción al estado de reproducción de YouTube: si pasa a reproducir, pausar audio global
+      _youtubeSubscription?.cancel();
+      _youtubeSubscription = controller.stream.listen((value) {
+        if (value.playerState == PlayerState.playing) {
+          try {
+            if (ref.read(globalAudioProvider).isPlaying) {
+              ref.read(globalAudioProvider.notifier).pause();
+            }
+          } catch (_) {}
+        }
+      });
+
       if (mounted) {
         setState(() {});
       }
@@ -308,10 +343,70 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     _pageDrag = null;
     _resetPageScrollControllers();
 
+    _stopAtrilAutoScroll();
+    if (_isAtrilMode) {
+      try {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } catch (_) {}
+    }
     _pageController?.dispose();
     _stopAndDisposeAudio();
     _disposeYoutubePlayer(notify: false);
     super.dispose();
+  }
+
+  void _toggleAtrilMode() {
+    setState(() {
+      _isAtrilMode = !_isAtrilMode;
+      if (_isAtrilMode) {
+        _showControlPanel = false;
+        _isAtrilControlsMinimized = false;
+        try {
+          WakelockPlus.enable();
+        } catch (_) {}
+        try {
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        } catch (_) {}
+      } else {
+        _stopAtrilAutoScroll();
+        _isAtrilAutoScrolling = false;
+        try {
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        } catch (_) {}
+      }
+    });
+  }
+
+  void _toggleAtrilAutoScroll() {
+    setState(() {
+      _isAtrilAutoScrolling = !_isAtrilAutoScrolling;
+      if (_isAtrilAutoScrolling) {
+        _startAtrilAutoScroll();
+      } else {
+        _stopAtrilAutoScroll();
+      }
+    });
+  }
+
+  void _startAtrilAutoScroll() {
+    _atrilAutoScrollTimer?.cancel();
+    _atrilAutoScrollTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      final controller = _activeScrollController;
+      if (controller != null && controller.hasClients) {
+        if (controller.offset >= controller.position.maxScrollExtent) {
+          _stopAtrilAutoScroll();
+          if (mounted) setState(() => _isAtrilAutoScrolling = false);
+          return;
+        }
+        final delta = 1.2 * _atrilScrollSpeed;
+        controller.jumpTo((controller.offset + delta).clamp(0.0, controller.position.maxScrollExtent));
+      }
+    });
+  }
+
+  void _stopAtrilAutoScroll() {
+    _atrilAutoScrollTimer?.cancel();
+    _atrilAutoScrollTimer = null;
   }
 
   void _scrollDownByHalfPage() {
@@ -523,6 +618,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final dbStatus = ref.watch(databaseStatusProvider);
 
+    // Sincronización bidireccional: si el usuario reanuda el audio global, pausar YouTube para evitar conflicto
+    ref.listen<GlobalAudioState>(globalAudioProvider, (previous, next) {
+      if (next.isPlaying && _youtubeController != null) {
+        try {
+          _youtubeController?.pauseVideo();
+        } catch (_) {}
+      }
+    });
+
     // Usar datos previos durante la recarga para evitar pantalla en blanco
     final hymns = allHymnsAsync.whenOrNull(data: (d) => d);
 
@@ -616,10 +720,14 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             : (hymn.collection == 'especiales' ? '✨ ALABANZAS ESPECIALES' : '🔥 COROS DE AVIVAMIENTO'));
 
     return PopScope(
-      canPop: true,
+      canPop: !_isAtrilMode,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           _clearLastViewedHymn();
+          return;
+        }
+        if (_isAtrilMode) {
+          _toggleAtrilMode();
         }
       },
       child: Focus(
@@ -655,7 +763,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         },
         child: Scaffold(
           extendBodyBehindAppBar: true,
-          appBar: AppBar(
+          appBar: _isAtrilMode ? null : AppBar(
             elevation: 0,
             backgroundColor: Colors.transparent,
             leading: IconButton(
@@ -750,6 +858,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   },
                 ),
               IconButton(
+                icon: const Icon(Icons.auto_stories_rounded),
+                tooltip: 'Modo Atril / Culto (Pantalla Limpia)',
+                onPressed: _toggleAtrilMode,
+              ),
+              IconButton(
                 icon: const Icon(Icons.playlist_add_rounded),
                 tooltip: 'Agregar a Repertorio',
                 onPressed: () {
@@ -785,6 +898,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       Navigator.of(context).push(MaterialPageRoute(
                         builder: (context) => ObsRemoteScreen(hymn: hymn),
                       ));
+                      break;
+                    case 'atril_mode':
+                      _toggleAtrilMode();
                       break;
                     case 'metronome':
                       setState(() {
@@ -833,6 +949,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         ],
                       ),
                     ),
+                  PopupMenuItem(
+                    value: 'atril_mode',
+                    child: Row(
+                      children: [
+                        Icon(Icons.auto_stories_rounded, color: theme.colorScheme.primary),
+                        const SizedBox(width: 10),
+                        Text('Modo Atril / Culto', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'metronome',
                     child: Row(
@@ -1007,6 +1133,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                             physics: const _ManualOnlyPageScrollPhysics(),
                             itemCount: _sortedHymns.length,
                             onPageChanged: (index) {
+                              if (_isAtrilAutoScrolling) {
+                                _stopAtrilAutoScroll();
+                                _isAtrilAutoScrolling = false;
+                              }
                               setState(() {
                                 _currentIndex = index;
                                 _transposeOffset = 0; // Resetear transposición al cambiar de himno
@@ -1111,6 +1241,37 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                               ],
                             ),
                             const Divider(height: 12),
+                            InkWell(
+                              onTap: _toggleAtrilMode,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.auto_stories_rounded, size: 18, color: theme.colorScheme.primary),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Entrar a Modo Atril / Culto',
+                                      style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                             if (hymn.lyrics.contains('[')) ...[
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1340,7 +1501,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.2),
 
               // Botón flotante para abrir los Ajustes de Lectura
-              if (!_showControlPanel)
+              if (!_isAtrilMode && !_showControlPanel)
                 Positioned(
                   right: 20,
                   bottom: (_showPlayerCard ? 150 : 20) + MediaQuery.of(context).padding.bottom,
@@ -1361,39 +1522,66 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
 
 
-              // Reproductor de Audio Flotante (Glassmorphic)
-              // Reproductor de Audio Flotante (Glassmorphic con estado global)
+              // Barra Flotante de Controles en Modo Atril / Culto
+              if (_isAtrilMode)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 20 + MediaQuery.of(context).padding.bottom,
+                  child: Center(
+                    child: _buildAtrilFloatingBar(context, hymn, isDark, theme),
+                  ),
+                ),
+
+              // Reproductor de Audio Flotante (Glassmorphic Adaptativo: Compacto en teléfonos, Estudio en tablets)
               Builder(
                 builder: (context) {
                   final globalAudio = ref.watch(globalAudioProvider);
                   final isCurrentHymnAudio = globalAudio.hymn?.id == hymn.id && globalAudio.hymn?.collection == hymn.collection;
-                  final shouldShowCard = (_showPlayerCard || globalAudio.isVisible) && isCurrentHymnAudio;
+                  final shouldShowCard = (_showPlayerCard && isCurrentHymnAudio) || (globalAudio.isVisible && globalAudio.hymn != null);
 
                   if (!shouldShowCard) {
                     return const SizedBox.shrink();
                   }
 
+                  final activeHymn = globalAudio.hymn ?? hymn;
                   final durationMs = globalAudio.duration.inMilliseconds.toDouble();
                   final positionMs = globalAudio.position.inMilliseconds.toDouble();
                   final maxSlider = durationMs > 0 ? durationMs : 1.0;
                   final valueSlider = positionMs.clamp(0.0, maxSlider);
 
-                  final Color playerAccentColor = hymn.collection == 'especiales'
+                  final Color playerAccentColor = activeHymn.collection == 'especiales'
                       ? const Color(0xFFA855F7)
-                      : (hymn.collection == 'coros'
+                      : (activeHymn.collection == 'coros'
                           ? const Color(0xFF10B981)
                           : theme.colorScheme.primary);
 
+                  final displayTitle = activeHymn.collection == 'iump'
+                      ? '${activeHymn.id}. ${activeHymn.title}'
+                      : activeHymn.title;
+
+                  final screenWidth = MediaQuery.of(context).size.width;
+                  final isTablet = screenWidth >= 600;
+                  final isCompact = !isTablet && !_isDetailPlayerExpanded;
+
+                  final double bottomPos;
+                  if (_isAtrilMode) {
+                    bottomPos = (_isAtrilControlsMinimized ? 20.0 : 80.0) + MediaQuery.of(context).padding.bottom;
+                  } else if (_showControlPanel) {
+                    bottomPos = (hymn.lyrics.contains('[') ? (isCompact ? 220.0 : 295.0) : (isCompact ? 145.0 : 195.0)) + MediaQuery.of(context).padding.bottom;
+                  } else {
+                    bottomPos = (isCompact ? 14.0 : 20.0) + MediaQuery.of(context).padding.bottom;
+                  }
+
                   return Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: (_showControlPanel ? (hymn.lyrics.contains('[') ? 295 : 195) : 20) + MediaQuery.of(context).padding.bottom,
+                    left: isTablet ? ((screenWidth - 680) / 2).clamp(20.0, screenWidth) : 14,
+                    right: isTablet ? ((screenWidth - 680) / 2).clamp(20.0, screenWidth) : 14,
+                    bottom: bottomPos,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(20),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
@@ -1408,7 +1596,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                                     const Color(0xFFF8FAFC).withValues(alpha: 0.96),
                                   ],
                             ),
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: playerAccentColor.withValues(alpha: 0.35),
                               width: 1.2,
@@ -1416,188 +1604,397 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                             boxShadow: [
                               BoxShadow(
                                 color: playerAccentColor.withValues(alpha: isDark ? 0.20 : 0.08),
-                                blurRadius: 18,
-                                offset: const Offset(0, 5),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
                               ),
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.08),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+                                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                children: [
-                                  SpinningVinyl(
-                                    isPlaying: globalAudio.isPlaying,
-                                    color: playerAccentColor,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Reproduciendo: ${hymn.title}',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark ? Colors.white : Colors.black87,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (globalAudio.isLoading)
-                                    SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(playerAccentColor),
-                                      ),
-                                    )
-                                  else
-                                    IconButton(
-                                      icon: const Icon(Icons.close_rounded, size: 19),
-                                      constraints: const BoxConstraints(),
-                                      padding: const EdgeInsets.all(4),
-                                      onPressed: () {
-                                        setState(() {
-                                          _showPlayerCard = false;
-                                        });
-                                        ref.read(globalAudioProvider.notifier).stopAndClose();
-                                      },
-                                    ),
-                                ],
-                              ),
-                              const Divider(height: 12),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.replay_10_rounded, size: 24),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                    color: isDark ? Colors.white70 : Colors.black54,
-                                    tooltip: 'Retroceder 10s',
-                                    onPressed: () {
-                                      ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: -10));
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-                                  GestureDetector(
-                                    onTap: () {
-                                      ref.read(globalAudioProvider.notifier).togglePlayPause();
-                                    },
-                                    child: Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            playerAccentColor,
-                                            playerAccentColor.withValues(alpha: 0.85),
-                                          ],
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: playerAccentColor.withValues(alpha: 0.45),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 2),
+                          child: isCompact
+                              ? Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+                                      child: Row(
+                                        children: [
+                                          SpinningVinyl(
+                                            isPlaying: globalAudio.isPlaying,
+                                            color: playerAccentColor,
+                                            size: 24,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  displayTitle,
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isDark ? Colors.white : Colors.black87,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                Text(
+                                                  '${_formatDuration(globalAudio.position)} / ${_formatDuration(globalAudio.duration)}',
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: isDark ? Colors.white60 : Colors.black54,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.replay_10_rounded, size: 22),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            color: isDark ? Colors.white70 : Colors.black54,
+                                            tooltip: 'Retroceder 10s',
+                                            onPressed: () {
+                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: -10));
+                                            },
+                                          ),
+                                          const SizedBox(width: 2),
+                                          GestureDetector(
+                                            onTap: () {
+                                              ref.read(globalAudioProvider.notifier).togglePlayPause();
+                                            },
+                                            child: Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    playerAccentColor,
+                                                    playerAccentColor.withValues(alpha: 0.85),
+                                                  ],
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: playerAccentColor.withValues(alpha: 0.45),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Center(
+                                                child: globalAudio.isLoading
+                                                    ? const SizedBox(
+                                                        width: 16,
+                                                        height: 16,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                        ),
+                                                      )
+                                                    : Icon(
+                                                        globalAudio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                                        size: 22,
+                                                        color: Colors.white,
+                                                      ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 2),
+                                          IconButton(
+                                            icon: const Icon(Icons.forward_10_rounded, size: 22),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            color: isDark ? Colors.white70 : Colors.black54,
+                                            tooltip: 'Avanzar 10s',
+                                            onPressed: () {
+                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: 10));
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: Icon(
+                                              globalAudio.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                                              size: 20,
+                                              color: globalAudio.isLooping ? playerAccentColor : (isDark ? Colors.white60 : Colors.black54),
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                            tooltip: globalAudio.isLooping ? 'Repetición activada' : 'Repetir canto',
+                                            onPressed: () {
+                                              ref.read(globalAudioProvider.notifier).toggleLoop();
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 26, minHeight: 30),
+                                            color: isDark ? Colors.white54 : Colors.black45,
+                                            tooltip: 'Expandir controles',
+                                            onPressed: () {
+                                              setState(() {
+                                                _isDetailPlayerExpanded = true;
+                                              });
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.close_rounded, size: 18),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 26, minHeight: 30),
+                                            color: isDark ? Colors.white54 : Colors.black45,
+                                            tooltip: 'Cerrar reproductor',
+                                            onPressed: () {
+                                              setState(() {
+                                                _showPlayerCard = false;
+                                              });
+                                              ref.read(globalAudioProvider.notifier).stopAndClose();
+                                            },
                                           ),
                                         ],
                                       ),
-                                      child: Center(
-                                        child: Icon(
-                                          globalAudio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                          size: 24,
-                                          color: Colors.white,
-                                        ),
-                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    icon: const Icon(Icons.forward_10_rounded, size: 24),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                    color: isDark ? Colors.white70 : Colors.black54,
-                                    tooltip: 'Avanzar 10s',
-                                    onPressed: () {
-                                      ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: 10));
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: Icon(
-                                      globalAudio.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
-                                      size: 22,
-                                      color: globalAudio.isLooping ? playerAccentColor : (isDark ? Colors.white60 : Colors.black54),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                                    tooltip: globalAudio.isLooping ? 'Repetición activada (Loop)' : 'Repetir canto continuamente',
-                                    onPressed: () {
-                                      final willBeLooping = !globalAudio.isLooping;
-                                      ref.read(globalAudioProvider.notifier).toggleLoop();
-                                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            willBeLooping ? '🔂 Repetición continua activada' : 'Repetición continua desactivada',
-                                            style: GoogleFonts.outfit(),
+                                    LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        return GestureDetector(
+                                          behavior: HitTestBehavior.opaque,
+                                          onHorizontalDragUpdate: (details) {
+                                            if (globalAudio.duration.inMilliseconds > 0 && constraints.maxWidth > 0) {
+                                              final ratio = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                                              final targetMs = (ratio * globalAudio.duration.inMilliseconds).toInt();
+                                              ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: targetMs));
+                                            }
+                                          },
+                                          onTapDown: (details) {
+                                            if (globalAudio.duration.inMilliseconds > 0 && constraints.maxWidth > 0) {
+                                              final ratio = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                                              final targetMs = (ratio * globalAudio.duration.inMilliseconds).toInt();
+                                              ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: targetMs));
+                                            }
+                                          },
+                                          child: Container(
+                                            height: 3.5,
+                                            width: double.infinity,
+                                            color: isDark ? Colors.white12 : Colors.black12,
+                                            alignment: Alignment.centerLeft,
+                                            child: FractionallySizedBox(
+                                              widthFactor: (globalAudio.duration.inMilliseconds > 0)
+                                                  ? (globalAudio.position.inMilliseconds / globalAudio.duration.inMilliseconds).clamp(0.0, 1.0)
+                                                  : 0.0,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: playerAccentColor,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: playerAccentColor.withValues(alpha: 0.6),
+                                                      blurRadius: 4,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
                                           ),
-                                          duration: const Duration(seconds: 1),
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: SliderTheme(
-                                      data: SliderTheme.of(context).copyWith(
-                                        trackHeight: 3.0,
-                                        activeTrackColor: playerAccentColor,
-                                        inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
-                                        thumbColor: playerAccentColor,
-                                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                      ),
-                                      child: Slider(
-                                        min: 0.0,
-                                        max: maxSlider,
-                                        value: valueSlider,
-                                        onChanged: (val) {
-                                          ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: val.toInt()));
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      _formatDuration(globalAudio.position),
-                                      style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
-                                    ),
-                                    Text(
-                                      _formatDuration(globalAudio.duration),
-                                      style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
+                                        );
+                                      },
                                     ),
                                   ],
+                                )
+                              : Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          SpinningVinyl(
+                                            isPlaying: globalAudio.isPlaying,
+                                            color: playerAccentColor,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              'Reproduciendo: $displayTitle',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: isDark ? Colors.white : Colors.black87,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (globalAudio.isLoading)
+                                            SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(playerAccentColor),
+                                              ),
+                                            )
+                                          else ...[
+                                            if (!isTablet)
+                                              IconButton(
+                                                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 21),
+                                                constraints: const BoxConstraints(),
+                                                padding: const EdgeInsets.all(4),
+                                                tooltip: 'Minimizar a barra compacta',
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _isDetailPlayerExpanded = false;
+                                                  });
+                                                },
+                                              ),
+                                            IconButton(
+                                              icon: const Icon(Icons.close_rounded, size: 19),
+                                              constraints: const BoxConstraints(),
+                                              padding: const EdgeInsets.all(4),
+                                              tooltip: 'Cerrar reproductor',
+                                              onPressed: () {
+                                                setState(() {
+                                                  _showPlayerCard = false;
+                                                });
+                                                ref.read(globalAudioProvider.notifier).stopAndClose();
+                                              },
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const Divider(height: 12),
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.replay_10_rounded, size: 24),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                            color: isDark ? Colors.white70 : Colors.black54,
+                                            tooltip: 'Retroceder 10s',
+                                            onPressed: () {
+                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: -10));
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          GestureDetector(
+                                            onTap: () {
+                                              ref.read(globalAudioProvider.notifier).togglePlayPause();
+                                            },
+                                            child: Container(
+                                              width: 40,
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: [
+                                                    playerAccentColor,
+                                                    playerAccentColor.withValues(alpha: 0.85),
+                                                  ],
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: playerAccentColor.withValues(alpha: 0.45),
+                                                    blurRadius: 10,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Center(
+                                                child: Icon(
+                                                  globalAudio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                                  size: 24,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            icon: const Icon(Icons.forward_10_rounded, size: 24),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                            color: isDark ? Colors.white70 : Colors.black54,
+                                            tooltip: 'Avanzar 10s',
+                                            onPressed: () {
+                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: 10));
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: Icon(
+                                              globalAudio.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                                              size: 22,
+                                              color: globalAudio.isLooping ? playerAccentColor : (isDark ? Colors.white60 : Colors.black54),
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                            tooltip: globalAudio.isLooping ? 'Repetición activada (Loop)' : 'Repetir canto continuamente',
+                                            onPressed: () {
+                                              final willBeLooping = !globalAudio.isLooping;
+                                              ref.read(globalAudioProvider.notifier).toggleLoop();
+                                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    willBeLooping ? '🔂 Repetición continua activada' : 'Repetición continua desactivada',
+                                                    style: GoogleFonts.outfit(),
+                                                  ),
+                                                  duration: const Duration(seconds: 1),
+                                                  behavior: SnackBarBehavior.floating,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: SliderTheme(
+                                              data: SliderTheme.of(context).copyWith(
+                                                trackHeight: 3.0,
+                                                activeTrackColor: playerAccentColor,
+                                                inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
+                                                thumbColor: playerAccentColor,
+                                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                              ),
+                                              child: Slider(
+                                                min: 0.0,
+                                                max: maxSlider,
+                                                value: valueSlider,
+                                                onChanged: (val) {
+                                                  ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: val.toInt()));
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _formatDuration(globalAudio.position),
+                                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
+                                            ),
+                                            Text(
+                                              _formatDuration(globalAudio.duration),
+                                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                     ),
@@ -1860,7 +2257,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? theme.colorScheme.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
@@ -1869,19 +2266,348 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           children: [
             Icon(
               icon,
-              size: 18,
+              size: 17,
               color: isSelected ? theme.colorScheme.onPrimary : (isDark ? Colors.white70 : Colors.black54),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               label,
               style: GoogleFonts.outfit(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 color: isSelected ? theme.colorScheme.onPrimary : (isDark ? Colors.white70 : Colors.black54),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAtrilHeader(Hymn hymn, String displayedTone, bool isDark, ThemeData theme) {
+    final title = hymn.collection == 'iump' ? 'Himno ${hymn.id} • ${hymn.title}' : hymn.title;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (hymn.beats.isNotEmpty || hymn.timeSignature.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      [
+                        if (hymn.beats.isNotEmpty) hymn.beats,
+                        if (hymn.timeSignature.isNotEmpty) '(${hymn.timeSignature})',
+                      ].join(' • '),
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        color: isDark ? Colors.white54 : Colors.black45,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (displayedTone.isNotEmpty) ...[
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.music_note_rounded,
+                    size: 14,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Tono $displayedTone',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAtrilFloatingBar(BuildContext context, Hymn hymn, bool isDark, ThemeData theme) {
+    if (_isAtrilControlsMinimized) {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _isAtrilControlsMinimized = false;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF0F172A).withValues(alpha: 0.85)
+                : Colors.white.withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.4),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _isAtrilAutoScrolling ? Icons.pause_circle_filled_rounded : Icons.auto_stories_rounded,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _isAtrilAutoScrolling ? 'Autoscroll Activo' : 'Controles Atril',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF0F172A).withValues(alpha: 0.90)
+                : Colors.white.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.35),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Botón Salir de Modo Atril
+              Tooltip(
+                message: 'Salir del Modo Atril',
+                child: InkWell(
+                  onTap: _toggleAtrilMode,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.fullscreen_exit_rounded, size: 18, color: Colors.redAccent),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Salir',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(height: 20, width: 1, color: isDark ? Colors.white12 : Colors.black12),
+              const SizedBox(width: 6),
+
+              // Scroll manual: Subir media página
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                iconSize: 24,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                tooltip: 'Subir página',
+                onPressed: _scrollUpByHalfPage,
+              ),
+
+              // Scroll manual: Bajar media página
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                iconSize: 24,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                tooltip: 'Bajar página',
+                onPressed: _scrollDownByHalfPage,
+              ),
+              const SizedBox(width: 4),
+              Container(height: 20, width: 1, color: isDark ? Colors.white12 : Colors.black12),
+              const SizedBox(width: 6),
+
+              // Botón Desplazamiento automático (Autoscroll)
+              Tooltip(
+                message: _isAtrilAutoScrolling ? 'Pausar autoscroll' : 'Iniciar autoscroll manos libres',
+                child: InkWell(
+                  onTap: _toggleAtrilAutoScroll,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _isAtrilAutoScrolling
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isAtrilAutoScrolling ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          size: 16,
+                          color: _isAtrilAutoScrolling ? Colors.white : theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Auto',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: _isAtrilAutoScrolling ? Colors.white : theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Si está activo el autoscroll, botón selector de velocidad
+              if (_isAtrilAutoScrolling) ...[
+                const SizedBox(width: 4),
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    setState(() {
+                      if (_atrilScrollSpeed == 0.7) {
+                        _atrilScrollSpeed = 1.0;
+                      } else if (_atrilScrollSpeed == 1.0) {
+                        _atrilScrollSpeed = 1.5;
+                      } else if (_atrilScrollSpeed == 1.5) {
+                        _atrilScrollSpeed = 2.0;
+                      } else {
+                        _atrilScrollSpeed = 0.7;
+                      }
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${_atrilScrollSpeed}x',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(width: 4),
+              Container(height: 20, width: 1, color: isDark ? Colors.white12 : Colors.black12),
+              const SizedBox(width: 4),
+
+              // Ajuste rápido de tamaño letra: A- y A+
+              IconButton(
+                icon: const Text('A-', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 32),
+                tooltip: 'Reducir letra',
+                onPressed: () {
+                  ref.read(fontSizeProvider.notifier).decrease();
+                },
+              ),
+              IconButton(
+                icon: const Text('A+', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 32),
+                tooltip: 'Aumentar letra',
+                onPressed: () {
+                  ref.read(fontSizeProvider.notifier).increase();
+                },
+              ),
+
+              // Botón minimizar controles
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 26, minHeight: 32),
+                tooltip: 'Minimizar controles',
+                onPressed: () {
+                  setState(() {
+                    _isAtrilControlsMinimized = true;
+                  });
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2193,12 +2919,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.all(4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildViewToggle('texto', 'Letra y Acordes', Icons.text_format_rounded, isDark, theme),
-              _buildViewToggle('partitura', 'Partitura Oficial', Icons.library_music_rounded, isDark, theme),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildViewToggle('texto', 'Letra y Acordes', Icons.text_format_rounded, isDark, theme),
+                _buildViewToggle('partitura', 'Partitura Oficial', Icons.library_music_rounded, isDark, theme),
+              ],
+            ),
           ),
         ),
       ],
@@ -2216,7 +2946,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   ) {
     final hasChords = hymn.lyrics.contains('[');
     final displayedTone = _getTransposedTone(hymn.tone, _transposeOffset);
-    final header = _buildHymnHeader(hymn, pageIndex, fontSize, isDark, theme, displayedTone);
+    final effectiveFontSize = _isAtrilMode ? (fontSize * 1.15).clamp(16.0, 36.0) : fontSize;
+    final header = _isAtrilMode
+        ? _buildAtrilHeader(hymn, displayedTone, isDark, theme)
+        : _buildHymnHeader(hymn, pageIndex, fontSize, isDark, theme, displayedTone);
 
     return SizedBox.expand(
       child: SafeArea(
@@ -2231,7 +2964,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
                   20.0, 
-                  16.0, 
+                  _isAtrilMode ? (MediaQuery.of(context).padding.top + 20.0) : 16.0, 
                   20.0, 
                   100.0 + MediaQuery.of(context).padding.bottom
                 ),
@@ -2248,7 +2981,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           child: Divider(indent: 80, endIndent: 80, thickness: 1, color: Colors.black12),
                         ).animate().fadeIn(delay: 200.ms),
                         ..._getMergedBlocksCached(hymn.lyrics, _transposeOffset).map(
-                          (block) => _buildLyricsBlock(context, hymn, block, fontSize, isDark, theme)
+                          (block) => _buildLyricsBlock(context, hymn, block, effectiveFontSize, isDark, theme)
                         ),
                         if (_sortedHymns.length > 1)
                           _buildBottomHymnNavigator(pageIndex, isDark, theme),

@@ -11,6 +11,7 @@ import 'package:himnario_iump/features/hymns/presentation/scanner_result_screen.
 import 'package:himnario_iump/features/hymns/presentation/widgets/semantic_search_dialog.dart';
 import 'package:himnario_iump/core/services/spanish_accent_engine.dart';
 import 'package:himnario_iump/core/services/spanish_grammar_corrector.dart';
+import 'package:himnario_iump/core/services/global_audio_service.dart';
 
 class _FakeAdminModeNotifier extends AdminModeNotifier {
   final bool initialValue;
@@ -1007,6 +1008,66 @@ void main() {
         expect(find.byKey(const ValueKey('yt_thumb_especiales_3_aqz-KE-bpKQ')), findsOneWidget);
         expect(find.byKey(const ValueKey('yt_thumb_especiales_2_M7lc1UVf-VE')), findsNothing);
         expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'HymnDetailScreen muestra reproductor compacto en pantalla de teléfono y expandido en tablet',
+      (tester) async {
+        final catalog = [
+          Hymn(
+            id: 10,
+            title: 'CANTO CON AUDIO',
+            toneNote: 'DO',
+            beats: '4',
+            timeSignature: '4/4',
+            lyrics: 'Letra del canto con audio',
+            collection: 'especiales',
+            audioUrl: 'https://example.com/audio.mp3',
+          ),
+        ];
+
+        // 1. En pantalla de teléfono (ancho 390 < 600)
+        tester.view.physicalSize = const Size(390 * 2, 844 * 2);
+        tester.view.devicePixelRatio = 2.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              adminModeProvider.overrideWith(() => _FakeAdminModeNotifier(false)),
+              allHymnsGlobalProvider.overrideWithValue(AsyncValue.data(catalog)),
+              globalAudioProvider.overrideWith(() => GlobalAudioNotifier()),
+            ],
+            child: const MaterialApp(
+              home: HymnDetailScreen(hymnId: 'especiales-10'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Presionar botón de audio en el AppBar para activar el reproductor
+        await tester.tap(find.byTooltip('Escuchar audio (Streaming)'));
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // En teléfono (< 600) se debe mostrar la barra compacta con botón 'Expandir controles'
+        expect(find.byTooltip('Expandir controles'), findsOneWidget);
+
+        // 2. Cambiar a pantalla de tablet (ancho 834 >= 600)
+        tester.view.physicalSize = const Size(834 * 2, 1194 * 2);
+        tester.view.devicePixelRatio = 2.0;
+        await tester.pump(const Duration(milliseconds: 300));
+
+        // En tablet (>= 600) se muestra el Slider Theme completo del reproductor de estudio
+        expect(find.byType(Slider), findsOneWidget);
+        expect(find.byTooltip('Expandir controles'), findsNothing);
+
+        // Desmontar el widget y avanzar el timer pendiente del AppBar marquee
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 3));
       },
     );
   });
