@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:himnario_iump/core/services/app_telemetry_service.dart';
+import 'package:himnario_iump/core/services/global_audio_service.dart';
 import 'package:himnario_iump/features/favorites/domain/favorites_notifier.dart';
 import 'package:himnario_iump/features/home/presentation/feature_guide_screen.dart';
 import 'package:himnario_iump/features/home/presentation/tools_screen.dart';
@@ -224,6 +225,19 @@ void main() {
   group('HymnDetailScreen Audio Management Tests', () {
     test('stopGlobalAudio limpia sin arrojar excepciones incluso si no hay reproductor activo', () {
       expect(() => HymnDetailScreen.stopGlobalAudio(), returnsNormally);
+    });
+
+    test('globalAudioProvider inicializa en estado inactivo y stopAndClose limpia', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final state = container.read(globalAudioProvider);
+      expect(state.isPlaying, isFalse);
+      expect(state.isVisible, isFalse);
+      expect(state.hymn, isNull);
+
+      await container.read(globalAudioProvider.notifier).stopAndClose();
+      expect(container.read(globalAudioProvider).isVisible, isFalse);
     });
   });
 

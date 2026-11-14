@@ -18,6 +18,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import '../domain/hymn.dart';
 import '../../../core/services/gemini_ai_service.dart';
+import '../../../core/services/global_audio_service.dart';
 import 'hymn_list_screen.dart';
 import 'notation_provider.dart';
 import 'presentation_screen.dart';
@@ -75,6 +76,7 @@ class HymnDetailScreen extends ConsumerStatefulWidget {
 
   /// Detiene y limpia cualquier reproducción de audio activa en la aplicación.
   static void stopGlobalAudio() {
+    GlobalAudioNotifier.stopActiveGlobalAudio();
     final player = _activeGlobalAudioPlayer;
     if (player != null) {
       try {
@@ -617,7 +619,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
-          _stopAndDisposeAudio();
           _clearLastViewedHymn();
         }
       },
@@ -660,7 +661,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
               onPressed: () {
-                _stopAndDisposeAudio();
                 _clearLastViewedHymn();
                 if (context.canPop()) {
                   context.pop();
@@ -702,54 +702,51 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   onPressed: () => _downloadAudio(hymn),
                 ),
               if (hymn.audioUrl.isNotEmpty)
-                IconButton(
-                  icon: Icon(
-                    hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')
-                        ? Icons.play_circle_filled_rounded
-                        : (_audioPlayer != null && _isPlaying
-                            ? Icons.pause_circle_filled_rounded
-                            : Icons.play_circle_filled_rounded),
-                    color: hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')
-                        ? Colors.redAccent
-                        : (_audioPlayer != null && _isPlaying ? theme.colorScheme.primary : null),
-                  ),
-                  tooltip: hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')
-                      ? 'Ver en YouTube (Enlace Oficial)'
-                      : (_isPlaying ? 'Pausar audio' : 'Escuchar audio (Streaming)'),
-                  onPressed: () {
-                    final isYoutube = hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be');
-                    if (isYoutube) {
-                      final uri = Uri.parse(hymn.audioUrl.trim());
-                      launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) {
-                        return launchUrl(uri, mode: LaunchMode.platformDefault);
-                      }).catchError((e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('No se pudo abrir el enlace: $e'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                        return false;
-                      });
-                    } else {
-                      if (_audioPlayer != null && _currentAudioUrl == hymn.audioUrl) {
-                        setState(() {
-                          _showPlayerCard = true;
-                        });
-                        if (_isPlaying) {
-                          _audioPlayer!.pause();
+                Builder(
+                  builder: (context) {
+                    final globalAudio = ref.watch(globalAudioProvider);
+                    final isThisHymnAudio = globalAudio.hymn?.id == hymn.id && globalAudio.hymn?.collection == hymn.collection;
+                    final isPlayingThis = isThisHymnAudio && globalAudio.isPlaying;
+
+                    return IconButton(
+                      icon: Icon(
+                        hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')
+                            ? Icons.play_circle_filled_rounded
+                            : (isPlayingThis
+                                ? Icons.pause_circle_filled_rounded
+                                : Icons.play_circle_filled_rounded),
+                        color: hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')
+                            ? Colors.redAccent
+                            : (isPlayingThis ? theme.colorScheme.primary : null),
+                      ),
+                      tooltip: hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be')
+                          ? 'Ver en YouTube (Enlace Oficial)'
+                          : (isPlayingThis ? 'Pausar audio' : 'Escuchar audio (Streaming)'),
+                      onPressed: () {
+                        final isYoutube = hymn.audioUrl.contains('youtube.com') || hymn.audioUrl.contains('youtu.be');
+                        if (isYoutube) {
+                          final uri = Uri.parse(hymn.audioUrl.trim());
+                          launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) {
+                            return launchUrl(uri, mode: LaunchMode.platformDefault);
+                          }).catchError((e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('No se pudo abrir el enlace: $e'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return false;
+                          });
                         } else {
-                          _audioPlayer!.play();
+                          setState(() {
+                            _showPlayerCard = true;
+                          });
+                          ref.read(globalAudioProvider.notifier).playHymn(hymn);
                         }
-                      } else {
-                        setState(() {
-                          _showPlayerCard = true;
-                        });
-                        _initAudio(hymn.audioUrl);
-                      }
-                    }
+                      },
+                    );
                   },
                 ),
               IconButton(
@@ -1365,198 +1362,203 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
 
               // Reproductor de Audio Flotante (Glassmorphic)
-              if (_showPlayerCard && _audioPlayer != null)
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: (_showControlPanel ? (hymn.lyrics.contains('[') ? 295 : 195) : 20) + MediaQuery.of(context).padding.bottom,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isDark 
-                            ? const Color(0xFF0F172A).withValues(alpha: 0.85) 
-                            : Colors.white.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                            width: 1.2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            )
-                          ]
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              children: [
-                                SpinningVinyl(
-                                  isPlaying: _isPlaying,
-                                  color: theme.colorScheme.primary,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Reproduciendo: ${hymn.title}',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.white70 : Colors.black87,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (_isLoadingAudio)
-                                  const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
-                                    ),
-                                  )
-                                else
-                                  IconButton(
-                                    icon: const Icon(Icons.close_rounded, size: 18),
-                                    constraints: const BoxConstraints(),
-                                    padding: const EdgeInsets.all(4),
-                                    onPressed: () {
-                                      setState(() {
-                                        _showPlayerCard = false;
-                                        _audioPlayer?.stop();
-                                      });
-                                    },
-                                  ),
-                              ],
+              // Reproductor de Audio Flotante (Glassmorphic con estado global)
+              Builder(
+                builder: (context) {
+                  final globalAudio = ref.watch(globalAudioProvider);
+                  final isCurrentHymnAudio = globalAudio.hymn?.id == hymn.id && globalAudio.hymn?.collection == hymn.collection;
+                  final shouldShowCard = (_showPlayerCard || globalAudio.isVisible) && isCurrentHymnAudio;
+
+                  if (!shouldShowCard) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final durationMs = globalAudio.duration.inMilliseconds.toDouble();
+                  final positionMs = globalAudio.position.inMilliseconds.toDouble();
+                  final maxSlider = durationMs > 0 ? durationMs : 1.0;
+                  final valueSlider = positionMs.clamp(0.0, maxSlider);
+
+                  return Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: (_showControlPanel ? (hymn.lyrics.contains('[') ? 295 : 195) : 20) + MediaQuery.of(context).padding.bottom,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isDark 
+                              ? const Color(0xFF0F172A).withValues(alpha: 0.85) 
+                              : Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                              width: 1.2,
                             ),
-                            const Divider(height: 12),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.replay_10_rounded, size: 24),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                  color: isDark ? Colors.white70 : Colors.black54,
-                                  tooltip: 'Retroceder 10s',
-                                  onPressed: () {
-                                    if (_audioPlayer != null) {
-                                      final newPos = _position - const Duration(seconds: 10);
-                                      _audioPlayer!.seek(newPos < Duration.zero ? Duration.zero : newPos);
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    _isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
-                                    size: 38,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              )
+                            ]
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  SpinningVinyl(
+                                    isPlaying: globalAudio.isPlaying,
                                     color: theme.colorScheme.primary,
+                                    size: 18,
                                   ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                                  onPressed: () {
-                                    if (_isPlaying) {
-                                      _audioPlayer?.pause();
-                                    } else {
-                                      _audioPlayer?.play();
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.forward_10_rounded, size: 24),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                  color: isDark ? Colors.white70 : Colors.black54,
-                                  tooltip: 'Avanzar 10s',
-                                  onPressed: () {
-                                    if (_audioPlayer != null) {
-                                      final newPos = _position + const Duration(seconds: 10);
-                                      _audioPlayer!.seek(newPos > _duration ? _duration : newPos);
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    _isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
-                                    size: 22,
-                                    color: _isLooping ? theme.colorScheme.primary : (isDark ? Colors.white60 : Colors.black54),
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                                  tooltip: _isLooping ? 'Repetición activada (Loop)' : 'Repetir canto continuamente',
-                                  onPressed: () {
-                                    setState(() {
-                                      _isLooping = !_isLooping;
-                                      _audioPlayer?.setLoopMode(_isLooping ? LoopMode.one : LoopMode.off);
-                                    });
-                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          _isLooping ? '🔂 Repetición continua activada' : 'Repetición continua desactivada',
-                                          style: GoogleFonts.outfit(),
-                                        ),
-                                        duration: const Duration(seconds: 1),
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Reproduciendo: ${hymn.title}',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white70 : Colors.black87,
                                       ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: SliderTheme(
-                                    data: SliderTheme.of(context).copyWith(
-                                      trackHeight: 3.0,
-                                      activeTrackColor: theme.colorScheme.primary,
-                                      inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
-                                      thumbColor: theme.colorScheme.primary,
-                                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    child: Slider(
-                                      min: 0.0,
-                                      max: _duration.inMilliseconds.toDouble(),
-                                      value: _position.inMilliseconds.toDouble().clamp(0.0, _duration.inMilliseconds.toDouble()),
-                                      onChanged: (val) {
-                                        _audioPlayer?.seek(Duration(milliseconds: val.toInt()));
+                                  ),
+                                  if (globalAudio.isLoading)
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+                                      ),
+                                    )
+                                  else
+                                    IconButton(
+                                      icon: const Icon(Icons.close_rounded, size: 18),
+                                      constraints: const BoxConstraints(),
+                                      padding: const EdgeInsets.all(4),
+                                      onPressed: () {
+                                        setState(() {
+                                          _showPlayerCard = false;
+                                        });
+                                        ref.read(globalAudioProvider.notifier).stopAndClose();
                                       },
                                     ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                ],
+                              ),
+                              const Divider(height: 12),
+                              Row(
                                 children: [
-                                  Text(
-                                    _formatDuration(_position),
-                                    style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
+                                  IconButton(
+                                    icon: const Icon(Icons.replay_10_rounded, size: 24),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                    color: isDark ? Colors.white70 : Colors.black54,
+                                    tooltip: 'Retroceder 10s',
+                                    onPressed: () {
+                                      ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: -10));
+                                    },
                                   ),
-                                  Text(
-                                    _formatDuration(_duration),
-                                    style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
+                                  IconButton(
+                                    icon: Icon(
+                                      globalAudio.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
+                                      size: 38,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                                    onPressed: () {
+                                      ref.read(globalAudioProvider.notifier).togglePlayPause();
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.forward_10_rounded, size: 24),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                    color: isDark ? Colors.white70 : Colors.black54,
+                                    tooltip: 'Avanzar 10s',
+                                    onPressed: () {
+                                      ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: 10));
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      globalAudio.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                                      size: 22,
+                                      color: globalAudio.isLooping ? theme.colorScheme.primary : (isDark ? Colors.white60 : Colors.black54),
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                    tooltip: globalAudio.isLooping ? 'Repetición activada (Loop)' : 'Repetir canto continuamente',
+                                    onPressed: () {
+                                      final willBeLooping = !globalAudio.isLooping;
+                                      ref.read(globalAudioProvider.notifier).toggleLoop();
+                                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            willBeLooping ? '🔂 Repetición continua activada' : 'Repetición continua desactivada',
+                                            style: GoogleFonts.outfit(),
+                                          ),
+                                          duration: const Duration(seconds: 1),
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: SliderTheme(
+                                      data: SliderTheme.of(context).copyWith(
+                                        trackHeight: 3.0,
+                                        activeTrackColor: theme.colorScheme.primary,
+                                        inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
+                                        thumbColor: theme.colorScheme.primary,
+                                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                      ),
+                                      child: Slider(
+                                        min: 0.0,
+                                        max: maxSlider,
+                                        value: valueSlider,
+                                        onChanged: (val) {
+                                          ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: val.toInt()));
+                                        },
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _formatDuration(globalAudio.position),
+                                      style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
+                                    ),
+                                    Text(
+                                      _formatDuration(globalAudio.duration),
+                                      style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ).animate().fadeIn(duration: 200.ms).slideY(begin: 0.1),
+                  ).animate().fadeIn(duration: 200.ms).slideY(begin: 0.1);
+                },
+              ),
 
               // Metrónomo Flotante Interactivo (Ubicación Rápida mediante Botones Dedicados)
               if (_showMetronome)

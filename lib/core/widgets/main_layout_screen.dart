@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../features/hymns/presentation/hymn_detail_screen.dart';
+import 'global_mini_player.dart';
 
 class MainLayoutScreen extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -13,7 +13,6 @@ class MainLayoutScreen extends StatelessWidget {
   });
 
   void _goBranch(int index) {
-    HymnDetailScreen.stopGlobalAudio();
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -28,7 +27,6 @@ class MainLayoutScreen extends StatelessWidget {
       canPop: navigationShell.currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && navigationShell.currentIndex != 0) {
-          HymnDetailScreen.stopGlobalAudio();
           _goBranch(0);
         }
       },
@@ -95,21 +93,30 @@ class MainLayoutScreen extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: ClipRect(child: navigationShell),
+                    child: Column(
+                      children: [
+                        Expanded(child: ClipRect(child: navigationShell)),
+                        const GlobalMiniPlayer(),
+                      ],
+                    ),
                   ),
                 ],
               ),
             );
           }
 
-          // Diseño Móvil (BottomNavigationBar flotante)
+          // Diseño Móvil (BottomNavigationBar flotante con MiniPlayer persistente)
           return Scaffold(
             extendBody: true,
             body: navigationShell,
             bottomNavigationBar: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: ClipRRect(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const GlobalMiniPlayer(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: ClipRRect(
                   borderRadius: BorderRadius.circular(30),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
@@ -171,11 +178,13 @@ class MainLayoutScreen extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          );
-        }
-      ),
-    );
+            ],
+          ),
+        ),
+      );
+    },
+  ),
+);
   }
 }
 
