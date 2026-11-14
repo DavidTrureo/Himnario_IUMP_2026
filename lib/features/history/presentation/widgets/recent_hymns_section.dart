@@ -114,12 +114,15 @@ class RecentHymnsSection extends ConsumerWidget {
           height: 112,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             itemCount: recents.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final item = recents[index];
-              return _buildRecentCard(context, ref, item.recent, item.hymn, isDark);
+              return RepaintBoundary(
+                key: ValueKey('recent_${item.recent.key}'),
+                child: _buildRecentCard(context, ref, item.recent, item.hymn, isDark),
+              );
             },
           ),
         ),

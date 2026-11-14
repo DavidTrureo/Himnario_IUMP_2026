@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../../../../core/services/gemini_ai_service.dart';
 
@@ -1267,6 +1268,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     final duplicatePairs = const <DuplicatePair>[];
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final notation = ref.watch(notationProvider);
+    final activeSearch = ref.watch(_activeSearchProvider);
 
     final isFilterActive =
         activeCategory != 'Todos' || selectedTone != 'Todos' || onlyChords;
@@ -2317,9 +2320,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                         Text(
                                                           Hymn.formatToneDisplay(
                                                             hymn.tone,
-                                                            ref.watch(
-                                                              notationProvider,
-                                                            ),
+                                                            notation,
                                                           ),
                                                           style: GoogleFonts.nunito(
                                                             fontSize: 11,
@@ -2389,9 +2390,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                             ),
                                             if (showFavorites &&
                                                 !_isMultiSelectMode &&
-                                                ref
-                                                    .watch(_activeSearchProvider)
-                                                    .isEmpty &&
+                                                activeSearch.isEmpty &&
                                                 reorderIndex != null)
                                               ReorderableDragStartListener(
                                                 index: reorderIndex,
@@ -2431,6 +2430,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
                             return Dismissible(
                               key: ValueKey('swipe_$key'),
+                              dragStartBehavior: DragStartBehavior.start,
                               direction: canSwipeLeft
                                   ? DismissDirection.horizontal
                                   : DismissDirection.startToEnd,
@@ -2538,10 +2538,15 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             BuildContext context,
                             int index,
                           ) {
-                            return buildHymnCard(
-                              context,
-                              hymns[index],
-                              reorderIndex: index,
+                            final hymn = hymns[index];
+                            final key = '${hymn.collection}-${hymn.id}';
+                            return RepaintBoundary(
+                              key: ValueKey('repaint_$key'),
+                              child: buildHymnCard(
+                                context,
+                                hymn,
+                                reorderIndex: index,
+                              ),
                             );
                           }
 
@@ -2558,9 +2563,10 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                               controller: _scrollController,
                               child: ListView.builder(
                                 controller: _scrollController,
+                                cacheExtent: 800.0,
                                 keyboardDismissBehavior:
                                     ScrollViewKeyboardDismissBehavior.onDrag,
-                                physics: const BouncingScrollPhysics(),
+                                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                                 padding: const EdgeInsets.fromLTRB(
                                   16.0,
                                   8.0,
@@ -2587,9 +2593,14 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                       );
                                     }
                                     if (index <= favCount) {
-                                      return buildHymnCard(
-                                        context,
-                                        hymns[index - 1],
+                                      final h = hymns[index - 1];
+                                      final k = '${h.collection}-${h.id}';
+                                      return RepaintBoundary(
+                                        key: ValueKey('repaint_fav_$k'),
+                                        child: buildHymnCard(
+                                          context,
+                                          h,
+                                        ),
                                       );
                                     }
                                     if (index == favCount + 1) {
@@ -2666,10 +2677,15 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                       );
                                     }
                                     final sugIndex = index - favCount - 2;
-                                    return buildHymnCard(
-                                      context,
-                                      suggestions[sugIndex],
-                                      isSuggestion: true,
+                                    final h = suggestions[sugIndex];
+                                    final k = '${h.collection}-${h.id}';
+                                    return RepaintBoundary(
+                                      key: ValueKey('repaint_sug_$k'),
+                                      child: buildHymnCard(
+                                        context,
+                                        h,
+                                        isSuggestion: true,
+                                      ),
                                     );
                                   } else {
                                     if (index == 0) {
@@ -2745,10 +2761,15 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                         ),
                                       );
                                     }
-                                    return buildHymnCard(
-                                      context,
-                                      suggestions[index - 1],
-                                      isSuggestion: true,
+                                    final h = suggestions[index - 1];
+                                    final k = '${h.collection}-${h.id}';
+                                    return RepaintBoundary(
+                                      key: ValueKey('repaint_sug_nofav_$k'),
+                                      child: buildHymnCard(
+                                        context,
+                                        h,
+                                        isSuggestion: true,
+                                      ),
                                     );
                                   }
                                 },
@@ -2758,7 +2779,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
 
                           if (showFavorites &&
                               !_isMultiSelectMode &&
-                              ref.watch(_activeSearchProvider).isEmpty) {
+                              activeSearch.isEmpty) {
                             return Scrollbar(
                               interactive: true,
                               controller: _scrollController,
@@ -2767,7 +2788,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                 keyboardDismissBehavior:
                                     ScrollViewKeyboardDismissBehavior.onDrag,
                                 buildDefaultDragHandles: false,
-                                physics: const BouncingScrollPhysics(),
+                                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                                 padding: const EdgeInsets.fromLTRB(
                                   16.0,
                                   8.0,
@@ -2790,9 +2811,10 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             controller: _scrollController,
                             child: ListView.builder(
                               controller: _scrollController,
+                              cacheExtent: 800.0,
                               keyboardDismissBehavior:
                                   ScrollViewKeyboardDismissBehavior.onDrag,
-                              physics: const BouncingScrollPhysics(),
+                              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                               padding: const EdgeInsets.fromLTRB(
                                 16.0,
                                 8.0,

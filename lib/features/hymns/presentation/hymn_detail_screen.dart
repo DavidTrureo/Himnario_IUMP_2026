@@ -652,6 +652,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     final adminMode = ref.watch(adminModeProvider);
     final isDark = theme.brightness == Brightness.dark;
     final dbStatus = ref.watch(databaseStatusProvider);
+    final notation = ref.watch(notationProvider);
 
     // Sincronización bidireccional: si el usuario reanuda el audio global, pausar YouTube para evitar conflicto
     ref.listen<GlobalAudioState>(globalAudioProvider, (previous, next) {
@@ -2960,7 +2961,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               ),
             ),
             child: Text(
-              Hymn.formatToneDisplay(displayedTone, ref.watch(notationProvider)),
+              Hymn.formatToneDisplay(displayedTone, ref.read(notationProvider)),
               style: GoogleFonts.outfit(
                 fontSize: fontSize * 0.7,
                 fontWeight: FontWeight.bold,
@@ -2968,7 +2969,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 letterSpacing: 1.2,
               ),
             ),
-          ).animate().fadeIn(delay: 150.ms).scale(),
+          ),
 
         // Toggle Letra / Partitura
         Container(
@@ -3019,7 +3020,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 interactive: true,
                 child: SingleChildScrollView(
                 controller: pageScrollController,
-                physics: const BouncingScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                 padding: EdgeInsets.fromLTRB(
                   20.0, 
                   _isAtrilMode ? (MediaQuery.of(context).padding.top + 20.0) : 16.0, 
@@ -3037,7 +3038,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 24.0),
                           child: Divider(indent: 80, endIndent: 80, thickness: 1, color: Colors.black12),
-                        ).animate().fadeIn(delay: 200.ms),
+                        ),
                         ..._getMergedBlocksCached(hymn.lyrics, _transposeOffset).map(
                           (block) => _buildLyricsBlock(context, hymn, block, effectiveFontSize, isDark, theme)
                         ),
@@ -3280,7 +3281,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       }
       bodyLines.addAll(restOfLines);
       
-      return Container(
+      final chorusWidget = Container(
         width: double.infinity,
         margin: const EdgeInsets.symmetric(vertical: 14.0),
         decoration: BoxDecoration(
@@ -3351,7 +3352,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             ),
           ),
         ),
-      ).animate().fadeIn(duration: 250.ms).slideY(begin: 0.04);
+      );
+      return RepaintBoundary(child: chorusWidget);
     } else {
       final lines = trimmed.split('\n');
       Widget verseWidget;
@@ -3453,7 +3455,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       }
       
-      return verseWidget.animate().fadeIn(duration: 250.ms).slideY(begin: 0.04);
+      return RepaintBoundary(child: verseWidget);
     }
   }
 
@@ -3509,7 +3511,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       // 2. Acorde + texto que va directamente debajo de él
       final rawChord = match.group(1)!;
       final transposedChord = ChordTransposerService.transposeSingleChord(rawChord, _transposeOffset);
-      final displayedChord = Hymn.convertChordNotation(transposedChord, ref.watch(notationProvider));
+      final displayedChord = Hymn.convertChordNotation(transposedChord, ref.read(notationProvider));
 
       // Fin del texto bajo este acorde: inicio del siguiente acorde (o fin de línea)
       final nextMatchStart = (i == matchesList.length - 1)

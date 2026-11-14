@@ -350,7 +350,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                       child: ListView(
                         padding: const EdgeInsets.only(bottom: 120),
-                        physics: const BouncingScrollPhysics(),
+                        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                         children: [
                           if (ref.watch(recentHymnsWithHymnProvider).isNotEmpty) ...[
                             const RecentHymnsSection(),
@@ -365,7 +365,7 @@ class HomeScreen extends ConsumerWidget {
                             iconColor: const Color(0xFF3B82F6),
                             collection: 'iump',
                             counter: iumpCount,
-                          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.15),
+                          ),
                           const SizedBox(height: 16),
                           _buildMenuItem(
                             context,
@@ -376,7 +376,7 @@ class HomeScreen extends ConsumerWidget {
                             iconColor: const Color(0xFF8B5CF6),
                             collection: 'especiales',
                             counter: especialesCount,
-                          ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.15),
+                          ),
                           const SizedBox(height: 16),
                           _buildMenuItem(
                             context,
@@ -387,7 +387,7 @@ class HomeScreen extends ConsumerWidget {
                             iconColor: const Color(0xFF10B981),
                             collection: 'coros',
                             counter: corosCount,
-                          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.15),
+                          ),
 
                           const SizedBox(height: 16),
                           _buildMenuItem(
@@ -399,7 +399,7 @@ class HomeScreen extends ConsumerWidget {
                             iconColor: const Color(0xFFF59E0B),
                             collection: 'acordes',
                             counter: acordesCount,
-                          ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.15),
+                          ),
 
                         ],
                       ),
