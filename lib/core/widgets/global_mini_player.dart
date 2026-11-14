@@ -66,26 +66,23 @@ class GlobalMiniPlayer extends ConsumerWidget {
         ? '${hymn.id}. ${hymn.title}'
         : hymn.title;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: () {
-            // Regresar al canto en reproducción si estamos en otra pantalla
-            final hymnKey = '${hymn.collection}-${hymn.id}';
-            if (!currentPath.endsWith(hymnKey)) {
-              try {
-                context.go('/home/hymn/$hymnKey');
-              } catch (_) {}
-            }
-          },
-          child: ClipRRect(
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
             borderRadius: BorderRadius.circular(22),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Container(
+            onTap: () {
+              // Regresar al canto en reproducción si estamos en otra pantalla
+              final hymnKey = '${hymn.collection}-${hymn.id}';
+              if (!currentPath.endsWith(hymnKey)) {
+                try {
+                  context.go('/home/hymn/$hymnKey');
+                } catch (_) {}
+              }
+            },
+            child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -156,10 +153,12 @@ class GlobalMiniPlayer extends ConsumerWidget {
                                         ),
                                       ),
                                     )
-                                  : SpinningVinyl(
-                                      isPlaying: audioState.isPlaying,
-                                      color: accentColor,
-                                      size: 22,
+                                  : RepaintBoundary(
+                                      child: SpinningVinyl(
+                                        isPlaying: audioState.isPlaying,
+                                        color: accentColor,
+                                        size: 22,
+                                      ),
                                     ),
                             ),
                           ),
@@ -372,7 +371,6 @@ class GlobalMiniPlayer extends ConsumerWidget {
             ),
           ),
         ),
-      ),
     );
   }
 }

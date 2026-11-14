@@ -67,6 +67,7 @@ class GlobalAudioNotifier extends Notifier<GlobalAudioState> {
   StreamSubscription? _durationSub;
   StreamSubscription? _positionSub;
   String? _currentAudioUrl;
+  Duration _lastEmittedPos = Duration.zero;
 
   @override
   GlobalAudioState build() {
@@ -189,8 +190,14 @@ class GlobalAudioNotifier extends Notifier<GlobalAudioState> {
         }
       });
 
+      _lastEmittedPos = Duration.zero;
       _positionSub = player.positionStream.listen((p) {
-        state = state.copyWith(position: p);
+        // Reducir la frecuencia de emisión a 500ms para evitar recomposiciones innecesarias
+        // que causen micro-tirones en el scroll de la app durante la reproducción
+        if ((p - _lastEmittedPos).abs() >= const Duration(milliseconds: 500) || p == Duration.zero) {
+          _lastEmittedPos = p;
+          state = state.copyWith(position: p);
+        }
       });
 
       state = state.copyWith(isLoading: false);
@@ -226,6 +233,7 @@ class GlobalAudioNotifier extends Notifier<GlobalAudioState> {
   Future<void> seek(Duration pos) async {
     try {
       await _player?.seek(pos);
+      _lastEmittedPos = pos;
       state = state.copyWith(position: pos);
     } catch (_) {}
   }

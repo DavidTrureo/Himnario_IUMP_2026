@@ -655,8 +655,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     final notation = ref.watch(notationProvider);
 
     // Sincronización bidireccional: si el usuario reanuda el audio global, pausar YouTube para evitar conflicto
-    ref.listen<GlobalAudioState>(globalAudioProvider, (previous, next) {
-      if (next.isPlaying && _youtubeController != null) {
+    ref.listen<bool>(globalAudioProvider.select((s) => s.isPlaying), (previous, isPlaying) {
+      if (isPlaying && _youtubeController != null) {
         try {
           _youtubeController?.pauseVideo();
         } catch (_) {}
@@ -848,9 +848,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               if (hymn.audioUrl.isNotEmpty)
                 Builder(
                   builder: (context) {
-                    final globalAudio = ref.watch(globalAudioProvider);
-                    final isThisHymnAudio = globalAudio.hymn?.id == hymn.id && globalAudio.hymn?.collection == hymn.collection;
-                    final isPlayingThis = isThisHymnAudio && globalAudio.isPlaying;
+                    final isPlayingThis = ref.watch(
+                      globalAudioProvider.select(
+                        (s) => s.isPlaying && s.hymn?.id == hymn.id && s.hymn?.collection == hymn.collection,
+                      ),
+                    );
 
                     return IconButton(
                       icon: Icon(
@@ -1539,8 +1541,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               if (!_isAtrilMode && !_showControlPanel)
                 Builder(
                   builder: (context) {
-                    final globalAudio = ref.watch(globalAudioProvider);
-                    final isAudioActive = globalAudio.isVisible && globalAudio.hymn != null;
+                    final isAudioActive = ref.watch(
+                      globalAudioProvider.select((s) => s.isVisible && s.hymn != null),
+                    );
                     final isTablet = MediaQuery.of(context).size.width >= 600;
 
                     final double bottomPos;
@@ -1567,7 +1570,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         },
                         child: const Icon(Icons.tune_rounded),
                       ),
-                    ).animate().fadeIn(delay: 200.ms).scale();
+                    );
                   },
                 ),
 
@@ -3049,7 +3052,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           curve: Curves.easeOutCubic,
                           height: _showControlPanel
                               ? (hymn.lyrics.contains('[') ? 280.0 : 200.0)
-                              : (ref.watch(globalAudioProvider).isVisible && ref.watch(globalAudioProvider).hymn != null
+                              : (ref.watch(globalAudioProvider.select((s) => s.isVisible && s.hymn != null))
                                   ? (MediaQuery.of(context).size.width >= 600 ? 160.0 : 180.0)
                                   : (MediaQuery.of(context).size.width >= 600 ? 40.0 : 110.0)),
                         ),
