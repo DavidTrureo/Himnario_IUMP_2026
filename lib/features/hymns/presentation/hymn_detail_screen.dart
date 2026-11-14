@@ -2141,7 +2141,23 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Descargando "$fileName" a tu PC (carpeta Descargas)...'),
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF38BDF8),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Descargando "$fileName" a tu PC (carpeta Descargas)...'),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 15),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -2153,18 +2169,22 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('¡"$fileName" guardado en la carpeta Descargas de tu equipo!'),
+              content: Text('¡"$fileName" guardado con éxito en la carpeta Descargas de tu equipo!'),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 4),
             ),
           );
         }
       } catch (e) {
-        try {
-          final uri = Uri.parse(hymn.audioUrl);
-          // ignore: deprecated_member_use
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } catch (_) {}
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al descargar el audio: $e'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
       return;
     }

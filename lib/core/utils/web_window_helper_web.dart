@@ -108,36 +108,22 @@ class WebWindowHelper {
   }
 
   static Future<void> triggerDownload(String url, String filename) async {
-    try {
-      // 1. Descarga vía Blob para garantizar que el navegador guarde el archivo en la carpeta Descargas del PC
-      final request = await html.HttpRequest.request(url, responseType: 'blob');
-      if (request.status == 200) {
-        final blob = request.response as html.Blob;
-        final blobUrl = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: blobUrl)
-          ..download = filename;
-        html.document.body?.children.add(anchor);
-        anchor.click();
-        anchor.remove();
-        Future.delayed(const Duration(seconds: 5), () {
-          html.Url.revokeObjectUrl(blobUrl);
-        });
-        return;
-      }
-    } catch (_) {}
-
-    // 2. Fallback por si la petición XHR es bloqueada: disparo directo mediante AnchorElement o ventana
-    try {
-      final anchor = html.AnchorElement(href: url)
-        ..target = '_blank'
+    // Descarga vía Blob para garantizar que el navegador guarde el archivo en la carpeta Descargas del PC
+    final request = await html.HttpRequest.request(url, responseType: 'blob');
+    if (request.status == 200) {
+      final blob = request.response as html.Blob;
+      final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: blobUrl)
         ..download = filename;
       html.document.body?.children.add(anchor);
       anchor.click();
       anchor.remove();
-    } catch (_) {
-      try {
-        html.window.open(url, '_blank');
-      } catch (_) {}
+      Future.delayed(const Duration(seconds: 10), () {
+        html.Url.revokeObjectUrl(blobUrl);
+      });
+      return;
+    } else {
+      throw Exception('Error HTTP ${request.status} al descargar el archivo de audio');
     }
   }
 }
