@@ -858,11 +858,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   },
                 ),
               IconButton(
-                icon: const Icon(Icons.auto_stories_rounded),
-                tooltip: 'Modo Atril / Culto (Pantalla Limpia)',
-                onPressed: _toggleAtrilMode,
-              ),
-              IconButton(
                 icon: const Icon(Icons.playlist_add_rounded),
                 tooltip: 'Agregar a Repertorio',
                 onPressed: () {
