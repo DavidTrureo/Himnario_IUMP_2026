@@ -842,7 +842,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               if (hymn.audioUrl.isNotEmpty && !hymn.audioUrl.contains('youtube.com') && !hymn.audioUrl.contains('youtu.be'))
                 IconButton(
                   icon: const Icon(Icons.cloud_download_rounded),
-                  tooltip: kIsWeb ? 'Descargar audio en tu navegador' : 'Descargar audio para escuchar sin internet',
+                  tooltip: kIsWeb ? 'Descargar audio a tu PC / dispositivo' : 'Descargar audio para escuchar sin internet',
                   onPressed: () => _downloadAudio(hymn),
                 ),
               if (hymn.audioUrl.isNotEmpty)
@@ -2124,33 +2124,36 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     if (hymn.audioUrl.isEmpty) return;
 
     if (kIsWeb) {
+      String ext = 'mp3';
+      try {
+        final uri = Uri.parse(hymn.audioUrl);
+        final decodedPath = Uri.decodeComponent(uri.path);
+        if (decodedPath.contains('.')) {
+          final possibleExt = decodedPath.split('.').last.toLowerCase();
+          if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'].contains(possibleExt)) {
+            ext = possibleExt;
+          }
+        }
+      } catch (_) {}
+
+      final cleanTitle = hymn.title.replaceAll('/', '-').replaceAll('\\', '-').trim();
+      final fileName = '$cleanTitle.$ext';
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Iniciando descarga de audio en tu navegador...'), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text('Descargando "$fileName" a tu PC (carpeta Descargas)...'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
 
       try {
-        String ext = 'mp3';
-        try {
-          final uri = Uri.parse(hymn.audioUrl);
-          final decodedPath = Uri.decodeComponent(uri.path);
-          if (decodedPath.contains('.')) {
-            final possibleExt = decodedPath.split('.').last.toLowerCase();
-            if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'].contains(possibleExt)) {
-              ext = possibleExt;
-            }
-          }
-        } catch (_) {}
-
-        final cleanTitle = hymn.title.replaceAll('/', '-').replaceAll('\\', '-').trim();
-        final fileName = '$cleanTitle.$ext';
-
-        WebWindowHelper.triggerDownload(hymn.audioUrl, fileName);
+        await WebWindowHelper.triggerDownload(hymn.audioUrl, fileName);
 
         if (mounted) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Descargando "$fileName" en tu navegador...'),
+              content: Text('¡"$fileName" guardado en la carpeta Descargas de tu equipo!'),
               behavior: SnackBarBehavior.floating,
               duration: const Duration(seconds: 4),
             ),

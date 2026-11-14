@@ -20,7 +20,7 @@ class WebWindowHelper {
     // No-op en móvil
   }
 
-  static void triggerDownload(String url, String filename) {
+  static Future<void> triggerDownload(String url, String filename) async {
     // No-op en móvil
   }
 }
