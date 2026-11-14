@@ -583,8 +583,8 @@ class HymnPdfService {
     String notation,
   ) {
     line = ChordTransposerService.normalizeEmbeddedChords(line);
-    final RegExp regExp = RegExp(r'\[([^\]]+)\]');
-    final matchesList = regExp.allMatches(line).toList();
+    final RegExp blockRegex = RegExp(r'((?:\[[^\]]+\]\s*)+)');
+    final matchesList = blockRegex.allMatches(line).toList();
 
     if (matchesList.isEmpty) {
       return pw.Text(
@@ -594,31 +594,35 @@ class HymnPdfService {
     }
 
     final List<pw.Widget> inlineWidgets = [];
-    int lastMatchEnd = 0;
+
+    // Texto antes del primer bloque de acordes
+    if (matchesList.first.start > 0) {
+      final textBefore = line.substring(0, matchesList.first.start);
+      if (textBefore.isNotEmpty) {
+        inlineWidgets.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 0.5),
+            child: pw.Text(
+              textBefore,
+              style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
+            ),
+          ),
+        );
+      }
+    }
 
     for (int i = 0; i < matchesList.length; i++) {
       final match = matchesList[i];
+      final chordBlock = match.group(0)!;
+      final rawChords = RegExp(r'\[([^\]]+)\]')
+          .allMatches(chordBlock)
+          .map((m) => m.group(1)!)
+          .toList();
 
-      // 1. Texto antes del acorde
-      if (match.start > lastMatchEnd) {
-        final textBefore = line.substring(lastMatchEnd, match.start);
-        if (textBefore.isNotEmpty) {
-          inlineWidgets.add(
-            pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 0.5), // Para alinear con el texto debajo del acorde
-              child: pw.Text(
-                textBefore,
-                style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
-              ),
-            ),
-          );
-        }
-      }
-
-      // 2. Acorde + texto bajo él
-      final rawChord = match.group(1)!;
-      final transposedChord = ChordTransposerService.transposeSingleChord(rawChord, transposeOffset);
-      final displayedChord = Hymn.convertChordNotation(transposedChord, notation);
+      final displayedChords = rawChords.map((rc) {
+        final transposed = ChordTransposerService.transposeSingleChord(rc, transposeOffset);
+        return Hymn.convertChordNotation(transposed, notation);
+      }).toList();
 
       final nextMatchStart = (i == matchesList.length - 1) ? line.length : matchesList[i + 1].start;
       final textUnder = line.substring(match.end, nextMatchStart);
@@ -628,26 +632,32 @@ class HymnPdfService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           mainAxisSize: pw.MainAxisSize.min,
           children: [
-            pw.Text(
-              displayedChord,
-              style: pw.TextStyle(
-                font: fontBold,
-                fontSize: 8.5,
-                color: PdfColor.fromHex('#4F46E5'),
-              ),
+            pw.Row(
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                for (int ci = 0; ci < displayedChords.length; ci++) ...[
+                  pw.Text(
+                    displayedChords[ci],
+                    style: pw.TextStyle(
+                      font: fontBold,
+                      fontSize: 8.5,
+                      color: PdfColor.fromHex('#4F46E5'),
+                    ),
+                  ),
+                  if (ci < displayedChords.length - 1) pw.SizedBox(width: 4),
+                ],
+              ],
             ),
-            if (textUnder.isNotEmpty)
+            if (textUnder.trim().isNotEmpty)
               pw.Text(
                 textUnder,
                 style: pw.TextStyle(font: fontRegular, fontSize: 12, color: PdfColor.fromHex('#1E293B')),
               )
             else
-              pw.SizedBox(height: 12), // Espaciador si no hay texto debajo para mantener alineación vertical
+              pw.SizedBox(height: 12, width: textUnder.isEmpty ? 0 : 4),
           ],
         ),
       );
-
-      lastMatchEnd = nextMatchStart;
     }
 
     return pw.Padding(

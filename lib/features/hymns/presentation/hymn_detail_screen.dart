@@ -3531,12 +3531,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
   List<Widget> _buildLineWithChords(String line, double fontSize, bool isDark, ThemeData theme, {bool isItalic = false}) {
     line = ChordTransposerService.normalizeEmbeddedChords(line);
-    final RegExp regExp = RegExp(r'\[([^\]]+)\]');
-
-    // IMPORTANTE: materializar el iterable en una lista para evitar
-    // que se re-evalúe el regex en cada acceso (.last, .indexOf, .elementAt)
-    // causando comparaciones de identidad fallidas y RangeError.
-    final matchesList = regExp.allMatches(line).toList();
+    final RegExp blockRegex = RegExp(r'((?:\[[^\]]+\]\s*)+)');
+    final matchesList = blockRegex.allMatches(line).toList();
 
     if (matchesList.isEmpty || !_showChords) {
       final cleanLine = line.replaceAll(RegExp(r'\[[^\]]+\]'), '');
@@ -3556,42 +3552,48 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
 
     final List<Widget> inlineWidgets = [];
-    int lastMatchEnd = 0;
+
+    // 1. Texto plano antes del primer bloque de acordes
+    if (matchesList.first.start > 0) {
+      final textBefore = line.substring(0, matchesList.first.start);
+      if (textBefore.isNotEmpty) {
+        inlineWidgets.add(
+          Text(
+            textBefore,
+            style: GoogleFonts.nunito(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w600,
+              fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+              color: isDark ? Colors.white.withValues(alpha: 0.85) : theme.colorScheme.onSurface,
+            ),
+          ),
+        );
+      }
+    }
 
     for (int i = 0; i < matchesList.length; i++) {
       final match = matchesList[i];
+      final chordBlock = match.group(0)!;
+      final rawChords = RegExp(r'\[([^\]]+)\]')
+          .allMatches(chordBlock)
+          .map((m) => m.group(1)!)
+          .toList();
 
-      // 1. Texto plano antes del acorde
-      if (match.start > lastMatchEnd) {
-        final textBefore = line.substring(lastMatchEnd, match.start);
-        if (textBefore.isNotEmpty) {
-          inlineWidgets.add(
-            Text(
-              textBefore,
-              style: GoogleFonts.nunito(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-                color: isDark ? Colors.white.withValues(alpha: 0.85) : theme.colorScheme.onSurface,
-              ),
-            ),
-          );
-        }
-      }
+      final displayedChords = rawChords.map((rc) {
+        final transposedChord = ChordTransposerService.transposeSingleChord(rc, _transposeOffset);
+        return Hymn.convertChordNotation(transposedChord, ref.read(notationProvider));
+      }).toList();
 
-      // 2. Acorde + texto que va directamente debajo de él
-      final rawChord = match.group(1)!;
-      final transposedChord = ChordTransposerService.transposeSingleChord(rawChord, _transposeOffset);
-      final displayedChord = Hymn.convertChordNotation(transposedChord, ref.read(notationProvider));
-
-      // Fin del texto bajo este acorde: inicio del siguiente acorde (o fin de línea)
       final nextMatchStart = (i == matchesList.length - 1)
           ? line.length
           : matchesList[i + 1].start;
 
       final textUnder = line.substring(match.end, nextMatchStart);
       final chordFontSize = fontSize * 0.65;
-      final minChordWidth = displayedChord.length * (chordFontSize * 0.58);
+      final minChordWidth = displayedChords.fold<double>(
+        0.0,
+        (sum, chord) => sum + (chord.length * (chordFontSize * 0.58)) + 4.0,
+      );
 
       inlineWidgets.add(
         ConstrainedBox(
@@ -3600,20 +3602,29 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              InkWell(
-                onTap: () => ChordDiagramDialog.show(context, displayedChord),
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-                  child: Text(
-                    displayedChord,
-                    style: GoogleFonts.outfit(
-                      fontSize: chordFontSize,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.amber[600],
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final displayedChord in displayedChords) ...[
+                    InkWell(
+                      onTap: () => ChordDiagramDialog.show(context, displayedChord),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                        child: Text(
+                          displayedChord,
+                          style: GoogleFonts.outfit(
+                            fontSize: chordFontSize,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.amber[600],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                    if (displayedChord != displayedChords.last)
+                      const SizedBox(width: 4),
+                  ],
+                ],
               ),
               Text(
                 textUnder.isEmpty ? ' ' : textUnder,
@@ -3628,8 +3639,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           ),
         ),
       );
-
-      lastMatchEnd = nextMatchStart;
     }
 
     return inlineWidgets;

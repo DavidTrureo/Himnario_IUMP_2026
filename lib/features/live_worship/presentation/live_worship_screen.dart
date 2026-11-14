@@ -602,8 +602,8 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
 
   List<Widget> _buildLineWithChords(String line, double fontSize, bool isDark, ThemeData theme, bool showChords) {
     line = ChordTransposerService.normalizeEmbeddedChords(line);
-    final RegExp regExp = RegExp(r'\[([^\]]+)\]');
-    final matchesList = regExp.allMatches(line).toList();
+    final RegExp blockRegex = RegExp(r'((?:\[[^\]]+\]\s*)+)');
+    final matchesList = blockRegex.allMatches(line).toList();
 
     if (matchesList.isEmpty || !showChords) {
       final cleanLine = line.replaceAll(RegExp(r'\[[^\]]+\]'), '');
@@ -621,31 +621,35 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
     }
 
     final List<Widget> inlineWidgets = [];
-    int lastMatchEnd = 0;
+
+    // 1. Texto antes del primer bloque de acordes
+    if (matchesList.first.start > 0) {
+      final textBefore = line.substring(0, matchesList.first.start);
+      if (textBefore.isNotEmpty) {
+        inlineWidgets.add(
+          Text(
+            textBefore,
+            style: GoogleFonts.nunito(
+              fontSize: fontSize,
+              color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF334155),
+            ),
+          ),
+        );
+      }
+    }
 
     for (int i = 0; i < matchesList.length; i++) {
       final match = matchesList[i];
+      final chordBlock = match.group(0)!;
+      final rawChords = RegExp(r'\[([^\]]+)\]')
+          .allMatches(chordBlock)
+          .map((m) => m.group(1)!)
+          .toList();
 
-      // 1. Texto plano antes del acorde
-      if (match.start > lastMatchEnd) {
-        final textBefore = line.substring(lastMatchEnd, match.start);
-        if (textBefore.isNotEmpty) {
-          inlineWidgets.add(
-            Text(
-              textBefore,
-              style: GoogleFonts.nunito(
-                fontSize: fontSize,
-                color: isDark ? Colors.white.withValues(alpha: 0.87) : const Color(0xFF334155),
-              ),
-            ),
-          );
-        }
-      }
-
-      // 2. Acorde + texto que va directamente debajo de él
-      final rawChord = match.group(1)!;
-      final transposedChord = ChordTransposerService.transposeSingleChord(rawChord, 0); // No transpose in Live mode yet
-      final displayedChord = Hymn.convertChordNotation(transposedChord, ref.watch(notationProvider));
+      final displayedChords = rawChords.map((rc) {
+        final transposedChord = ChordTransposerService.transposeSingleChord(rc, 0); // No transpose in Live mode yet
+        return Hymn.convertChordNotation(transposedChord, ref.watch(notationProvider));
+      }).toList();
 
       final nextMatchStart = (i == matchesList.length - 1)
           ? line.length
@@ -653,7 +657,10 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
 
       final textUnder = line.substring(match.end, nextMatchStart);
       final chordFontSize = fontSize * 0.65;
-      final minChordWidth = displayedChord.length * (chordFontSize * 0.58);
+      final minChordWidth = displayedChords.fold<double>(
+        0.0,
+        (sum, chord) => sum + (chord.length * (chordFontSize * 0.58)) + 4.0,
+      );
 
       inlineWidgets.add(
         ConstrainedBox(
@@ -662,16 +669,25 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-                child: Text(
-                  displayedChord,
-                  style: GoogleFonts.outfit(
-                    fontSize: chordFontSize,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.amber[600],
-                  ),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final displayedChord in displayedChords) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                      child: Text(
+                        displayedChord,
+                        style: GoogleFonts.outfit(
+                          fontSize: chordFontSize,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.amber[600],
+                        ),
+                      ),
+                    ),
+                    if (displayedChord != displayedChords.last)
+                      const SizedBox(width: 4),
+                  ],
+                ],
               ),
               if (textUnder.isNotEmpty)
                 Text(
@@ -685,8 +701,6 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
           ),
         ),
       );
-
-      lastMatchEnd = nextMatchStart;
     }
 
     return inlineWidgets;
