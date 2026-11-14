@@ -25,12 +25,13 @@ class _GuideSlide {
 
 const List<_GuideSlide> _kGuideSlides = [
   _GuideSlide(
-    audience: 'Congregación',
+    audience: 'Congregación y Culto',
     title: 'Más de 2.900 cantos siempre contigo',
     description:
-        'Encuentra rápidamente cualquier himno o alabanza, incluso sin internet durante el culto.',
+        'Encuentra rápidamente cualquier himno o alabanza, incluso sin internet durante el servicio.',
     bullets: [
       'Busca por número, título, frase de la letra o por tema con IA.',
+      'Historial Inteligente: consulta en Inicio los cantos entonados en el culto y retómalos al instante con su tonalidad exacta.',
       'Guarda tus cantos preferidos en Favoritos con un toque.',
       'Consulta Himnario IUMP, Alabanzas Especiales y Coros de Avivamiento.',
     ],
@@ -43,8 +44,9 @@ const List<_GuideSlide> _kGuideSlides = [
     description:
         'Pensado para leer cómodo sin cambios accidentales mientras sostienes tu teléfono o iPad.',
     bullets: [
-      'Desliza izquierda o derecha para hojear al canto anterior o siguiente.',
-      'Activa "Fijar canto" cuando estés en el púlpito para bloquear el swipe.',
+      'Desliza a la izquierda o derecha para hojear al canto anterior o siguiente.',
+      'Gestos rápidos Swipe: en listas y favoritos, desliza un canto a la izquierda para agregarlo a un repertorio o retirarlo.',
+      'Activa "Fijar canto" cuando estés en el púlpito para bloquear el swipe involuntario.',
       'Ajusta el tamaño de letra a tu vista con persistencia automática.',
     ],
     icon: Icons.swipe_rounded,
@@ -54,11 +56,12 @@ const List<_GuideSlide> _kGuideSlides = [
     audience: 'Músicos y Coro',
     title: 'Acordes, tono ajustable y partituras',
     description:
-        'Todo lo necesario para ensayar y ministrar con instrumento en un solo lugar.',
+        'Todo lo necesario para ensayar, acompañar y ministrar con tu instrumento en un solo lugar.',
     bullets: [
       'Cambia la tonalidad (transposición) y alterna notación C D E / Do Re Mi.',
-      'Visualiza Partitura Oficial cuando esté disponible en el canto.',
-      'Escucha el audio de referencia o abre el video de YouTube integrado.',
+      'Mini-reproductor persistente: escucha el audio mientras navegas por toda la app con controles -10s / +10s y loop.',
+      'Modo Atril / Culto: oculta barras de navegación para una lectura limpia a pantalla completa en el atril o instrumento.',
+      'Visualiza Partitura Oficial cuando esté disponible o abre el video de YouTube integrado.',
     ],
     icon: Icons.music_note_rounded,
     accentColor: Color(0xFF10B981),
@@ -67,10 +70,11 @@ const List<_GuideSlide> _kGuideSlides = [
     audience: 'Compartir e Imprimir',
     title: 'Hermoso diseño PDF: con o sin acordes',
     description:
-        'Comparte por WhatsApp o imprime cantos y repertorios con diagramación editorial impecable.',
+        'Comparte por WhatsApp o imprime cantos y repertorios al instante con diseño profesional.',
     bullets: [
-      'Comparte cantos individuales en PDF con acordes y notas musicales o en modo "Solo letra".',
-      'Desde Listas, imprime el programa completo con 1 y hasta 2 cantos por página.',
+      'Compartir directo: envía partituras por WhatsApp o imprímelas con 1 toque sin tener que guardar archivos intermedios.',
+      'Exporta en PDF con acordes y notas musicales o en formato "Solo letra".',
+      'Desde Listas, imprime el programa completo del culto con 1 o 2 cantos por página.',
       'Diseño limpio, elegante y autoajustado sin cortar estrofas ni desbordar la hoja.',
     ],
     icon: Icons.picture_as_pdf_rounded,
