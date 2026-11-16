@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../../core/utils/external_browser_helper.dart';
 import '../domain/hymn.dart';
 import 'hymn_list_screen.dart';
 
@@ -283,19 +282,6 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                           ),
                           const SizedBox(height: 12),
                           _DevicesManagementSection(isDark: isDark),
-                          const SizedBox(height: 22),
-
-                          // Módulo 3: Proyección y Transmisión en Vivo
-                          Text(
-                            'Salas de Culto y Proyección',
-                            style: GoogleFonts.outfit(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _LiveWorshipManagementSection(isDark: isDark),
                         ],
                       ),
                     ),
@@ -1054,45 +1040,6 @@ class _DevicesManagementSection extends StatelessWidget {
             title: 'Chequeo de Bajas y Desinstalaciones FCM',
             subtitle: 'Verificación silenciosa sin enviar notificaciones',
             onTap: () => context.push('/admin-devices?filter=uninstalled'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LiveWorshipManagementSection extends StatelessWidget {
-  final bool isDark;
-
-  const _LiveWorshipManagementSection({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06),
-        ),
-      ),
-      child: Column(
-        children: [
-          _ActionListTile(
-            icon: Icons.tv_rounded,
-            iconColor: const Color(0xFF06B6D4),
-            title: 'Abrir Pantalla Receptora TV / Proyector',
-            subtitle: 'Genera una sala receptora para recibir cantos a distancia',
-            onTap: () => context.push('/tv'),
-          ),
-          const Divider(height: 1),
-          _ActionListTile(
-            icon: Icons.language_rounded,
-            iconColor: const Color(0xFFA78BFA),
-            title: 'Portal Himnario Web Oficial',
-            subtitle: 'Abrir himnario-vito-2026.web.app en navegador',
-            onTap: () => ExternalBrowserHelper.openUrl('https://himnario-vito-2026.web.app'),
           ),
         ],
       ),
