@@ -481,7 +481,7 @@ class _LiveKpiGrid extends ConsumerWidget {
                   subtitle: 'Dispositivos registrados',
                   icon: Icons.devices_rounded,
                   color: const Color(0xFF0EA5E9),
-                  onTap: () => context.push('/admin-devices'),
+                  onTap: () => context.push('/admin-devices?filter=all'),
                 );
               },
             ),
@@ -502,11 +502,7 @@ class _LiveKpiGrid extends ConsumerWidget {
                   subtitle: 'Uso reciente en el mes',
                   icon: Icons.bolt_rounded,
                   color: const Color(0xFF10B981),
-                  onTap: () => _showActiveStatsSheet(
-                    context: context,
-                    isDark: isDark,
-                    activeCount: count,
-                  ),
+                  onTap: () => context.push('/admin-devices?filter=active'),
                 );
               },
             ),
@@ -631,107 +627,6 @@ class _KpiCard extends StatelessWidget {
   }
 }
 
-void _showActiveStatsSheet({
-  required BuildContext context,
-  required bool isDark,
-  required int activeCount,
-}) {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (ctx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.bolt_rounded, color: Color(0xFF10B981), size: 26),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Actividad en los Últimos 30 Días',
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          '$activeCount dispositivos activos en el mes',
-                          style: GoogleFonts.nunito(
-                            fontSize: 13,
-                            color: const Color(0xFF10B981),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Este indicador mide los teléfonos, iPads y navegadores web que han utilizado el himnario en los últimos 30 días. Refleja a los miembros que usan la app activamente durante las reuniones y cultos.',
-                style: GoogleFonts.nunito(
-                  fontSize: 14,
-                  height: 1.45,
-                  color: isDark ? Colors.white70 : Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0EA5E9),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    context.push('/admin-devices');
-                  },
-                  icon: const Icon(Icons.devices_rounded),
-                  label: const Text('Ver Desglose Completo de Plataformas'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
 void _showCatalogBreakdownSheet({
   required BuildContext context,
   required WidgetRef ref,
@@ -821,6 +716,7 @@ void _showCatalogBreakdownSheet({
                 isDark: isDark,
                 onExplore: () {
                   Navigator.pop(ctx);
+                  ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(true);
                   ref.read(activeCollectionProvider.notifier).setCollection('iump');
                   ref.read(showFavoritesProvider.notifier).setFavorites(false);
                   ref.read(searchQueryProvider.notifier).updateQuery('');
@@ -837,6 +733,7 @@ void _showCatalogBreakdownSheet({
                 isDark: isDark,
                 onExplore: () {
                   Navigator.pop(ctx);
+                  ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(true);
                   ref.read(activeCollectionProvider.notifier).setCollection('especiales');
                   ref.read(showFavoritesProvider.notifier).setFavorites(false);
                   ref.read(searchQueryProvider.notifier).updateQuery('');
@@ -853,6 +750,7 @@ void _showCatalogBreakdownSheet({
                 isDark: isDark,
                 onExplore: () {
                   Navigator.pop(ctx);
+                  ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(true);
                   ref.read(activeCollectionProvider.notifier).setCollection('coros');
                   ref.read(showFavoritesProvider.notifier).setFavorites(false);
                   ref.read(searchQueryProvider.notifier).updateQuery('');
@@ -908,6 +806,7 @@ void _showCatalogBreakdownSheet({
                     TextButton(
                       onPressed: () {
                         Navigator.pop(ctx);
+                        ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(true);
                         ref.read(activeCollectionProvider.notifier).setCollection('acordes');
                         ref.read(showFavoritesProvider.notifier).setFavorites(false);
                         ref.read(searchQueryProvider.notifier).updateQuery('');
@@ -931,6 +830,7 @@ void _showCatalogBreakdownSheet({
                   ),
                   onPressed: () {
                     Navigator.pop(ctx);
+                    ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(true);
                     ref.read(activeCollectionProvider.notifier).setCollection('all');
                     ref.read(showFavoritesProvider.notifier).setFavorites(false);
                     ref.read(searchQueryProvider.notifier).updateQuery('');
@@ -1091,6 +991,7 @@ class _ContentManagementSection extends ConsumerWidget {
             title: 'Auditoría de Acordes Musicales',
             subtitle: '$acordesCount de $totalHymns cantos ya cuentan con acordes',
             onTap: () {
+              ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(true);
               ref.read(activeCollectionProvider.notifier).setCollection('acordes');
               ref.read(showFavoritesProvider.notifier).setFavorites(false);
               ref.read(searchQueryProvider.notifier).updateQuery('');
@@ -1107,6 +1008,7 @@ class _ContentManagementSection extends ConsumerWidget {
             title: 'Explorador y Edición del Catálogo',
             subtitle: 'Revisa y edita títulos, letras o acordes directamente',
             onTap: () {
+              ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(true);
               ref.read(activeCollectionProvider.notifier).setCollection('all');
               ref.read(showFavoritesProvider.notifier).setFavorites(false);
               ref.read(searchQueryProvider.notifier).updateQuery('');
@@ -1143,7 +1045,7 @@ class _DevicesManagementSection extends StatelessWidget {
             iconColor: const Color(0xFF0EA5E9),
             title: 'Detalle de Dispositivos e Instalaciones',
             subtitle: 'Desglose por plataforma (Android / iOS / Web) y versiones',
-            onTap: () => context.push('/admin-devices'),
+            onTap: () => context.push('/admin-devices?filter=all'),
           ),
           const Divider(height: 1),
           _ActionListTile(
@@ -1151,7 +1053,7 @@ class _DevicesManagementSection extends StatelessWidget {
             iconColor: const Color(0xFFEF4444),
             title: 'Chequeo de Bajas y Desinstalaciones FCM',
             subtitle: 'Verificación silenciosa sin enviar notificaciones',
-            onTap: () => context.push('/admin-devices'),
+            onTap: () => context.push('/admin-devices?filter=uninstalled'),
           ),
         ],
       ),

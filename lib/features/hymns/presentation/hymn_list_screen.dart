@@ -54,6 +54,21 @@ final activeCollectionProvider =
       return ActiveCollectionNotifier();
     });
 
+// Notifier para controlar si el usuario navegó al catálogo desde el Panel de Administrador
+class FromAdminNavigationNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setFromAdmin(bool value) {
+    state = value;
+  }
+}
+
+final fromAdminNavigationProvider =
+    NotifierProvider<FromAdminNavigationNotifier, bool>(() {
+  return FromAdminNavigationNotifier();
+});
+
 // Provider asíncrono para cargar todos los himnos
 final allHymnsProvider = Provider<AsyncValue<List<Hymn>>>((ref) {
   final collection = ref.watch(activeCollectionProvider);
@@ -1422,6 +1437,29 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                       });
                                     },
                                   )
+                                else if (ref.watch(fromAdminNavigationProvider))
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                                        foregroundColor: const Color(0xFFF59E0B),
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                        minimumSize: const Size(0, 36),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          side: const BorderSide(color: Color(0xFFF59E0B), width: 1.2),
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(false);
+                                        context.push('/admin-dashboard');
+                                      },
+                                      icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                                      label: const Text('Panel Admin', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                                    ),
+                                  )
                                 else if (Navigator.canPop(context))
                                   IconButton(
                                     icon: const Icon(Icons.arrow_back_rounded),
@@ -1749,6 +1787,65 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                               ref,
                               activeCollection,
                               activeCategory,
+                            ),
+
+                          // Banner contextual de navegación desde Administrador
+                          if (ref.watch(fromAdminNavigationProvider))
+                            Container(
+                              margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.16 : 0.10),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.shield_rounded, size: 20, color: Color(0xFFF59E0B)),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Explorando Catálogo como Administrador',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Toca cualquier canto para editar título, letra o acordes.',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 11.5,
+                                            color: isDark ? Colors.white60 : Colors.black54,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFF59E0B),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: const Size(0, 32),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () {
+                                      ref.read(fromAdminNavigationProvider.notifier).setFromAdmin(false);
+                                      context.push('/admin-dashboard');
+                                    },
+                                    icon: const Icon(Icons.arrow_back_rounded, size: 14),
+                                    label: const Text('Volver al Panel', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
                             ),
 
                           // Panel Administrador de Revisión de Duplicados en Pares (1 vs 1)

@@ -237,7 +237,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/admin-devices',
-      builder: (context, state) => const AdminDevicesScreen(),
+      builder: (context, state) {
+        final filter = state.uri.queryParameters['filter'] ?? 'all';
+        return AdminDevicesScreen(initialFilter: filter);
+      },
     ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,

@@ -3,6 +3,7 @@ import 'dart:ui' as dart_ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -17,6 +18,7 @@ class _DeviceStatsSummary {
   final int iosCount;
   final int webCount;
   final Map<String, int> versionBreakdown;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> allDevices;
 
   const _DeviceStatsSummary({
     required this.totalRegistered,
@@ -27,11 +29,17 @@ class _DeviceStatsSummary {
     required this.iosCount,
     required this.webCount,
     required this.versionBreakdown,
+    required this.allDevices,
   });
 }
 
 class AdminDevicesScreen extends ConsumerStatefulWidget {
-  const AdminDevicesScreen({super.key});
+  final String initialFilter;
+
+  const AdminDevicesScreen({
+    super.key,
+    this.initialFilter = 'all',
+  });
 
   @override
   ConsumerState<AdminDevicesScreen> createState() => _AdminDevicesScreenState();
@@ -39,6 +47,10 @@ class AdminDevicesScreen extends ConsumerStatefulWidget {
 
 class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
   Future<_DeviceStatsSummary>? _statsFuture;
+  late String _currentFilter;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
   bool _isCheckingFcm = false;
   String? _fcmCheckResultMessage;
   bool _fcmCheckWasError = false;
@@ -46,7 +58,14 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
   @override
   void initState() {
     super.initState();
+    _currentFilter = widget.initialFilter;
     _statsFuture = _loadStats();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<_DeviceStatsSummary> _loadStats() async {
@@ -76,9 +95,10 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
       installsRef.where('platform', isEqualTo: 'web').count().get(),
     ]);
 
+    // Obtenemos los dispositivos para mostrarlos en el explorador interactivo
     final recentSnap = await installsRef
         .orderBy('lastSeenAt', descending: true)
-        .limit(50)
+        .limit(150)
         .get();
 
     final versions = <String, int>{};
@@ -96,6 +116,7 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
       iosCount: countFutures[5].count ?? 0,
       webCount: countFutures[6].count ?? 0,
       versionBreakdown: versions,
+      allDevices: recentSnap.docs,
     );
   }
 
@@ -142,10 +163,270 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
     }
   }
 
+  String _formatTimeAgo(DateTime? date) {
+    if (date == null) return 'Sin fecha';
+    final diff = DateTime.now().difference(date);
+    if (diff.inSeconds < 60) return 'Hace instantes';
+    if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes}m';
+    if (diff.inHours < 24) return 'Hace ${diff.inHours}h';
+    if (diff.inDays < 7) return 'Hace ${diff.inDays}d';
+    if (diff.inDays < 30) return 'Hace ${(diff.inDays / 7).floor()} sem';
+    if (diff.inDays < 365) return 'Hace ${(diff.inDays / 30).floor()} mes(es)';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  String _formatFullDate(DateTime? date) {
+    if (date == null) return 'No registrado';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filterDevices(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> devices,
+    DateTime cutoffDate,
+  ) {
+    final query = _searchQuery.trim().toLowerCase();
+
+    return devices.where((doc) {
+      final data = doc.data();
+      final status = (data['installStatus'] as String?) ?? 'active';
+      final platform = (data['platform'] as String?) ?? 'other';
+      final lastSeenTs = data['lastSeenAt'] as Timestamp?;
+      final lastSeenDate = lastSeenTs?.toDate();
+
+      final isUninstalled = status == 'uninstalled_fcm';
+      final isActive = !isUninstalled && lastSeenDate != null && lastSeenDate.isAfter(cutoffDate);
+      final isInactive = !isUninstalled && (lastSeenDate == null || lastSeenDate.isBefore(cutoffDate));
+
+      // Filtro de categoría
+      bool matchesCategory = true;
+      switch (_currentFilter) {
+        case 'active':
+          matchesCategory = isActive;
+          break;
+        case 'inactive':
+          matchesCategory = isInactive;
+          break;
+        case 'uninstalled':
+          matchesCategory = isUninstalled;
+          break;
+        case 'android':
+          matchesCategory = platform == 'android';
+          break;
+        case 'ios':
+          matchesCategory = platform == 'ios';
+          break;
+        case 'web':
+          matchesCategory = platform == 'web';
+          break;
+        case 'all':
+        default:
+          matchesCategory = true;
+          break;
+      }
+
+      if (!matchesCategory) return false;
+
+      // Filtro de búsqueda
+      if (query.isNotEmpty) {
+        final deviceId = (data['deviceId'] as String? ?? doc.id).toLowerCase();
+        final appVersion = (data['appVersion'] as String? ?? '').toLowerCase();
+        final plat = platform.toLowerCase();
+        return deviceId.contains(query) ||
+            appVersion.contains(query) ||
+            plat.contains(query);
+      }
+
+      return true;
+    }).toList();
+  }
+
+  void _showDeviceDetailModal({
+    required BuildContext context,
+    required QueryDocumentSnapshot<Map<String, dynamic>> doc,
+    required bool isDark,
+    required DateTime cutoffDate,
+  }) {
+    final data = doc.data();
+    final deviceId = (data['deviceId'] as String?) ?? doc.id;
+    final platform = (data['platform'] as String?) ?? 'desconocida';
+    final appVersion = (data['appVersion'] as String?) ?? 'Sin versión';
+    final status = (data['installStatus'] as String?) ?? 'active';
+    final hasFcm = (data['hasFcmToken'] as bool?) ?? false;
+    final firstSeenTs = data['firstSeenAt'] as Timestamp?;
+    final lastSeenTs = data['lastSeenAt'] as Timestamp?;
+
+    final isUninstalled = status == 'uninstalled_fcm';
+    final isActive = !isUninstalled && lastSeenTs != null && lastSeenTs.toDate().isAfter(cutoffDate);
+
+    Color statusColor;
+    String statusLabel;
+    if (isUninstalled) {
+      statusColor = const Color(0xFFEF4444);
+      statusLabel = 'BAJA FCM (Desinstalado / Token inválido)';
+    } else if (isActive) {
+      statusColor = const Color(0xFF10B981);
+      statusLabel = 'ACTIVO (Uso en últimos 30 días)';
+    } else {
+      statusColor = const Color(0xFFF59E0B);
+      statusLabel = 'INACTIVO (+30 días sin uso)';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.black12,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        platform == 'android'
+                            ? Icons.android_rounded
+                            : platform == 'ios'
+                                ? Icons.apple_rounded
+                                : Icons.language_rounded,
+                        color: statusColor,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Detalle del Dispositivo',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            statusLabel,
+                            style: GoogleFonts.nunito(
+                              fontSize: 12.5,
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _modalInfoRow('Plataforma', platform.toUpperCase(), isDark),
+                _modalInfoRow('Versión de App', appVersion, isDark),
+                _modalInfoRow('Primera Conexión', _formatFullDate(firstSeenTs?.toDate()), isDark),
+                _modalInfoRow('Último Uso', _formatFullDate(lastSeenTs?.toDate()), isDark),
+                _modalInfoRow('Notificaciones FCM', hasFcm ? 'Registrado y activo' : 'Sin notificaciones', isDark),
+                _modalInfoRow('ID Interno', deviceId.length > 24 ? '${deviceId.substring(0, 24)}...' : deviceId, isDark),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: deviceId));
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('ID del dispositivo copiado al portapapeles.'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                        label: const Text('Copiar ID'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0EA5E9),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cerrar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _modalInfoRow(String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 13,
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: GoogleFonts.outfit(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = ref.watch(adminModeProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cutoffDate = DateTime.now().subtract(const Duration(days: 30));
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -160,7 +441,7 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
         actions: [
           if (isAdmin)
             IconButton(
-              tooltip: 'Actualizar contadores',
+              tooltip: 'Actualizar datos',
               onPressed: _refreshStats,
               icon: const Icon(Icons.refresh_rounded),
             ),
@@ -240,12 +521,15 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
                       }
 
                       final stats = snapshot.data!;
+                      final filteredDevices = _filterDevices(stats.allDevices, cutoffDate);
+
                       return Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 960),
                           child: ListView(
-                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
                             children: [
+                              // 1. Grid interactivo de KPIs (Filtros Principales)
                               LayoutBuilder(
                                 builder: (context, constraints) {
                                   final isWide = constraints.maxWidth >= 600;
@@ -257,240 +541,525 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
                                     mainAxisSpacing: 12,
                                     childAspectRatio: isWide ? 1.45 : 1.30,
                                     children: [
-                                      _StatCard(
+                                      _InteractiveStatCard(
                                         label: 'Instalaciones',
                                         value: stats.totalRegistered.toString(),
                                         icon: Icons.devices_rounded,
                                         color: const Color(0xFF0EA5E9),
-                                        onTap: () => _showStatDetail(
-                                          context: context,
-                                          title: 'Instalaciones Totales',
-                                          value: stats.totalRegistered.toString(),
-                                          description:
-                                              'Total histórico de dispositivos únicos registrados en la base de datos que han abierto la app.',
-                                          icon: Icons.devices_rounded,
-                                          color: const Color(0xFF0EA5E9),
-                                        ),
+                                        isSelected: _currentFilter == 'all',
+                                        subtitle: 'Todas las registradas',
+                                        onTap: () => setState(() => _currentFilter = 'all'),
                                       ),
-                                      _StatCard(
+                                      _InteractiveStatCard(
                                         label: 'Activos (30d)',
                                         value: stats.activeLast30Days.toString(),
-                                        icon: Icons.check_circle_rounded,
+                                        icon: Icons.bolt_rounded,
                                         color: const Color(0xFF10B981),
-                                        onTap: () => _showStatDetail(
-                                          context: context,
-                                          title: 'Dispositivos Activos',
-                                          value:
-                                              '${stats.activeLast30Days} (${((stats.activeLast30Days / (stats.totalRegistered > 0 ? stats.totalRegistered : 1)) * 100).toStringAsFixed(0)}%)',
-                                          description:
-                                              'Dispositivos que han interactuado con la app en los últimos 30 días. Indica la congregación que utiliza el himnario de forma regular en los cultos.',
-                                          icon: Icons.check_circle_rounded,
-                                          color: const Color(0xFF10B981),
-                                        ),
+                                        isSelected: _currentFilter == 'active',
+                                        subtitle: 'Uso reciente en el mes',
+                                        onTap: () => setState(() => _currentFilter = 'active'),
                                       ),
-                                      _StatCard(
+                                      _InteractiveStatCard(
                                         label: 'Inactivos (+30d)',
                                         value: stats.inactiveOver30Days.toString(),
                                         icon: Icons.hourglass_bottom_rounded,
                                         color: const Color(0xFFF59E0B),
-                                        onTap: () => _showStatDetail(
-                                          context: context,
-                                          title: 'Dispositivos Inactivos',
-                                          value: stats.inactiveOver30Days.toString(),
-                                          description: stats.inactiveOver30Days == 0
-                                              ? '¡Excelente! Actualmente no hay ningún dispositivo inactivo; toda la congregación registrada ha usado la app en los últimos 30 días.'
-                                              : 'Dispositivos que llevan más de 30 días sin abrir la app.',
-                                          icon: Icons.hourglass_bottom_rounded,
-                                          color: const Color(0xFFF59E0B),
-                                        ),
+                                        isSelected: _currentFilter == 'inactive',
+                                        subtitle: 'Sin uso en > 30 días',
+                                        onTap: () => setState(() => _currentFilter = 'inactive'),
                                       ),
-                                      _StatCard(
+                                      _InteractiveStatCard(
                                         label: 'Bajas (FCM)',
                                         value: stats.uninstalledFcm.toString(),
                                         icon: Icons.phonelink_erase_rounded,
                                         color: const Color(0xFFEF4444),
-                                        onTap: () => _showStatDetail(
-                                          context: context,
-                                          title: 'Bajas Detectadas por FCM',
-                                          value: stats.uninstalledFcm.toString(),
-                                          description:
-                                              'Dispositivos que desinstalaron la app o cuyo token de notificación expiró según la verificación silenciosa de Google FCM.',
-                                          icon: Icons.phonelink_erase_rounded,
-                                          color: const Color(0xFFEF4444),
-                                        ),
+                                        isSelected: _currentFilter == 'uninstalled',
+                                        subtitle: 'App desinstalada / Token off',
+                                        onTap: () => setState(() => _currentFilter = 'uninstalled'),
                                       ),
                                     ],
                                   );
                                 },
                               ),
-                              const SizedBox(height: 18),
-                          _SectionCard(
-                            title: 'Por plataforma',
-                            isDark: isDark,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _PlatformPill(
-                                    label: 'Android',
-                                    count: stats.androidCount,
-                                    icon: Icons.android_rounded,
-                                    color: const Color(0xFF22C55E),
-                                  ),
+                              const SizedBox(height: 16),
+
+                              // 2. Filtro interactivo por Plataforma
+                              _SectionCard(
+                                title: 'Filtrar por Plataforma',
+                                isDark: isDark,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: _InteractivePlatformPill(
+                                        label: 'Android',
+                                        count: stats.androidCount,
+                                        icon: Icons.android_rounded,
+                                        color: const Color(0xFF22C55E),
+                                        isSelected: _currentFilter == 'android',
+                                        onTap: () => setState(() => _currentFilter = 'android'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _InteractivePlatformPill(
+                                        label: 'iOS / iPad',
+                                        count: stats.iosCount,
+                                        icon: Icons.apple_rounded,
+                                        color: const Color(0xFF38BDF8),
+                                        isSelected: _currentFilter == 'ios',
+                                        onTap: () => setState(() => _currentFilter = 'ios'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _InteractivePlatformPill(
+                                        label: 'Web',
+                                        count: stats.webCount,
+                                        icon: Icons.language_rounded,
+                                        color: const Color(0xFFA78BFA),
+                                        isSelected: _currentFilter == 'web',
+                                        onTap: () => setState(() => _currentFilter = 'web'),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _PlatformPill(
-                                    label: 'iOS / iPad',
-                                    count: stats.iosCount,
-                                    icon: Icons.apple_rounded,
-                                    color: const Color(0xFF38BDF8),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _PlatformPill(
-                                    label: 'Web',
-                                    count: stats.webCount,
-                                    icon: Icons.language_rounded,
-                                    color: const Color(0xFFA78BFA),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          if (stats.versionBreakdown.isNotEmpty) ...[
-                            _SectionCard(
-                              title: 'Versiones recientes (últimos 50 dispositivos)',
-                              isDark: isDark,
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: stats.versionBreakdown.entries
-                                    .map(
-                                      (entry) => Chip(
-                                        label: Text(
-                                          '${entry.key}: ${entry.value}',
-                                          style: GoogleFonts.outfit(fontSize: 12.5),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 3. Módulo FCM (Destacado cuando se filtra por Bajas FCM o se selecciona)
+                              if (_currentFilter == 'uninstalled') ...[
+                                _SectionCard(
+                                  title: 'Chequeo y Detección de Desinstalaciones FCM',
+                                  isDark: isDark,
+                                  accentColor: const Color(0xFFEF4444),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Se muestran los dispositivos cuyo token de Firebase Cloud Messaging fue invalidado o cuya app fue desinstalada. Puedes ejecutar una verificación silenciosa para auditar el estado actual de los dispositivos.',
+                                        style: GoogleFonts.nunito(
+                                          fontSize: 13.5,
+                                          height: 1.45,
+                                          color: isDark ? Colors.white70 : Colors.black87,
                                         ),
                                       ),
-                                    )
-                                    .toList(),
+                                      const SizedBox(height: 14),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFEF4444),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          ),
+                                          onPressed: _isCheckingFcm ? null : _runFcmUninstallCheck,
+                                          icon: _isCheckingFcm
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                  ),
+                                                )
+                                              : const Icon(Icons.phonelink_erase_rounded),
+                                          label: Text(
+                                            _isCheckingFcm
+                                                ? 'Ejecutando auditoría silenciosa...'
+                                                : 'Verificar Desinstalaciones FCM en Vivo',
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ),
+                                      if (_fcmCheckResultMessage != null) ...[
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          _fcmCheckResultMessage!,
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: _fcmCheckWasError
+                                                ? Colors.redAccent
+                                                : const Color(0xFF10B981),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              // 4. Explorador Detallado de Dispositivos (Listado Dinámico)
+                              _SectionCard(
+                                title: 'Explorador de Dispositivos Registrados',
+                                isDark: isDark,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Header con badge del filtro actual
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Mostrando ${filteredDevices.length} dispositivo(s)',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 14.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? Colors.white : Colors.black87,
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: _getFilterColor(_currentFilter).withValues(alpha: 0.16),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: _getFilterColor(_currentFilter).withValues(alpha: 0.35),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _getFilterLabel(_currentFilter),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: _getFilterColor(_currentFilter),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // Campo de Búsqueda rápida
+                                    TextField(
+                                      controller: _searchController,
+                                      onChanged: (val) => setState(() => _searchQuery = val),
+                                      decoration: InputDecoration(
+                                        hintText: 'Buscar por versión o ID...',
+                                        hintStyle: GoogleFonts.nunito(fontSize: 13, color: isDark ? Colors.white38 : Colors.black38),
+                                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                                        suffixIcon: _searchQuery.isNotEmpty
+                                            ? IconButton(
+                                                icon: const Icon(Icons.clear_rounded, size: 18),
+                                                onPressed: () {
+                                                  _searchController.clear();
+                                                  setState(() => _searchQuery = '');
+                                                },
+                                              )
+                                            : null,
+                                        isDense: true,
+                                        filled: true,
+                                        fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+
+                                    // Lista de Dispositivos o Empty State
+                                    if (filteredDevices.isEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.all(24),
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: isDark ? Colors.white10 : Colors.black12,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            Icon(
+                                              _currentFilter == 'inactive'
+                                                  ? Icons.check_circle_outline_rounded
+                                                  : Icons.devices_other_rounded,
+                                              size: 40,
+                                              color: _currentFilter == 'inactive'
+                                                  ? const Color(0xFF10B981)
+                                                  : Colors.amber,
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Text(
+                                              _currentFilter == 'inactive'
+                                                  ? '¡Excelente! No hay dispositivos inactivos'
+                                                  : 'No se encontraron dispositivos',
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: isDark ? Colors.white : Colors.black87,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              _currentFilter == 'inactive'
+                                                  ? 'Toda la congregación registrada ha utilizado la app en los últimos 30 días.'
+                                                  : 'Prueba cambiando el filtro o limpiando el término de búsqueda.',
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.nunito(
+                                                fontSize: 13,
+                                                color: isDark ? Colors.white60 : Colors.black54,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    else
+                                      ListView.separated(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        itemCount: filteredDevices.length,
+                                        separatorBuilder: (_, index) => const Divider(height: 1),
+                                        itemBuilder: (context, index) {
+                                          final doc = filteredDevices[index];
+                                          final data = doc.data();
+                                          final deviceId = (data['deviceId'] as String?) ?? doc.id;
+                                          final platform = (data['platform'] as String?) ?? 'other';
+                                          final appVersion = (data['appVersion'] as String?) ?? '1.0.60';
+                                          final status = (data['installStatus'] as String?) ?? 'active';
+                                          final lastSeenTs = data['lastSeenAt'] as Timestamp?;
+                                          final lastSeenDate = lastSeenTs?.toDate();
+
+                                          final isUninstalled = status == 'uninstalled_fcm';
+                                          final isActive = !isUninstalled && lastSeenDate != null && lastSeenDate.isAfter(cutoffDate);
+
+                                          Color platColor;
+                                          IconData platIcon;
+                                          String platName;
+                                          if (platform == 'android') {
+                                            platColor = const Color(0xFF22C55E);
+                                            platIcon = Icons.android_rounded;
+                                            platName = 'Android';
+                                          } else if (platform == 'ios') {
+                                            platColor = const Color(0xFF38BDF8);
+                                            platIcon = Icons.apple_rounded;
+                                            platName = 'iOS / iPad';
+                                          } else {
+                                            platColor = const Color(0xFFA78BFA);
+                                            platIcon = Icons.language_rounded;
+                                            platName = 'Web';
+                                          }
+
+                                          return ListTile(
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            leading: Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: platColor.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: Icon(platIcon, color: platColor, size: 20),
+                                            ),
+                                            title: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    '$platName · #${deviceId.length > 8 ? deviceId.substring(0, 8) : deviceId}',
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: isDark ? Colors.white : Colors.black87,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isUninstalled)
+                                                  _badge('BAJA FCM', const Color(0xFFEF4444))
+                                                else if (isActive)
+                                                  _badge('ACTIVO', const Color(0xFF10B981))
+                                                else
+                                                  _badge('INACTIVO', const Color(0xFFF59E0B)),
+                                              ],
+                                            ),
+                                            subtitle: Text(
+                                              'v$appVersion · ${_formatTimeAgo(lastSeenDate)}',
+                                              style: GoogleFonts.nunito(
+                                                fontSize: 12,
+                                                color: isDark ? Colors.white60 : Colors.black54,
+                                              ),
+                                            ),
+                                            trailing: const Icon(
+                                              Icons.chevron_right_rounded,
+                                              size: 18,
+                                              color: Colors.grey,
+                                            ),
+                                            onTap: () => _showDeviceDetailModal(
+                                              context: context,
+                                              doc: doc,
+                                              isDark: isDark,
+                                              cutoffDate: cutoffDate,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          _SectionCard(
-                            title: 'Verificación de desinstalaciones',
-                            isDark: isDark,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Ejecuta una comprobación silenciosa (sin enviar notificaciones) contra los tokens FCM registrados para detectar apps desinstaladas.',
+                              const SizedBox(height: 16),
+
+                              // 5. Versiones de la app
+                              if (stats.versionBreakdown.isNotEmpty) ...[
+                                _SectionCard(
+                                  title: 'Versiones de App Instaladas',
+                                  isDark: isDark,
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: stats.versionBreakdown.entries
+                                        .map(
+                                          (entry) => Chip(
+                                            label: Text(
+                                              '${entry.key}: ${entry.value}',
+                                              style: GoogleFonts.outfit(fontSize: 12.5),
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              // 6. Alcance del conteo
+                              _SectionCard(
+                                title: 'Alcance del Conteo de Telemetría',
+                                isDark: isDark,
+                                child: Text(
+                                  '• Cuenta dispositivos registrados desde la versión 1.0.37+42 en adelante.\n'
+                                  '• El conteo por FCM aplica a dispositivos que aceptaron notificaciones.\n'
+                                  '• Para el historial oficial completo de Play Store / App Store y Firebase Analytics (first_open / app_remove), revisa sus respectivas consolas web.',
                                   style: GoogleFonts.nunito(
-                                    fontSize: 13.5,
-                                    height: 1.4,
+                                    fontSize: 13,
+                                    height: 1.45,
                                     color: isDark ? Colors.white70 : Colors.black54,
                                   ),
                                 ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _isCheckingFcm
-                                        ? null
-                                        : _runFcmUninstallCheck,
-                                    icon: _isCheckingFcm
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2),
-                                          )
-                                        : const Icon(Icons.verified_user_rounded),
-                                    label: Text(
-                                      _isCheckingFcm
-                                          ? 'Verificando tokens...'
-                                          : 'Verificar desinstalaciones (FCM)',
-                                    ),
-                                  ),
-                                ),
-                                if (_fcmCheckResultMessage != null) ...[
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    _fcmCheckResultMessage!,
-                                    style: GoogleFonts.nunito(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: _fcmCheckWasError
-                                          ? Colors.redAccent
-                                          : const Color(0xFF10B981),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _SectionCard(
-                            title: 'Alcance del conteo',
-                            isDark: isDark,
-                            child: Text(
-                              '• Cuenta dispositivos registrados desde la versión 1.0.37+42 en adelante.\n'
-                              '• El conteo por FCM aplica a dispositivos que aceptaron notificaciones.\n'
-                              '• Para el historial oficial completo de Play Store / App Store y Firebase Analytics (first_open / app_remove), revisa sus respectivas consolas web.',
-                              style: GoogleFonts.nunito(
-                                fontSize: 13,
-                                height: 1.45,
-                                color: isDark ? Colors.white70 : Colors.black54,
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
         ],
       ),
     );
   }
+
+  Widget _badge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.outfit(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Color _getFilterColor(String filter) {
+    switch (filter) {
+      case 'active':
+        return const Color(0xFF10B981);
+      case 'inactive':
+        return const Color(0xFFF59E0B);
+      case 'uninstalled':
+        return const Color(0xFFEF4444);
+      case 'android':
+        return const Color(0xFF22C55E);
+      case 'ios':
+        return const Color(0xFF38BDF8);
+      case 'web':
+        return const Color(0xFFA78BFA);
+      case 'all':
+      default:
+        return const Color(0xFF0EA5E9);
+    }
+  }
+
+  String _getFilterLabel(String filter) {
+    switch (filter) {
+      case 'active':
+        return 'FILTRO: ACTIVOS (30d)';
+      case 'inactive':
+        return 'FILTRO: INACTIVOS (+30d)';
+      case 'uninstalled':
+        return 'FILTRO: BAJAS FCM';
+      case 'android':
+        return 'FILTRO: ANDROID';
+      case 'ios':
+        return 'FILTRO: IOS / IPAD';
+      case 'web':
+        return 'FILTRO: WEB';
+      case 'all':
+      default:
+        return 'FILTRO: TODAS LAS INSTALACIONES';
+    }
+  }
 }
 
-class _StatCard extends StatelessWidget {
+class _InteractiveStatCard extends StatelessWidget {
   final String label;
   final String value;
+  final String subtitle;
   final IconData icon;
   final Color color;
+  final bool isSelected;
   final VoidCallback onTap;
 
-  const _StatCard({
+  const _InteractiveStatCard({
     required this.label,
     required this.value,
+    required this.subtitle,
     required this.icon,
     required this.color,
+    required this.isSelected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          color: isSelected
+              ? color.withValues(alpha: isDark ? 0.18 : 0.12)
+              : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: 0.06),
+            color: isSelected
+                ? color
+                : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06)),
+            width: isSelected ? 2.0 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.22),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,16 +1070,34 @@ class _StatCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
+                    color: color.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(icon, color: color, size: 18),
                 ),
-                Icon(
-                  Icons.info_outline_rounded,
-                  size: 14,
-                  color: isDark ? Colors.white30 : Colors.black26,
-                ),
+                if (isSelected)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'ACTIVO',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.filter_list_rounded,
+                    size: 14,
+                    color: isDark ? Colors.white30 : Colors.black26,
+                  ),
               ],
             ),
             const Spacer(),
@@ -528,9 +1115,20 @@ class _StatCard extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.nunito(
-                fontSize: 12,
-                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 11,
+                color: isDark ? Colors.white54 : Colors.black45,
               ),
             ),
           ],
@@ -540,116 +1138,90 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-void _showStatDetail({
-  required BuildContext context,
-  required String title,
-  required String value,
-  required String description,
-  required IconData icon,
-  required Color color,
-}) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (ctx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(icon, color: color, size: 26),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          value,
-                          style: GoogleFonts.outfit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: color,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                description,
-                style: GoogleFonts.nunito(
-                  fontSize: 14,
-                  height: 1.45,
-                  color: isDark ? Colors.white70 : Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Entendido'),
-                ),
-              ),
-            ],
+class _InteractivePlatformPill extends StatelessWidget {
+  final String label;
+  final int count;
+  final IconData icon;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _InteractivePlatformPill({
+    required this.label,
+    required this.count,
+    required this.icon,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: isDark ? 0.25 : 0.18)
+              : color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: isSelected ? 2.0 : 1.0,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.20),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
-      );
-    },
-  );
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              count.toString(),
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
   final bool isDark;
+  final Color? accentColor;
 
   const _SectionCard({
     required this.title,
     required this.child,
     required this.isDark,
+    this.accentColor,
   });
 
   @override
@@ -660,9 +1232,11 @@ class _SectionCard extends StatelessWidget {
         color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.black.withValues(alpha: 0.06),
+          color: accentColor ??
+              (isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.06)),
+          width: accentColor != null ? 1.5 : 1.0,
         ),
       ),
       child: Column(
@@ -673,7 +1247,7 @@ class _SectionCard extends StatelessWidget {
             style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
+              color: accentColor ?? (isDark ? Colors.white : Colors.black87),
             ),
           ),
           const SizedBox(height: 12),
@@ -683,51 +1257,3 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
-
-class _PlatformPill extends StatelessWidget {
-  final String label;
-  final int count;
-  final IconData icon;
-  final Color color;
-
-  const _PlatformPill({
-    required this.label,
-    required this.count,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 6),
-          Text(
-            count.toString(),
-            style: GoogleFonts.outfit(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          Text(
-            label,
-            style: GoogleFonts.nunito(
-              fontSize: 12,
-              color: isDark ? Colors.white70 : Colors.black54,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
