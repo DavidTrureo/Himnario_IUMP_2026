@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// Motor Gramatical de Reglas Generales de Acentuación RAE
 /// Clasifica y acentúa palabras en español según su sílaba tónica:
 /// 1. Agudas: Tilde si terminan en Vocal, -N o -S.
@@ -149,17 +147,9 @@ class SpanishAccentEngine {
     'estara': 'estará',
     'estaran': 'estarán',
     'estan': 'están',
-    'esta': 'está',
-    'salvo': 'salvó',
-    'resucito': 'resucitó',
-    'sanó': 'sanó',
-    'sano': 'sanó',
     'vencio': 'venció',
-    'vencio': 'venció',
-    'pago': 'pagó',
     'murió': 'murió',
     'murio': 'murió',
-    'entrego': 'entregó',
 
     // Adverbios y Adjetivos Agudos
     'tambien': 'también',
@@ -171,7 +161,6 @@ class SpanishAccentEngine {
     'jamas': 'jamás',
     'quizas': 'quizás',
     'despues': 'después',
-    'mas': 'más', // en contextos de cantidad (más de ti)
 
     // Hiatos (Ruptura de diptongo en i/u)
     'dia': 'día',

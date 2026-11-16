@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'spanish_accent_engine.dart';
 
 class GrammarCorrectionResult {
@@ -17,12 +15,8 @@ class GrammarCorrectionResult {
 class SpanishGrammarCorrector {
   // Diccionario de correcciones de palabras sin tilde -> con tilde y erratas comunes
   static final Map<Pattern, String> _wordReplacements = {
-    // Tiempos verbales pasados comunes (errores de tilde)
-    RegExp(r'\bquemo\b', caseSensitive: false): 'quemó', // Forzamos quemo -> quemó en el contexto de himnos
+    // Corrector de erratas tipográficas y combinaciones contextuales inequívocas
     RegExp(r'\bperdónó\b', caseSensitive: false): 'perdonó', // Corrector de doble tilde accidental
-    RegExp(r'\bolvido\b', caseSensitive: false): 'olvidó', // Forzamos olvido -> olvidó
-    RegExp(r'\bdestruyo\b', caseSensitive: false): 'destruyó', // Forzamos destruyo -> destruyó
-    RegExp(r'\bcosto\b', caseSensitive: false): 'costó', // Forzamos costo -> costó
     RegExp(r'\bse olvido\b', caseSensitive: false): 'se olvidó',
     RegExp(r'\bme olvido\b', caseSensitive: false): 'me olvidó',
     RegExp(r'\bte olvido\b', caseSensitive: false): 'te olvidó',

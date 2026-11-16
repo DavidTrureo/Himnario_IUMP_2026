@@ -367,15 +367,21 @@ JSON esperado:
       }
     }
 
-    // Pasar el resultado final por el corrector local para asegurar 100% de tildes
-    final doubleCheck = SpanishGrammarCorrector.correctText(
-      title: currentTitle,
-      lyrics: currentLyrics,
-    );
-
-    currentTitle = doubleCheck.title;
-    currentLyrics = doubleCheck.lyrics;
-    totalCorrections += doubleCheck.correctionsCount;
+    // Si la IA de Gemini no pudo responder (fallback offline), aplicamos el corrector local.
+    // Si Gemini ya procesó el canto con éxito, respetamos su análisis contextual de tiempos verbales
+    // para evitar forzar tildes incorrectas en palabras en presente o adjetivos.
+    if (!isAiAssisted) {
+      final fallbackCheck = SpanishGrammarCorrector.correctText(
+        title: currentTitle,
+        lyrics: currentLyrics,
+      );
+      currentTitle = fallbackCheck.title;
+      currentLyrics = fallbackCheck.lyrics;
+      totalCorrections += fallbackCheck.correctionsCount;
+    } else {
+      currentTitle = currentTitle.toUpperCase();
+      currentLyrics = currentLyrics.replaceAll('perdónó', 'perdonó');
+    }
 
     // 2. Abrir el Modal de Resumen de Cambios (Antes vs Después)
     if (!context.mounted) return null;
