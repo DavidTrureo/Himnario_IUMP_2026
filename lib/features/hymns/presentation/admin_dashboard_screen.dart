@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/utils/external_browser_helper.dart';
 import '../domain/hymn.dart';
 import 'hymn_list_screen.dart';
 
@@ -760,16 +761,7 @@ class _LiveWorshipManagementSection extends StatelessWidget {
             iconColor: const Color(0xFFA78BFA),
             title: 'Portal Himnario Web Oficial',
             subtitle: 'Abrir himnario-vito-2026.web.app en navegador',
-            onTap: () async {
-              final uri = Uri.parse('https://himnario-vito-2026.web.app');
-              try {
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-                }
-              } catch (_) {
-                await launchUrl(uri, mode: LaunchMode.inAppWebView);
-              }
-            },
+            onTap: () => ExternalBrowserHelper.openUrl('https://himnario-vito-2026.web.app'),
           ),
         ],
       ),

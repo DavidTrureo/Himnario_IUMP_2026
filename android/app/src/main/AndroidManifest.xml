@@ -26,23 +26,25 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Intent filter para abrir la app automáticamente al escanear QR o presionar enlaces (HTTPS con autoVerify) -->
+            <!-- Intent filter para abrir la app automáticamente al escanear QR o presionar enlaces de cantos (HTTPS con autoVerify) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data
-                    android:scheme="https"
-                    android:host="himnario-vito-2026.web.app" />
+                <data android:scheme="https" android:host="himnario-vito-2026.web.app" android:pathPrefix="/hymn" />
+                <data android:scheme="https" android:host="himnario-vito-2026.web.app" android:pathPrefix="/canto" />
+                <data android:scheme="https" android:host="himnario-vito-2026.web.app" android:pathPrefix="/culto-en-vivo" />
+                <data android:scheme="https" android:host="himnario-vito-2026.web.app" android:pathPrefix="/projector-view" />
             </intent-filter>
             <!-- Soporte secundario para enlaces HTTP sin autoVerify (evita advertencia de seguridad en Google Play) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data
-                    android:scheme="http"
-                    android:host="himnario-vito-2026.web.app" />
+                <data android:scheme="http" android:host="himnario-vito-2026.web.app" android:pathPrefix="/hymn" />
+                <data android:scheme="http" android:host="himnario-vito-2026.web.app" android:pathPrefix="/canto" />
+                <data android:scheme="http" android:host="himnario-vito-2026.web.app" android:pathPrefix="/culto-en-vivo" />
+                <data android:scheme="http" android:host="himnario-vito-2026.web.app" android:pathPrefix="/projector-view" />
             </intent-filter>
             <!-- Soporte para esquema personalizado himnario:// -->
             <intent-filter>
