@@ -68,24 +68,28 @@ class HymnStructureToolbar extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       isScrollControlled: true,
       builder: (ctx) {
+        final bottomInset = MediaQuery.of(ctx).padding.bottom;
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.65,
-          maxChildSize: 0.9,
+          initialChildSize: 0.75,
+          maxChildSize: 0.92,
           minChildSize: 0.4,
           builder: (_, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            return SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: EdgeInsets.fromLTRB(20, 12, 20, 32 + bottomInset),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   Center(
                     child: Container(
                       width: 40,
@@ -169,11 +173,12 @@ class HymnStructureToolbar extends StatelessWidget {
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
+            ),
+          );
+        },
+      );
+    },
+  );
   }
 
   Widget _buildCategorySection(
