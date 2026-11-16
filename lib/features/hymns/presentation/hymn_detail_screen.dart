@@ -35,6 +35,7 @@ import '../../../core/services/chord_transposer_service.dart';
 import '../../../core/services/local_hymn_storage_service.dart';
 import 'widgets/chord_diagram_dialog.dart';
 import 'widgets/visual_metronome_widget.dart';
+import 'widgets/hymn_structure_toolbar.dart';
 import '../../../core/widgets/app_music_icons.dart';
 import '../../../core/services/hymn_pdf_service.dart';
 import '../../../core/utils/web_window_helper.dart';
@@ -3320,7 +3321,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     final firstLine = lines.first.trim();
 
     final RegExp keywordRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro\s+final|coro|final|solista|puente|interludio)(?:\s*:\s*|\s+|$)', 
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro\s+final|coro|solista\s+\d+|solista|puente\s+\d+|puente|interludio|final|pre-?coro|intro(ducción)?|estribillo|outro|coda|hombres|mujeres|todos)(?:\s*:\s*|\s+|$)', 
       caseSensitive: false
     );
     
@@ -4482,7 +4483,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
+                      HymnStructureToolbar(controller: lyricsController),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: lyricsController,
                         decoration: const InputDecoration(

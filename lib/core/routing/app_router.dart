@@ -20,6 +20,8 @@ import '../../features/hymns/presentation/admin_devices_screen.dart';
 import '../../features/hymns/presentation/admin_dashboard_screen.dart';
 import '../../features/hymns/presentation/hymn_tv_receiver_screen.dart';
 import '../../features/hymns/presentation/tv_remote_control_screen.dart';
+import '../../features/hymns/presentation/add_hymn_screen.dart';
+import '../../features/hymns/presentation/my_suggestions_screen.dart';
 import '../../features/hymns/domain/hymn.dart';
 
 
@@ -272,6 +274,19 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/scan-qr',
       builder: (context, state) => const QrScannerScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/my-suggestions',
+      builder: (context, state) => const MySuggestionsScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/add-hymn',
+      builder: (context, state) {
+        final collection = state.uri.queryParameters['collection'] ?? 'especiales';
+        return AddHymnScreen(initialCollection: collection);
+      },
     ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,

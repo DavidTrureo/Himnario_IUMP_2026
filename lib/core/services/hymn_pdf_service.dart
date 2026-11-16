@@ -13,6 +13,23 @@ class HymnPdfService {
   static pw.Font? _fontRegular;
   static pw.Font? _fontBold;
 
+  static final RegExp _structuralHeaderRegex = RegExp(
+    r'^(coro(\s+\d+|\s+[ivx]+|\s+final)?|solista(\s+\d+)?|solo|puente(\s+\d+)?|interludio|final|pre-?coro|intro(ducción)?|estribillo|outro|coda|hombres|mujeres|todos)(\s*:\s*|\s+|$)',
+    caseSensitive: false,
+  );
+
+  static bool _isStructuralHeader(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return false;
+    return _structuralHeaderRegex.hasMatch(trimmed);
+  }
+
+  static Match? _matchStructuralHeader(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return null;
+    return _structuralHeaderRegex.firstMatch(trimmed);
+  }
+
   /// Genera un documento PDF profesional y hermoso para un canto individual.
   static Future<Uint8List> generateHymnPdf(
     Hymn hymn, {
@@ -311,11 +328,8 @@ class HymnPdfService {
     for (final b in blocks) {
       final lines = b.trim().split('\n');
       if (lines.isNotEmpty) {
-        final firstLine = lines.first.trim().toLowerCase();
-        final hasExplicitChorusHeader = firstLine.contains('coro') || 
-                                        firstLine.contains('puente') || 
-                                        firstLine.contains('interludio') || 
-                                        firstLine.contains('final');
+        final firstLine = lines.first.trim();
+        final hasExplicitChorusHeader = _isStructuralHeader(firstLine);
         final isVerseHeader = RegExp(r'^(estrofa|\d+\.|\d+\b)', caseSensitive: false).hasMatch(firstLine);
 
         if (hasExplicitChorusHeader) {
@@ -470,11 +484,7 @@ class HymnPdfService {
     if (lines.isEmpty) return pw.SizedBox();
 
     final firstLine = lines.first.trim();
-    final hasExplicitChorusHeader = firstLine.toLowerCase().contains('coro') ||
-                                    firstLine.toLowerCase().contains('puente') ||
-                                    firstLine.toLowerCase().contains('interludio') ||
-                                    firstLine.toLowerCase().contains('final');
-
+    final hasExplicitChorusHeader = _isStructuralHeader(firstLine);
     final isVerseHeader = RegExp(r'^(estrofa|\d+\.|\d+\b)', caseSensitive: false).hasMatch(firstLine);
 
     final List<pw.Widget> lineWidgets = [];
@@ -483,6 +493,14 @@ class HymnPdfService {
     pw.Widget? headerWidget;
 
     if (hasExplicitChorusHeader) {
+      final match = _matchStructuralHeader(firstLine);
+      String headerTag = firstLine;
+      String restOfFirstLine = '';
+      if (match != null) {
+        headerTag = firstLine.substring(0, match.end).trim();
+        restOfFirstLine = firstLine.substring(match.end).trim();
+      }
+
       headerWidget = pw.Container(
         padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         margin: pw.EdgeInsets.only(bottom: blockMarginBottom > 6 ? 6 : 4),
@@ -491,7 +509,7 @@ class HymnPdfService {
           borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
         ),
         child: pw.Text(
-          firstLine.toUpperCase(),
+          headerTag.toUpperCase().replaceAll(RegExp(r':$'), '').trim(),
           style: pw.TextStyle(
             font: fontBold,
             fontSize: (fontSize - 1.5).clamp(7.5, 9.0),
@@ -501,6 +519,27 @@ class HymnPdfService {
         ),
       );
       startIdx = 1;
+
+      if (restOfFirstLine.isNotEmpty) {
+        if (restOfFirstLine.contains('[') && restOfFirstLine.contains(']')) {
+          lineWidgets.add(buildLineWithChords(Hymn.formatLineCasing(restOfFirstLine), fontRegular, fontBold, transposeOffset, notation));
+        } else {
+          lineWidgets.add(
+            pw.Padding(
+              padding: pw.EdgeInsets.symmetric(vertical: lineVerticalPadding),
+              child: pw.Text(
+                restOfFirstLine,
+                style: pw.TextStyle(
+                  font: fontRegular,
+                  fontSize: fontSize,
+                  color: PdfColor.fromHex('#1E293B'),
+                  height: lineHeight,
+                ),
+              ),
+            ),
+          );
+        }
+      }
     } else if (isVerseHeader && !isChorusBlock) {
       headerWidget = pw.Padding(
         padding: pw.EdgeInsets.only(top: 2, bottom: blockMarginBottom > 6 ? 4 : 2),

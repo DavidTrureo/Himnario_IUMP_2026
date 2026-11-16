@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:himnario_iump/core/services/local_hymn_storage_service.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
@@ -12,7 +13,16 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/services/chord_transposer_service.dart';
 import '../../../core/services/gemini_ai_service.dart';
+import '../../../core/services/suggestion_tracking_service.dart';
+import 'widgets/hymn_structure_toolbar.dart';
 import 'hymn_list_screen.dart';
+
+enum _DuplicateAction {
+  viewExisting,
+  requestCorrection,
+  saveLocalMedley,
+  proceedAsNew,
+}
 
 class AddHymnScreen extends ConsumerStatefulWidget {
   final String initialCollection;
@@ -230,6 +240,268 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
     }
   }
 
+  Future<_DuplicateAction?> _showDuplicateChoiceDialog(
+    BuildContext context,
+    Hymn duplicate,
+  ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return showDialog<_DuplicateAction>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Row(
+            children: [
+              const Icon(Icons.auto_awesome_rounded, color: Color(0xFFF59E0B), size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Coincidencia en el Catálogo',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Detectamos partes de la letra similares a un canto existente:',
+                  style: GoogleFonts.nunito(fontSize: 13.5, color: isDark ? Colors.white70 : Colors.black87),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        duplicate.title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_collectionLabel(duplicate.collection)} (N° ${duplicate.id})',
+                        style: GoogleFonts.nunito(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '¿Qué deseas hacer con esta propuesta?',
+                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                _buildChoiceTile(
+                  icon: Icons.visibility_rounded,
+                  color: const Color(0xFF0EA5E9),
+                  title: 'Ver Canto en el Himnario',
+                  subtitle: 'Comprueba si la versión oficial ya satisface lo que buscas.',
+                  onTap: () => Navigator.pop(dialogCtx, _DuplicateAction.viewExisting),
+                ),
+                _buildChoiceTile(
+                  icon: Icons.auto_fix_high_rounded,
+                  color: const Color(0xFF10B981),
+                  title: 'Solicitar Corrección / Mejora',
+                  subtitle: 'Si el canto existente tiene faltas o está desordenado, envía tu versión para mejorarlo.',
+                  onTap: () => Navigator.pop(dialogCtx, _DuplicateAction.requestCorrection),
+                ),
+                _buildChoiceTile(
+                  icon: Icons.library_music_rounded,
+                  color: const Color(0xFF8B5CF6),
+                  title: 'Es un Medley / Popurrí (Guardar Local)',
+                  subtitle: 'Ideal para arreglos propios de tu coro. Se guardará en tu móvil para imprimir y compartir.',
+                  onTap: () => Navigator.pop(dialogCtx, _DuplicateAction.saveLocalMedley),
+                ),
+                _buildChoiceTile(
+                  icon: Icons.add_circle_outline_rounded,
+                  color: const Color(0xFFF59E0B),
+                  title: 'Es un Canto Nuevo Diferente',
+                  subtitle: 'Enviar como sugerencia de canto independiente al catálogo oficial.',
+                  onTap: () => Navigator.pop(dialogCtx, _DuplicateAction.proceedAsNew),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, null),
+              child: Text('Cancelar', style: GoogleFonts.nunito(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildChoiceTile({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 20, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.nunito(
+                        fontSize: 11.5,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSuggestionSuccessDialog(
+    BuildContext context, {
+    required bool isNewSong,
+    required String title,
+    required String requesterName,
+    required String requesterChurch,
+    required bool isCorrection,
+    String? targetTitle,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF10B981),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  isCorrection ? '¡Corrección Enviada!' : '¡Sugerencia Enviada!',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isNewSong)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: Color(0xFF0284C7), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Este canto no existe actualmente en el catálogo oficial.',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0284C7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Text(
+                isCorrection
+                    ? 'Tu propuesta de mejora para "$targetTitle" ha sido recibida con éxito junto a tus datos ($requesterName de $requesterChurch).\n\nEl administrador revisará los cambios para dejar el canto impecable en la base de datos oficial próximamente.'
+                    : 'Tu sugerencia de "$title" ha sido recibida con éxito junto a tus datos ($requesterName de $requesterChurch).\n\nEl administrador revisará la letra, la ordenará y la incorporará al catálogo oficial próximamente.\n\n¡Muchas gracias por tu valioso aporte!',
+                style: GoogleFonts.nunito(fontSize: 13.5, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '💡 Podrás seguir el estado de esta sugerencia en "Herramientas > Mis Sugerencias al Catálogo".',
+                style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey[500], fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _saveHymn({required bool isLocal, required bool isAdmin}) async {
     final title = _titleController.text.trim();
     final lyrics = ChordTransposerService.normalizeLyrics(_lyricsController.text.trim());
@@ -240,6 +512,24 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
         const SnackBar(content: Text('Por favor, ingresa título y letra')),
       );
       return;
+    }
+
+    final requesterName = _nameController.text.trim();
+    final requesterChurch = _churchController.text.trim();
+
+    if (!isLocal && !isAdmin) {
+      if (requesterName.isEmpty || requesterChurch.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFF59E0B),
+            content: Text(
+              'Por favor, ingresa tu Nombre y tu Iglesia/Local para enviar la sugerencia al administrador.',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+            ),
+          ),
+        );
+        return;
+      }
     }
 
     int? explicitIumpId;
@@ -266,29 +556,33 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
       }
     }
 
+    String suggestionType = 'new';
+    int? targetHymnId;
+    String? targetHymnTitle;
+    String? targetHymnCollection;
+    String? correctionReason;
+
     final existingHymns = ref.read(allHymnsProvider).value ?? [];
     final duplicate = Hymn.findPossibleDuplicate(lyrics, existingHymns);
     if (duplicate != null) {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (dialogCtx) => AlertDialog(
-          title: const Text('Posible Duplicado'),
-          content: Text(
-            'Este canto se parece mucho a "${duplicate.title}" que ya existe en el himnario. ¿Seguro que deseas añadirlo?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx, false),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx, true),
-              child: const Text('Añadir de todos modos'),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true || !mounted) return;
+      final action = await _showDuplicateChoiceDialog(context, duplicate);
+      if (action == null) return; // Canceló el diálogo
+
+      if (action == _DuplicateAction.viewExisting) {
+        if (!mounted) return;
+        context.push('/home/hymn/${duplicate.collection}-${duplicate.id}');
+        return;
+      } else if (action == _DuplicateAction.saveLocalMedley) {
+        isLocal = true;
+      } else if (action == _DuplicateAction.requestCorrection) {
+        suggestionType = 'correction';
+        targetHymnId = duplicate.id;
+        targetHymnTitle = duplicate.title;
+        targetHymnCollection = duplicate.collection;
+        correctionReason = 'Solicitud de corrección y ordenamiento de letra';
+      } else if (action == _DuplicateAction.proceedAsNew) {
+        suggestionType = 'new';
+      }
     }
 
     setState(() => _isLoading = true);
@@ -337,7 +631,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
           );
         }
       } else {
-        await FirebaseFirestore.instance.collection('cantos_sugeridos').add({
+        final docRef = await FirebaseFirestore.instance.collection('cantos_sugeridos').add({
           'title': title.toUpperCase(),
           'lyrics': lyrics,
           'collection': _selectedCollection,
@@ -345,14 +639,42 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
           'beats': _beatsController.text.trim(),
           'timeSignature': _timeSignatureController.text.trim(),
           'category': _selectedCategory,
-          'requesterName': _nameController.text.trim(),
-          'requesterChurch': _churchController.text.trim(),
+          'requesterName': requesterName,
+          'requesterChurch': requesterChurch,
           'timestamp': FieldValue.serverTimestamp(),
           'status': 'pending',
+          'type': suggestionType,
+          'targetHymnId': targetHymnId,
+          'targetTitle': targetHymnTitle,
+          'targetCollection': targetHymnCollection,
+          'reason': correctionReason,
         });
+
+        await SuggestionTrackingService.saveSubmittedSuggestion(
+          SubmittedSuggestion(
+            docId: docRef.id,
+            title: title.toUpperCase(),
+            collection: _selectedCollection,
+            requesterName: requesterName,
+            requesterChurch: requesterChurch,
+            date: DateTime.now(),
+            type: suggestionType,
+            targetHymnId: targetHymnId,
+            targetTitle: targetHymnTitle,
+            reason: correctionReason,
+            status: 'pending',
+          ),
+        );
+
         if (mounted) {
-          messenger.showSnackBar(
-            const SnackBar(content: Text('Canto sugerido enviado a revisión.')),
+          await _showSuggestionSuccessDialog(
+            context,
+            isNewSong: duplicate == null,
+            title: title.toUpperCase(),
+            requesterName: requesterName,
+            requesterChurch: requesterChurch,
+            isCorrection: suggestionType == 'correction',
+            targetTitle: targetHymnTitle,
           );
         }
       }
@@ -409,6 +731,12 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
         centerTitle: true,
         elevation: 0,
         actions: [
+          if (!isAdmin)
+            IconButton(
+              icon: const Icon(Icons.mark_email_read_outlined),
+              tooltip: 'Mis Sugerencias Enviadas',
+              onPressed: () => context.push('/my-suggestions'),
+            ),
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(16.0),
@@ -671,6 +999,10 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    HymnStructureToolbar(
+                      controller: _lyricsController,
+                      onChanged: () => setState(() {}),
+                    ),
                     TextField(
                       controller: _lyricsController,
                       minLines: 12,
@@ -708,7 +1040,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
                     children: [
                       _buildSectionTitle('Datos del Sugeridor', Icons.person_outline),
                       Text(
-                        'Opcional. Se enviarán junto a la letra si eliges "Sugerir Oficial".',
+                        'Requerido para sugerencias al catálogo oficial. El administrador sabrá quién realizó el aporte.',
                         style: TextStyle(
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
                           fontSize: 13,
@@ -721,7 +1053,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
                             child: TextField(
                               controller: _nameController,
                               decoration: InputDecoration(
-                                labelText: 'Tu Nombre',
+                                labelText: 'Tu Nombre *',
                                 prefixIcon: const Icon(Icons.badge_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
@@ -734,7 +1066,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
                             child: TextField(
                               controller: _churchController,
                               decoration: InputDecoration(
-                                labelText: 'Iglesia/Local',
+                                labelText: 'Iglesia/Local *',
                                 prefixIcon: const Icon(Icons.church_outlined),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,

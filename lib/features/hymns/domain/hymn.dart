@@ -243,7 +243,7 @@ class Hymn {
     );
 
     final RegExp chorusInlineHeader = RegExp(
-      r'^((?:CORO|PUENTE|FINAL|SOLISTA|INTERLUDIO)(?:\s+(?:\d+|[IVXivx]+|FINAL))?\s*[\.\-:]?)\s+(.+)$',
+      r'^((?:CORO|PUENTE|FINAL|SOLISTA|INTERLUDIO|PRE-CORO|PRECORO|ESTRIBILLO|INTRO|OUTRO|CODA|HOMBRES|MUJERES|TODOS)(?:\s+(?:\d+|[IVXivx]+|FINAL))?\s*[\.\-:]?)\s+(.+)$',
       caseSensitive: false,
     );
 

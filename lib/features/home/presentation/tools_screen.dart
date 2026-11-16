@@ -130,6 +130,16 @@ class ToolsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
 
           _ToolCard(
+            title: 'Mis Sugerencias al Catálogo',
+            subtitle: 'Revisa el estado de los cantos enviados al administrador',
+            icon: Icons.mark_email_read_rounded,
+            iconColor: const Color(0xFF6366F1),
+            onTap: () {
+              context.push('/my-suggestions');
+            },
+          ),
+          const SizedBox(height: 16),
+          _ToolCard(
             title: 'Guía Rápida de Funciones',
             subtitle: 'Descubre todo lo que puedes hacer con la app',
             icon: Icons.tips_and_updates_rounded,
