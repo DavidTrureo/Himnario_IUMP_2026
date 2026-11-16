@@ -240,44 +240,90 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
                       }
 
                       final stats = snapshot.data!;
-                      return ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                        children: [
-                          GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 1.42,
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 960),
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
                             children: [
-                              _StatCard(
-                                label: 'Instalaciones',
-                                value: stats.totalRegistered.toString(),
-                                icon: Icons.devices_rounded,
-                                color: const Color(0xFF0EA5E9),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isWide = constraints.maxWidth >= 600;
+                                  return GridView.count(
+                                    crossAxisCount: isWide ? 4 : 2,
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: isWide ? 1.45 : 1.30,
+                                    children: [
+                                      _StatCard(
+                                        label: 'Instalaciones',
+                                        value: stats.totalRegistered.toString(),
+                                        icon: Icons.devices_rounded,
+                                        color: const Color(0xFF0EA5E9),
+                                        onTap: () => _showStatDetail(
+                                          context: context,
+                                          title: 'Instalaciones Totales',
+                                          value: stats.totalRegistered.toString(),
+                                          description:
+                                              'Total histórico de dispositivos únicos registrados en la base de datos que han abierto la app.',
+                                          icon: Icons.devices_rounded,
+                                          color: const Color(0xFF0EA5E9),
+                                        ),
+                                      ),
+                                      _StatCard(
+                                        label: 'Activos (30d)',
+                                        value: stats.activeLast30Days.toString(),
+                                        icon: Icons.check_circle_rounded,
+                                        color: const Color(0xFF10B981),
+                                        onTap: () => _showStatDetail(
+                                          context: context,
+                                          title: 'Dispositivos Activos',
+                                          value:
+                                              '${stats.activeLast30Days} (${((stats.activeLast30Days / (stats.totalRegistered > 0 ? stats.totalRegistered : 1)) * 100).toStringAsFixed(0)}%)',
+                                          description:
+                                              'Dispositivos que han interactuado con la app en los últimos 30 días. Indica la congregación que utiliza el himnario de forma regular en los cultos.',
+                                          icon: Icons.check_circle_rounded,
+                                          color: const Color(0xFF10B981),
+                                        ),
+                                      ),
+                                      _StatCard(
+                                        label: 'Inactivos (+30d)',
+                                        value: stats.inactiveOver30Days.toString(),
+                                        icon: Icons.hourglass_bottom_rounded,
+                                        color: const Color(0xFFF59E0B),
+                                        onTap: () => _showStatDetail(
+                                          context: context,
+                                          title: 'Dispositivos Inactivos',
+                                          value: stats.inactiveOver30Days.toString(),
+                                          description: stats.inactiveOver30Days == 0
+                                              ? '¡Excelente! Actualmente no hay ningún dispositivo inactivo; toda la congregación registrada ha usado la app en los últimos 30 días.'
+                                              : 'Dispositivos que llevan más de 30 días sin abrir la app.',
+                                          icon: Icons.hourglass_bottom_rounded,
+                                          color: const Color(0xFFF59E0B),
+                                        ),
+                                      ),
+                                      _StatCard(
+                                        label: 'Bajas (FCM)',
+                                        value: stats.uninstalledFcm.toString(),
+                                        icon: Icons.phonelink_erase_rounded,
+                                        color: const Color(0xFFEF4444),
+                                        onTap: () => _showStatDetail(
+                                          context: context,
+                                          title: 'Bajas Detectadas por FCM',
+                                          value: stats.uninstalledFcm.toString(),
+                                          description:
+                                              'Dispositivos que desinstalaron la app o cuyo token de notificación expiró según la verificación silenciosa de Google FCM.',
+                                          icon: Icons.phonelink_erase_rounded,
+                                          color: const Color(0xFFEF4444),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
-                              _StatCard(
-                                label: 'Activos (30d)',
-                                value: stats.activeLast30Days.toString(),
-                                icon: Icons.check_circle_rounded,
-                                color: const Color(0xFF10B981),
-                              ),
-                              _StatCard(
-                                label: 'Inactivos (+30d)',
-                                value: stats.inactiveOver30Days.toString(),
-                                icon: Icons.hourglass_bottom_rounded,
-                                color: const Color(0xFFF59E0B),
-                              ),
-                              _StatCard(
-                                label: 'Bajas (FCM)',
-                                value: stats.uninstalledFcm.toString(),
-                                icon: Icons.phonelink_erase_rounded,
-                                color: const Color(0xFFEF4444),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
+                              const SizedBox(height: 18),
                           _SectionCard(
                             title: 'Por plataforma',
                             isDark: isDark,
@@ -402,10 +448,12 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
                             ),
                           ),
                         ],
-                      );
-                    },
-                  ),
-          ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -417,57 +465,180 @@ class _StatCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final VoidCallback onTap;
 
   const _StatCard({
     required this.label,
     required this.value,
     required this.icon,
     required this.color,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.black.withValues(alpha: 0.06),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 14,
+                  color: isDark ? Colors.white30 : Colors.black26,
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: color, size: 22),
-          Column(
+    );
+  }
+}
+
+void _showStatDetail({
+  required BuildContext context,
+  required String title,
+  required String value,
+  required String description,
+  required IconData icon,
+  required Color color,
+}) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                value,
-                style: GoogleFonts.outfit(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: color, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          value,
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               Text(
-                label,
+                description,
                 style: GoogleFonts.nunito(
-                  fontSize: 12.5,
-                  color: isDark ? Colors.white60 : Colors.black54,
+                  fontSize: 14,
+                  height: 1.45,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Entendido'),
                 ),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    },
+  );
 }
 
 class _SectionCard extends StatelessWidget {

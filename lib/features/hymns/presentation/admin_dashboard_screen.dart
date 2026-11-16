@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/utils/external_browser_helper.dart';
 import '../domain/hymn.dart';
@@ -223,71 +222,83 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       ),
                     ),
                   )
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
-                    children: [
-                      // Encabezado de identidad Admin
-                      _AdminHeaderCard(
-                        isDark: isDark,
-                        appVersion: _appVersion,
-                      ),
-                      const SizedBox(height: 18),
+                : Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
+                        children: [
+                          // Encabezado de identidad Admin
+                          _AdminHeaderCard(
+                            isDark: isDark,
+                            appVersion: _appVersion,
+                          ),
+                          const SizedBox(height: 18),
 
-                      // KPIs en Vivo (Sugerencias, Dispositivos, Cantos)
-                      Text(
-                        'Pulso del Himnario en Tiempo Real',
-                        style: GoogleFonts.outfit(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _LiveKpiGrid(isDark: isDark, totalHymns: totalHymns),
-                      const SizedBox(height: 22),
+                          // KPIs en Vivo (Sugerencias, Dispositivos, Cantos)
+                          Text(
+                            'Pulso del Himnario en Tiempo Real',
+                            style: GoogleFonts.outfit(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _LiveKpiGrid(
+                            isDark: isDark,
+                            totalHymns: totalHymns,
+                            iumpCount: iumpList.length,
+                            espCount: espList.length,
+                            corosCount: corosList.length,
+                            acordesCount: acordesCount,
+                          ),
+                          const SizedBox(height: 22),
 
-                      // Módulo 1: Gestión de Cantos & Sugerencias IA
-                      Text(
-                        'Gestión de Contenido y Cantos',
-                        style: GoogleFonts.outfit(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _ContentManagementSection(
-                        isDark: isDark,
-                        acordesCount: acordesCount,
-                        totalHymns: totalHymns,
-                      ),
-                      const SizedBox(height: 22),
+                          // Módulo 1: Gestión de Cantos & Sugerencias IA
+                          Text(
+                            'Gestión de Contenido y Cantos',
+                            style: GoogleFonts.outfit(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _ContentManagementSection(
+                            isDark: isDark,
+                            acordesCount: acordesCount,
+                            totalHymns: totalHymns,
+                          ),
+                          const SizedBox(height: 22),
 
-                      // Módulo 2: Telemetría y Dispositivos
-                      Text(
-                        'Dispositivos e Infraestructura',
-                        style: GoogleFonts.outfit(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _DevicesManagementSection(isDark: isDark),
-                      const SizedBox(height: 22),
+                          // Módulo 2: Telemetría y Dispositivos
+                          Text(
+                            'Dispositivos e Infraestructura',
+                            style: GoogleFonts.outfit(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _DevicesManagementSection(isDark: isDark),
+                          const SizedBox(height: 22),
 
-                      // Módulo 3: Proyección y Transmisión en Vivo
-                      Text(
-                        'Salas de Culto y Proyección',
-                        style: GoogleFonts.outfit(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
+                          // Módulo 3: Proyección y Transmisión en Vivo
+                          Text(
+                            'Salas de Culto y Proyección',
+                            style: GoogleFonts.outfit(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _LiveWorshipManagementSection(isDark: isDark),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      _LiveWorshipManagementSection(isDark: isDark),
-                    ],
+                    ),
                   ),
           ),
         ],
@@ -407,10 +418,18 @@ class _AdminHeaderCard extends StatelessWidget {
 class _LiveKpiGrid extends ConsumerWidget {
   final bool isDark;
   final int totalHymns;
+  final int iumpCount;
+  final int espCount;
+  final int corosCount;
+  final int acordesCount;
 
   const _LiveKpiGrid({
     required this.isDark,
     required this.totalHymns,
+    required this.iumpCount,
+    required this.espCount,
+    required this.corosCount,
+    required this.acordesCount,
   });
 
   @override
@@ -419,93 +438,101 @@ class _LiveKpiGrid extends ConsumerWidget {
     final installsRef = firestore?.collection('device_installs');
     final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 30)));
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.35,
-      children: [
-        // KPI 1: Sugerencias Pendientes
-        StreamBuilder<QuerySnapshot>(
-          stream: firestore != null
-              ? firestore
-                  .collection('cantos_sugeridos')
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 600;
+        return GridView.count(
+          crossAxisCount: isWide ? 4 : 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: isWide ? 1.45 : 1.30,
+          children: [
+            // KPI 1: Sugerencias Pendientes
+            StreamBuilder<QuerySnapshot>(
+              stream: firestore
+                  ?.collection('cantos_sugeridos')
                   .where('status', isEqualTo: 'pending')
-                  .snapshots()
-              : null,
-          builder: (context, snapshot) {
-            final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
-            return _KpiCard(
-              isDark: isDark,
-              title: 'Sugerencias IA',
-              value: count.toString(),
-              subtitle: count == 0 ? 'Al día (0 pendientes)' : 'Requieren revisión',
-              icon: Icons.mark_email_unread_rounded,
-              color: count > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-              onTap: () => context.push('/admin-suggestions'),
-            );
-          },
-        ),
+                  .snapshots(),
+              builder: (context, snapshot) {
+                final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                return _KpiCard(
+                  isDark: isDark,
+                  title: 'Sugerencias IA',
+                  value: count.toString(),
+                  subtitle: count == 0 ? 'Al día (0 pendientes)' : 'Requieren revisión',
+                  icon: Icons.mark_email_unread_rounded,
+                  color: count > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                  onTap: () => context.push('/admin-suggestions'),
+                );
+              },
+            ),
 
-        // KPI 2: Dispositivos Instalados
-        FutureBuilder<AggregateQuerySnapshot>(
-          future: installsRef?.count().get(),
-          builder: (context, snapshot) {
-            final count = snapshot.hasData ? snapshot.data!.count ?? 0 : 0;
-            return _KpiCard(
-              isDark: isDark,
-              title: 'Instalaciones',
-              value: count.toString(),
-              subtitle: 'Dispositivos registrados',
-              icon: Icons.devices_rounded,
-              color: const Color(0xFF0EA5E9),
-              onTap: () => context.push('/admin-devices'),
-            );
-          },
-        ),
+            // KPI 2: Dispositivos Instalados
+            FutureBuilder<AggregateQuerySnapshot>(
+              future: installsRef?.count().get(),
+              builder: (context, snapshot) {
+                final count = snapshot.hasData ? snapshot.data!.count ?? 0 : 0;
+                return _KpiCard(
+                  isDark: isDark,
+                  title: 'Instalaciones',
+                  value: count.toString(),
+                  subtitle: 'Dispositivos registrados',
+                  icon: Icons.devices_rounded,
+                  color: const Color(0xFF0EA5E9),
+                  onTap: () => context.push('/admin-devices'),
+                );
+              },
+            ),
 
-        // KPI 3: Activos en 30 días
-        FutureBuilder<AggregateQuerySnapshot>(
-          future: installsRef != null
-              ? installsRef
-                  .where('installStatus', isEqualTo: 'active')
+            // KPI 3: Activos en 30 días
+            FutureBuilder<AggregateQuerySnapshot>(
+              future: installsRef
+                  ?.where('installStatus', isEqualTo: 'active')
                   .where('lastSeenAt', isGreaterThanOrEqualTo: cutoff)
                   .count()
-                  .get()
-              : null,
-          builder: (context, snapshot) {
-            final count = snapshot.hasData ? snapshot.data!.count ?? 0 : 0;
-            return _KpiCard(
-              isDark: isDark,
-              title: 'Activos (30d)',
-              value: count.toString(),
-              subtitle: 'Uso reciente en el mes',
-              icon: Icons.bolt_rounded,
-              color: const Color(0xFF10B981),
-              onTap: () => context.push('/admin-devices'),
-            );
-          },
-        ),
+                  .get(),
+              builder: (context, snapshot) {
+                final count = snapshot.hasData ? snapshot.data!.count ?? 0 : 0;
+                return _KpiCard(
+                  isDark: isDark,
+                  title: 'Activos (30d)',
+                  value: count.toString(),
+                  subtitle: 'Uso reciente en el mes',
+                  icon: Icons.bolt_rounded,
+                  color: const Color(0xFF10B981),
+                  onTap: () => _showActiveStatsSheet(
+                    context: context,
+                    isDark: isDark,
+                    activeCount: count,
+                  ),
+                );
+              },
+            ),
 
-        // KPI 4: Total de Cantos en Base de Datos
-        _KpiCard(
-          isDark: isDark,
-          title: 'Repertorio Total',
-          value: totalHymns > 0 ? totalHymns.toString() : '2.996',
-          subtitle: 'IUMP + Especiales + Coros',
-          icon: Icons.library_music_rounded,
-          color: const Color(0xFF8B5CF6),
-          onTap: () {
-            ref.read(activeCollectionProvider.notifier).setCollection('all');
-            ref.read(showFavoritesProvider.notifier).setFavorites(false);
-            ref.read(searchQueryProvider.notifier).updateQuery('');
-            ref.read(activeCategoryProvider.notifier).setCategory('Todos');
-            context.go('/home/hymns');
-          },
-        ),
-      ],
+            // KPI 4: Total de Cantos en Base de Datos (Auditoría Ejecutiva)
+            _KpiCard(
+              isDark: isDark,
+              title: 'Repertorio Total',
+              value: totalHymns > 0 ? totalHymns.toString() : '2.989',
+              subtitle: 'IUMP + Especiales + Coros',
+              icon: Icons.library_music_rounded,
+              color: const Color(0xFF8B5CF6),
+              onTap: () => _showCatalogBreakdownSheet(
+                context: context,
+                ref: ref,
+                isDark: isDark,
+                totalHymns: totalHymns,
+                iumpCount: iumpCount,
+                espCount: espCount,
+                corosCount: corosCount,
+                acordesCount: acordesCount,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -535,7 +562,7 @@ class _KpiCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
           borderRadius: BorderRadius.circular(18),
@@ -547,51 +574,455 @@ class _KpiCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icon, color: color, size: 24),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
                 Icon(
                   Icons.arrow_forward_ios_rounded,
-                  size: 13,
+                  size: 11,
                   color: isDark ? Colors.white30 : Colors.black26,
                 ),
               ],
             ),
-            Column(
+            const Spacer(),
+            Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.nunito(
+                fontSize: 11,
+                color: isDark ? Colors.white54 : Colors.black45,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _showActiveStatsSheet({
+  required BuildContext context,
+  required bool isDark,
+  required int activeCount,
+}) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.bolt_rounded, color: Color(0xFF10B981), size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Actividad en los Últimos 30 Días',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          '$activeCount dispositivos activos en el mes',
+                          style: GoogleFonts.nunito(
+                            fontSize: 13,
+                            color: const Color(0xFF10B981),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Este indicador mide los teléfonos, iPads y navegadores web que han utilizado el himnario en los últimos 30 días. Refleja a los miembros que usan la app activamente durante las reuniones y cultos.',
+                style: GoogleFonts.nunito(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0EA5E9),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    context.push('/admin-devices');
+                  },
+                  icon: const Icon(Icons.devices_rounded),
+                  label: const Text('Ver Desglose Completo de Plataformas'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+void _showCatalogBreakdownSheet({
+  required BuildContext context,
+  required WidgetRef ref,
+  required bool isDark,
+  required int totalHymns,
+  required int iumpCount,
+  required int espCount,
+  required int corosCount,
+  required int acordesCount,
+}) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    isScrollControlled: true,
+    builder: (ctx) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.library_music_rounded, color: Color(0xFF8B5CF6), size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Desglose del Catálogo Oficial',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          '$totalHymns cantos en el repertorio activo',
+                          style: GoogleFonts.nunito(
+                            fontSize: 13,
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Colecciones en la Base de Datos',
+                style: GoogleFonts.outfit(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _CollectionBreakdownTile(
+                icon: Icons.menu_book_rounded,
+                iconColor: const Color(0xFF38BDF8),
+                title: 'Himnos Oficiales IUMP',
+                count: iumpCount,
+                isDark: isDark,
+                onExplore: () {
+                  Navigator.pop(ctx);
+                  ref.read(activeCollectionProvider.notifier).setCollection('iump');
+                  ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                  ref.read(searchQueryProvider.notifier).updateQuery('');
+                  ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+                  context.go('/home/hymns');
+                },
+              ),
+              const SizedBox(height: 8),
+              _CollectionBreakdownTile(
+                icon: Icons.auto_awesome_rounded,
+                iconColor: const Color(0xFFF59E0B),
+                title: 'Cantos Especiales',
+                count: espCount,
+                isDark: isDark,
+                onExplore: () {
+                  Navigator.pop(ctx);
+                  ref.read(activeCollectionProvider.notifier).setCollection('especiales');
+                  ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                  ref.read(searchQueryProvider.notifier).updateQuery('');
+                  ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+                  context.go('/home/hymns');
+                },
+              ),
+              const SizedBox(height: 8),
+              _CollectionBreakdownTile(
+                icon: Icons.local_fire_department_rounded,
+                iconColor: const Color(0xFFEF4444),
+                title: 'Coros Pentecostales y Adoración',
+                count: corosCount,
+                isDark: isDark,
+                onExplore: () {
+                  Navigator.pop(ctx);
+                  ref.read(activeCollectionProvider.notifier).setCollection('coros');
+                  ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                  ref.read(searchQueryProvider.notifier).updateQuery('');
+                  ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+                  context.go('/home/hymns');
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Auditoría Musical de Acordes',
+                style: GoogleFonts.outfit(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.music_note_rounded, color: Color(0xFF10B981), size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$acordesCount cantos con acordes musicales',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            '${totalHymns - acordesCount} cantos pendientes de cifrar',
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              color: isDark ? Colors.white54 : Colors.black45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        ref.read(activeCollectionProvider.notifier).setCollection('acordes');
+                        ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                        ref.read(searchQueryProvider.notifier).updateQuery('');
+                        ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+                        context.go('/home/hymns');
+                      },
+                      child: const Text('Ver acordes'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B5CF6),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    ref.read(activeCollectionProvider.notifier).setCollection('all');
+                    ref.read(showFavoritesProvider.notifier).setFavorites(false);
+                    ref.read(searchQueryProvider.notifier).updateQuery('');
+                    ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+                    context.go('/home/hymns');
+                  },
+                  icon: const Icon(Icons.format_list_bulleted_rounded),
+                  label: const Text('Explorar Catálogo Completo'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _CollectionBreakdownTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final int count;
+  final bool isDark;
+  final VoidCallback onExplore;
+
+  const _CollectionBreakdownTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.count,
+    required this.isDark,
+    required this.onExplore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  value,
+                  title,
                   style: GoogleFonts.outfit(
-                    fontSize: 23,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
                 Text(
-                  title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  '$count cantos disponibles',
                   style: GoogleFonts.nunito(
-                    fontSize: 11,
+                    fontSize: 11.5,
                     color: isDark ? Colors.white54 : Colors.black45,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: iconColor.withValues(alpha: 0.15),
+              foregroundColor: iconColor,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: const Size(0, 32),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+            ),
+            onPressed: onExplore,
+            child: const Text('Explorar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -623,12 +1054,10 @@ class _ContentManagementSection extends ConsumerWidget {
         children: [
           // 1. Revisión de sugerencias pendientes
           StreamBuilder<QuerySnapshot>(
-            stream: _safeFirestore() != null
-                ? _safeFirestore()!
-                    .collection('cantos_sugeridos')
-                    .where('status', isEqualTo: 'pending')
-                    .snapshots()
-                : null,
+            stream: _safeFirestore()
+                ?.collection('cantos_sugeridos')
+                .where('status', isEqualTo: 'pending')
+                .snapshots(),
             builder: (context, snapshot) {
               final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
               return _ActionListTile(
