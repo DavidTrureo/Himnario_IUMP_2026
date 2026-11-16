@@ -140,17 +140,6 @@ class ToolsScreen extends ConsumerWidget {
               },
             ),
             const SizedBox(height: 16),
-          ] else ...[
-            _ToolCard(
-              title: 'Sugerencias de la Congregación',
-              subtitle: 'Revisa, corrige y aprueba los cantos propuestos por los usuarios',
-              icon: Icons.mark_email_unread_rounded,
-              iconColor: const Color(0xFF6366F1),
-              onTap: () {
-                context.push('/admin-suggestions');
-              },
-            ),
-            const SizedBox(height: 16),
           ],
           _ToolCard(
             title: 'Guía Rápida de Funciones',

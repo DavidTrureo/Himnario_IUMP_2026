@@ -403,7 +403,7 @@ class _AdminHeaderCard extends StatelessWidget {
   }
 }
 
-class _LiveKpiGrid extends StatelessWidget {
+class _LiveKpiGrid extends ConsumerWidget {
   final bool isDark;
   final int totalHymns;
 
@@ -413,7 +413,7 @@ class _LiveKpiGrid extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final firestore = _safeFirestore();
     final installsRef = firestore?.collection('device_installs');
     final cutoff = Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 30)));
@@ -496,7 +496,13 @@ class _LiveKpiGrid extends StatelessWidget {
           subtitle: 'IUMP + Especiales + Coros',
           icon: Icons.library_music_rounded,
           color: const Color(0xFF8B5CF6),
-          onTap: () => context.push('/home/hymns'),
+          onTap: () {
+            ref.read(activeCollectionProvider.notifier).setCollection('all');
+            ref.read(showFavoritesProvider.notifier).setFavorites(false);
+            ref.read(searchQueryProvider.notifier).updateQuery('');
+            ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+            context.go('/home/hymns');
+          },
         ),
       ],
     );
@@ -590,7 +596,7 @@ class _KpiCard extends StatelessWidget {
   }
 }
 
-class _ContentManagementSection extends StatelessWidget {
+class _ContentManagementSection extends ConsumerWidget {
   final bool isDark;
   final int acordesCount;
   final int totalHymns;
@@ -602,7 +608,7 @@ class _ContentManagementSection extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Material(
       color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
       clipBehavior: Clip.antiAlias,
@@ -654,7 +660,13 @@ class _ContentManagementSection extends StatelessWidget {
             iconColor: const Color(0xFF10B981),
             title: 'Auditoría de Acordes Musicales',
             subtitle: '$acordesCount de $totalHymns cantos ya cuentan con acordes',
-            onTap: () => context.push('/home/hymns'),
+            onTap: () {
+              ref.read(activeCollectionProvider.notifier).setCollection('acordes');
+              ref.read(showFavoritesProvider.notifier).setFavorites(false);
+              ref.read(searchQueryProvider.notifier).updateQuery('');
+              ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+              context.go('/home/hymns');
+            },
           ),
           const Divider(height: 1),
 
@@ -664,7 +676,13 @@ class _ContentManagementSection extends StatelessWidget {
             iconColor: const Color(0xFF0EA5E9),
             title: 'Explorador y Edición del Catálogo',
             subtitle: 'Revisa y edita títulos, letras o acordes directamente',
-            onTap: () => context.push('/home/hymns'),
+            onTap: () {
+              ref.read(activeCollectionProvider.notifier).setCollection('all');
+              ref.read(showFavoritesProvider.notifier).setFavorites(false);
+              ref.read(searchQueryProvider.notifier).updateQuery('');
+              ref.read(activeCategoryProvider.notifier).setCategory('Todos');
+              context.go('/home/hymns');
+            },
           ),
         ],
       ),
@@ -744,8 +762,12 @@ class _LiveWorshipManagementSection extends StatelessWidget {
             subtitle: 'Abrir himnario-vito-2026.web.app en navegador',
             onTap: () async {
               final uri = Uri.parse('https://himnario-vito-2026.web.app');
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              try {
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+                }
+              } catch (_) {
+                await launchUrl(uri, mode: LaunchMode.inAppWebView);
               }
             },
           ),
