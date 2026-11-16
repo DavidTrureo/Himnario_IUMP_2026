@@ -1661,6 +1661,9 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               .updateQuery(value);
                                           _resetScrollToTop();
                                         },
+                                        onSubmitted: (_) {
+                                          FocusScope.of(context).unfocus();
+                                        },
                                       ),
                                   ),
                                 ),

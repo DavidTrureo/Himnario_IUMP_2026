@@ -148,3 +148,4 @@ class SuggestionTrackingService {
     } catch (_) {}
   }
 }
+

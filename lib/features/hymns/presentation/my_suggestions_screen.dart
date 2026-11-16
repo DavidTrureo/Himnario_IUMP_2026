@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/services/suggestion_tracking_service.dart';
 import '../domain/hymn.dart';
+import 'hymn_list_screen.dart';
 
 class MySuggestionsScreen extends ConsumerStatefulWidget {
   const MySuggestionsScreen({super.key});

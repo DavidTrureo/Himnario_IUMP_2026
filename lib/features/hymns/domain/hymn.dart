@@ -44,24 +44,22 @@ class Hymn {
     return _staticCache[collection] ?? const [];
   }
 
-  static Future<void> preloadAssets() async {
-    for (final coll in ['iump', 'especiales', 'coros']) {
-      String path;
-      if (coll == 'especiales') {
-        path = 'assets/json/special_hymns.json';
-      } else if (coll == 'coros') {
-        path = 'assets/json/coros.json';
-      } else {
-        path = 'assets/json/hymns.json';
-      }
-      try {
-        final jsonString = await rootBundle.loadString(path);
-        final List<dynamic> jsonList = json.decode(jsonString);
-        _staticCache[coll] = jsonList.map((j) => Hymn.fromJson(j, coll)).toList();
-      } catch (e) {
-        debugPrint('>>> Error al precargar asset $path: $e');
-      }
+  static Future<void> _preloadSingle(String coll, String path) async {
+    try {
+      final jsonString = await rootBundle.loadString(path);
+      final List<dynamic> jsonList = json.decode(jsonString);
+      _staticCache[coll] = jsonList.map((j) => Hymn.fromJson(j, coll)).toList();
+    } catch (e) {
+      debugPrint('>>> Error al precargar asset $path: $e');
     }
+  }
+
+  static Future<void> preloadAssets() async {
+    await Future.wait([
+      _preloadSingle('iump', 'assets/json/hymns.json'),
+      _preloadSingle('especiales', 'assets/json/special_hymns.json'),
+      _preloadSingle('coros', 'assets/json/coros.json'),
+    ]);
   }
 
   String get collectionName {
@@ -1126,24 +1124,22 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
     return _staticCache[collection] ?? const [];
   }
 
-  static Future<void> preloadAssets() async {
-    for (final coll in ['iump', 'especiales', 'coros']) {
-      String path;
-      if (coll == 'especiales') {
-        path = 'assets/json/special_hymns.json';
-      } else if (coll == 'coros') {
-        path = 'assets/json/coros.json';
-      } else {
-        path = 'assets/json/hymns.json';
-      }
-      try {
-        final jsonString = await rootBundle.loadString(path);
-        final List<dynamic> jsonList = json.decode(jsonString);
-        _staticCache[coll] = jsonList.map((j) => Hymn.fromJson(j, coll)).toList();
-      } catch (e) {
-        debugPrint('>>> Error al precargar asset $path: $e');
-      }
+  static Future<void> _preloadSingle(String coll, String path) async {
+    try {
+      final jsonString = await rootBundle.loadString(path);
+      final List<dynamic> jsonList = json.decode(jsonString);
+      _staticCache[coll] = jsonList.map((j) => Hymn.fromJson(j, coll)).toList();
+    } catch (e) {
+      debugPrint('>>> Error al precargar asset $path: $e');
     }
+  }
+
+  static Future<void> preloadAssets() async {
+    await Future.wait([
+      _preloadSingle('iump', 'assets/json/hymns.json'),
+      _preloadSingle('especiales', 'assets/json/special_hymns.json'),
+      _preloadSingle('coros', 'assets/json/coros.json'),
+    ]);
   }
 
   Future<List<Hymn>> _loadBaseHymns(String collection) async {
