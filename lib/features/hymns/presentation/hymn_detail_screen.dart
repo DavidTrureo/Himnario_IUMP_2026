@@ -3309,93 +3309,42 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             },
           ),
         
-        // Fila de Metadatos (Colección + Tono Musical)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              // Píldora de Colección
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4.5),
-                decoration: BoxDecoration(
-                  color: (switch (hymn.collection) {
-                    'iump' => const Color(0xFF3B82F6),
-                    'especiales' => const Color(0xFF8B5CF6),
-                    'coros' => const Color(0xFF10B981),
-                    _ => const Color(0xFF0EA5E9),
-                  }).withValues(alpha: isDark ? 0.15 : 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: (switch (hymn.collection) {
-                      'iump' => const Color(0xFF60A5FA),
-                      'especiales' => const Color(0xFFA78BFA),
-                      'coros' => const Color(0xFF34D399),
-                      _ => const Color(0xFF38BDF8),
-                    }).withValues(alpha: isDark ? 0.35 : 0.25),
-                    width: 0.9,
-                  ),
-                ),
-                child: Text(
-                  switch (hymn.collection) {
-                    'iump' => 'Himnario IUMP',
-                    'especiales' => 'Alabanza Especial',
-                    'coros' => 'Coro de Avivamiento',
-                    _ => 'Alabanza',
-                  },
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: switch (hymn.collection) {
-                      'iump' => isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
-                      'especiales' => isDark ? const Color(0xFFD8B4FE) : const Color(0xFF6D28D9),
-                      'coros' => isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
-                      _ => isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0369A1),
-                    },
-                    letterSpacing: 0.3,
-                  ),
+        // Fila de Metadatos (Tono Musical)
+        if (displayedTone.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0EA5E9).withValues(alpha: isDark ? 0.14 : 0.08),
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(
+                  color: const Color(0xFF38BDF8).withValues(alpha: isDark ? 0.35 : 0.22),
+                  width: 0.9,
                 ),
               ),
-
-              // Píldora de Tono Musical
-              if (displayedTone.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0EA5E9).withValues(alpha: isDark ? 0.14 : 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFF38BDF8).withValues(alpha: isDark ? 0.35 : 0.22),
-                      width: 0.9,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.music_note_rounded,
+                    size: 14,
+                    color: Color(0xFF38BDF8),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    Hymn.formatToneDisplay(displayedTone, ref.read(notationProvider)),
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7),
+                      letterSpacing: 0.4,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.music_note_rounded,
-                        size: 13,
-                        color: Color(0xFF38BDF8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        Hymn.formatToneDisplay(displayedTone, ref.read(notationProvider)),
-                        style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7),
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
 
         // Toggle Letra / Partitura
         Container(
