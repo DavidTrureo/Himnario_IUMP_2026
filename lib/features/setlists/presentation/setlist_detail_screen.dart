@@ -118,7 +118,14 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     final allHymns = allHymnsAsync.value ?? [];
     final setlistHymns = _getHymnsInSetlist(setlist, allHymns);
 
-    return Scaffold(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          ref.read(activeSetlistProvider.notifier).setSetlist(null);
+        }
+      },
+      child: Scaffold(
       extendBody: true,
       backgroundColor: theme.colorScheme.surface,
       body: Stack(
@@ -392,7 +399,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         loading: () => const SizedBox.shrink(),
         error: (_, e) => const SizedBox.shrink(),
       ),
-    );
+    ),
+  );
   }
 
   List<Hymn> _getHymnsInSetlist(Setlist setlist, List<Hymn> allHymns) {

@@ -172,8 +172,13 @@ String? _findSimilarHymnWorker(Map<String, dynamic> args) {
 
 class HymnDetailScreen extends ConsumerStatefulWidget {
   final String hymnId;
+  final bool fromSetlist;
 
-  const HymnDetailScreen({super.key, required this.hymnId});
+  const HymnDetailScreen({
+    super.key,
+    required this.hymnId,
+    this.fromSetlist = false,
+  });
 
   static AudioPlayer? _activeGlobalAudioPlayer;
 
@@ -749,11 +754,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
 
     final effectiveCollection = targetHymn.collection;
-    final activeSetlist = ref.read(activeSetlistProvider);
+    final activeSetlist = widget.fromSetlist ? ref.read(activeSetlistProvider) : null;
 
     List<Hymn> newSortedHymns = [];
 
-    if (activeSetlist != null) {
+    if (widget.fromSetlist && activeSetlist != null) {
       for (final hId in activeSetlist.hymnIds) {
         final hParts = hId.split('-');
         final hCol = hParts[0];
@@ -765,7 +770,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       }
     }
 
-    // Si el setlist no contiene el canto buscado, cargar la colección correspondiente
+    // Si no venimos de un repertorio o el setlist no contiene el canto buscado, cargar la colección completa
     if (newSortedHymns.isEmpty || !newSortedHymns.any((h) => h.collection == effectiveCollection && h.id == targetHymn!.id)) {
       newSortedHymns = hymns.where((h) => h.collection == effectiveCollection).toList();
       if (effectiveCollection == 'iump') {
@@ -992,9 +997,13 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     final hymn = _sortedHymns[_currentIndex!];
     final isFavorite = favorites.contains('${hymn.collection}-${hymn.id}');
 
-    final activeSetlist = ref.watch(activeSetlistProvider);
-    final String moduleBadgeText = activeSetlist != null
-        ? '📋 MODO CULTO • ${activeSetlist.title}'
+    final activeSetlist = widget.fromSetlist ? ref.watch(activeSetlistProvider) : null;
+    final bool isViewingInSetlist = widget.fromSetlist &&
+        activeSetlist != null &&
+        activeSetlist.hymnIds.contains('${hymn.collection}-${hymn.id}');
+
+    final String moduleBadgeText = isViewingInSetlist
+        ? '📋 MODO CULTO • ${activeSetlist!.title}'
         : (hymn.collection == 'iump' 
             ? '🏛️ HIMNARIO IUMP' 
             : (hymn.collection == 'especiales' ? '✨ ALABANZAS ESPECIALES' : '🔥 COROS DE AVIVAMIENTO'));

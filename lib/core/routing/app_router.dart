@@ -49,7 +49,7 @@ final setlistDetailRoute = GoRoute(
       path: 'hymn/:id',
       builder: (context, state) {
         final hymnId = state.pathParameters['id']!;
-        return HymnDetailScreen(hymnId: hymnId);
+        return HymnDetailScreen(hymnId: hymnId, fromSetlist: true);
       },
     ),
   ],
