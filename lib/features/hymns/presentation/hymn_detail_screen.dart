@@ -12,7 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform, compute;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -70,6 +70,105 @@ final ignoredDuplicatePairsProvider = FutureProvider<Set<String>>((ref) async {
   final list = prefs.getStringList('ignored_duplicate_pairs') ?? [];
   return list.toSet();
 });
+
+String _normalizeTitleFast(String title) {
+  return title
+      .toLowerCase()
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('ü', 'u')
+      .replaceAll('ñ', 'n')
+      .replaceAll(RegExp(r'[^a-z0-9]'), '');
+}
+
+String _cleanLyricsFast(String lyrics) {
+  return lyrics
+      .replaceAll(RegExp(r'\[[^\]]*\]'), '')
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-záéíóúñ0-9]'), '');
+}
+
+/// Worker top-level ejecutado en isolate secundario (`compute`) para detectar cantos similares
+/// en O(L) con bolsa de bigramas por entero, sin bloquear jamás el hilo principal de UI.
+String? _findSimilarHymnWorker(Map<String, dynamic> args) {
+  final String currentKey = args['currentKey'] as String;
+  final String currentTitle = args['currentTitle'] as String;
+  final String currentLyrics = args['currentLyrics'] as String;
+  final List<dynamic> candidates = args['candidates'] as List<dynamic>;
+  final Set<String> ignoredPairs = (args['ignoredPairs'] as List<dynamic>).cast<String>().toSet();
+
+  final normTitle1 = _normalizeTitleFast(currentTitle);
+  final clean1 = _cleanLyricsFast(currentLyrics);
+  final len1 = currentLyrics.length;
+
+  Map<int, int>? bag1;
+  int totalBigrams1 = 0;
+
+  Map<int, int> getBag1() {
+    if (bag1 != null) return bag1!;
+    final m = <int, int>{};
+    if (clean1.length >= 2) {
+      totalBigrams1 = clean1.length - 1;
+      for (int i = 0; i < totalBigrams1; i++) {
+        final code = (clean1.codeUnitAt(i) << 16) | clean1.codeUnitAt(i + 1);
+        m[code] = (m[code] ?? 0) + 1;
+      }
+    }
+    bag1 = m;
+    return m;
+  }
+
+  for (final raw in candidates) {
+    final item = raw as List<dynamic>;
+    final key2 = item[0] as String;
+    if (key2 == currentKey) continue;
+    if (ignoredPairs.contains('${currentKey}_$key2') || ignoredPairs.contains('${key2}_$currentKey')) {
+      continue;
+    }
+
+    final title2 = item[1] as String;
+    final lyrics2 = item[2] as String;
+
+    // 1. Coincidencia exacta de título normalizado (súper rápido)
+    if (normTitle1.length > 3 && normTitle1 == _normalizeTitleFast(title2)) {
+      return key2;
+    }
+
+    // 2. Pre-filtro rápido por diferencia de longitud (>35%)
+    final len2 = lyrics2.length;
+    final maxLen = len1 > len2 ? len1 : len2;
+    final minLen = len1 < len2 ? len1 : len2;
+    if (maxLen == 0 || minLen < maxLen * 0.65) continue;
+
+    // 3. Similitud de Dice O(L) sobre bigramas empaquetados en int
+    final clean2 = _cleanLyricsFast(lyrics2);
+    if (clean1.isEmpty || clean2.isEmpty) continue;
+    if (clean1 == clean2) return key2;
+    if (clean1.length < 2 || clean2.length < 2) continue;
+
+    final b1 = getBag1();
+    final totalBigrams2 = clean2.length - 1;
+    final remaining = Map<int, int>.from(b1);
+    int intersection = 0;
+    for (int i = 0; i < totalBigrams2; i++) {
+      final code = (clean2.codeUnitAt(i) << 16) | clean2.codeUnitAt(i + 1);
+      final count = remaining[code];
+      if (count != null && count > 0) {
+        intersection++;
+        remaining[code] = count - 1;
+      }
+    }
+
+    final similarity = (2.0 * intersection) / (totalBigrams1 + totalBigrams2);
+    if (similarity >= 0.8) {
+      return key2;
+    }
+  }
+  return null;
+}
 
 class HymnDetailScreen extends ConsumerStatefulWidget {
   final String hymnId;
@@ -237,40 +336,104 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
   }
 
-  String? _lastLyricsForBlocks;
-  int? _lastTransposeOffsetForBlocks;
-  List<String> _cachedBlocks = [];
+  final Map<String, List<String>> _blocksCache = {};
+  List<Hymn>? _lastSyncedHymnsList;
+  Timer? _similarityDebounceTimer;
+  final Set<String> _inFlightSimilarityKeys = {};
 
   static final Map<String, Hymn?> _similarityCache = {};
 
-  Hymn? _getSimilarHymnCached(Hymn current, List<Hymn> allHymns, Set<String> ignoredPairs) {
+  /// Devuelve el canto similar SOLO desde caché instantánea O(1).
+  /// Si aún no se calculó para el canto activo, programa el cálculo en isolate secundario
+  /// (350 ms después de detener el hojeo) para que abrir y deslizar cantos tome 0 ms en UI.
+  Hymn? _getSimilarHymnCached(
+    Hymn current,
+    List<Hymn> allHymns,
+    Set<String> ignoredPairs, {
+    required bool isCurrentPage,
+  }) {
     final key = '${current.collection}-${current.id}';
     if (_similarityCache.containsKey(key)) {
       final cached = _similarityCache[key];
       if (cached != null) {
         final pairKey2 = '${cached.collection}-${cached.id}';
-        if (ignoredPairs.contains('${key}_${pairKey2}') || ignoredPairs.contains('${pairKey2}_${key}')) {
+        if (ignoredPairs.contains('${key}_$pairKey2') || ignoredPairs.contains('${pairKey2}_$key')) {
           _similarityCache[key] = null;
           return null;
         }
       }
       return cached;
     }
-    final result = _findSimilarHymn(current, allHymns, ignoredPairs: ignoredPairs);
-    _similarityCache[key] = result;
-    return result;
+
+    if (isCurrentPage && !_inFlightSimilarityKeys.contains(key) && allHymns.isNotEmpty) {
+      _scheduleAsyncSimilarityCheck(current, allHymns, ignoredPairs);
+    }
+    return null;
+  }
+
+  void _scheduleAsyncSimilarityCheck(
+    Hymn current,
+    List<Hymn> allHymns,
+    Set<String> ignoredPairs,
+  ) {
+    final key = '${current.collection}-${current.id}';
+    _similarityDebounceTimer?.cancel();
+    _similarityDebounceTimer = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted || _similarityCache.containsKey(key) || _inFlightSimilarityKeys.contains(key)) {
+        return;
+      }
+      // Verificar que el usuario siga en este canto (si ya deslizó a otro, no desperdiciar CPU)
+      if (_currentIndex == null ||
+          _currentIndex! >= _sortedHymns.length ||
+          '${_sortedHymns[_currentIndex!].collection}-${_sortedHymns[_currentIndex!].id}' != key) {
+        return;
+      }
+
+      _inFlightSimilarityKeys.add(key);
+      try {
+        final candidates = allHymns
+            .map((h) => ['${h.collection}-${h.id}', h.title, h.lyrics])
+            .toList(growable: false);
+        final matchKey = await compute(_findSimilarHymnWorker, <String, dynamic>{
+          'currentKey': key,
+          'currentTitle': current.title,
+          'currentLyrics': current.lyrics,
+          'candidates': candidates,
+          'ignoredPairs': ignoredPairs.toList(growable: false),
+        });
+
+        Hymn? matched;
+        if (matchKey != null) {
+          matched = allHymns
+              .where((h) => '${h.collection}-${h.id}' == matchKey)
+              .firstOrNull;
+        }
+        _similarityCache[key] = matched;
+        if (mounted && matched != null) {
+          setState(() {});
+        }
+      } catch (_) {
+        _similarityCache[key] = null;
+      } finally {
+        _inFlightSimilarityKeys.remove(key);
+      }
+    });
   }
 
   List<String> _getMergedBlocksCached(String lyrics, int transposeOffset) {
-    if (_lastLyricsForBlocks == lyrics && _lastTransposeOffsetForBlocks == transposeOffset) {
-      return _cachedBlocks;
+    final cacheKey = '$transposeOffset|${lyrics.hashCode}|${lyrics.length}';
+    final cached = _blocksCache[cacheKey];
+    if (cached != null) {
+      return cached;
     }
-    _lastLyricsForBlocks = lyrics;
-    _lastTransposeOffsetForBlocks = transposeOffset;
     final sanitized = Hymn.ensureHeadersOnOwnLine(lyrics);
     final transposedLyrics = Hymn.transposeLyrics(sanitized, transposeOffset);
-    _cachedBlocks = _getMergedBlocks(transposedLyrics);
-    return _cachedBlocks;
+    final computedBlocks = _getMergedBlocks(transposedLyrics);
+    if (_blocksCache.length >= 12) {
+      _blocksCache.remove(_blocksCache.keys.first);
+    }
+    _blocksCache[cacheKey] = computedBlocks;
+    return computedBlocks;
   }
 
   @override
@@ -373,6 +536,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     _stopAtrilAutoScroll();
     _engagementTimer?.cancel();
+    _similarityDebounceTimer?.cancel();
     if (_isAtrilMode) {
       try {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -633,6 +797,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       }
 
       _initialized = true;
+      _lastSyncedHymnsList = hymns;
       final currentH = _sortedHymns[targetIndex];
       _saveLastViewedHymn(currentH);
       _startEngagementTracking(currentH);
@@ -703,15 +868,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     _initializeHymns(hymns);
 
-    // Actualizar los datos de los himnos en la lista ordenada para reflejar
-    // los cambios hechos (e.g. acordes agregados/removidos) sin perder la
-    // posición ni el PageController.
-    if (_initialized) {
+    // Actualizar los datos de los himnos en la lista ordenada SOLO cuando la lista global realmente cambió,
+    // usando un mapa O(1) en lugar de un doble bucle O(N*M) para mantener el hojeo a 60/120 FPS.
+    if (_initialized && !identical(_lastSyncedHymnsList, hymns)) {
+      _lastSyncedHymnsList = hymns;
+      final byKey = <String, Hymn>{
+        for (final h in hymns) '${h.collection}-${h.id}': h,
+      };
       for (int i = 0; i < _sortedHymns.length; i++) {
         final old = _sortedHymns[i];
-        final updated = hymns.where(
-          (h) => h.collection == old.collection && h.id == old.id,
-        ).firstOrNull;
+        final updated = byKey['${old.collection}-${old.id}'];
         if (updated != null && updated != old) {
           _sortedHymns[i] = updated;
         }
@@ -1190,23 +1356,23 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 ),
               ),
               Positioned(
-                top: 100,
-                right: -80,
-                child: Container(
-                  width: 250,
-                  height: 250,
-                  decoration: BoxDecoration(
-                    color: isDark 
-                      ? const Color(0xFF6366F1).withValues(alpha: 0.06) 
-                      : const Color(0xFF818CF8).withValues(alpha: 0.04),
-                    shape: BoxShape.circle,
+                top: 40,
+                right: -120,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 360,
+                    height: 360,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          (isDark ? const Color(0xFF6366F1) : const Color(0xFF818CF8))
+                              .withValues(alpha: isDark ? 0.10 : 0.07),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Positioned.fill(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-                  child: const SizedBox(),
                 ),
               ),
 
@@ -2832,7 +2998,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             final allHymns = allHymnsState.value ?? [];
             final ignoredPairsState = ref.watch(ignoredDuplicatePairsProvider);
             final ignoredPairsSet = ignoredPairsState.value ?? {};
-            final similarHymn = _getSimilarHymnCached(hymn, allHymns, ignoredPairsSet);
+            final similarHymn = _getSimilarHymnCached(
+              hymn,
+              allHymns,
+              ignoredPairsSet,
+              isCurrentPage: pageIndex == _currentIndex,
+            );
             if (similarHymn == null) return const SizedBox.shrink();
             
             return Container(
@@ -3448,11 +3619,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   color: isDark ? const Color(0xFF6366F1) : theme.colorScheme.primary,
                 ),
                 Expanded(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18.0),
-                      child: Column(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18.0),
+                    child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Container(
@@ -3490,7 +3659,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -5013,84 +5181,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         );
       }
     }
-  }
-
-  Hymn? _findSimilarHymn(Hymn current, List<Hymn> allHymns, {Set<String>? ignoredPairs}) {
-    final key1 = '${current.collection}-${current.id}';
-    for (final other in allHymns) {
-      if (other.collection == current.collection && other.id == current.id) {
-        continue;
-      }
-      final key2 = '${other.collection}-${other.id}';
-      if (ignoredPairs != null && (ignoredPairs.contains('${key1}_${key2}') || ignoredPairs.contains('${key2}_${key1}'))) {
-        continue;
-      }
-
-      // Pre-filtrado rápido por diferencia de longitud
-      final len1 = current.lyrics.length;
-      final len2 = other.lyrics.length;
-      final maxLen = len1 > len2 ? len1 : len2;
-      final minLen = len1 < len2 ? len1 : len2;
-      if (minLen < maxLen * 0.65) {
-        // Si las longitudes de las letras difieren en más del 35%, no pueden ser 80% similares,
-        // pero aún así comprobamos si sus títulos coinciden exactamente
-        final normalizedTitle1 = _normalizeTitle(current.title);
-        final normalizedTitle2 = _normalizeTitle(other.title);
-        if (normalizedTitle1.length > 3 && normalizedTitle1 == normalizedTitle2) {
-          return other;
-        }
-        continue;
-      }
-      
-      final similarity = _calculateLyricsSimilarity(current.lyrics, other.lyrics);
-      if (similarity >= 0.8) {
-        return other;
-      }
-      
-      final normalizedTitle1 = _normalizeTitle(current.title);
-      final normalizedTitle2 = _normalizeTitle(other.title);
-      if (normalizedTitle1.length > 3 && normalizedTitle1 == normalizedTitle2) {
-        return other;
-      }
-    }
-    return null;
-  }
-  
-  double _calculateLyricsSimilarity(String lyrics1, String lyrics2) {
-    final clean1 = lyrics1.replaceAll(RegExp(r'\[[^\]]*\]'), '').toLowerCase().replaceAll(RegExp(r'[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]'), '');
-    final clean2 = lyrics2.replaceAll(RegExp(r'\[[^\]]*\]'), '').toLowerCase().replaceAll(RegExp(r'[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]'), '');
-    
-    if (clean1 == clean2) return 1.0;
-    if (clean1.isEmpty || clean2.isEmpty) return 0.0;
-    
-    final bigrams1 = _getBigrams(clean1);
-    final bigrams2 = _getBigrams(clean2);
-    
-    if (bigrams1.isEmpty || bigrams2.isEmpty) return 0.0;
-    
-    int intersection = 0;
-    final list2 = List<String>.from(bigrams2);
-    for (final b1 in bigrams1) {
-      final idx = list2.indexOf(b1);
-      if (idx != -1) {
-        intersection++;
-        list2.removeAt(idx);
-      }
-    }
-    
-    return (2.0 * intersection) / (bigrams1.length + bigrams2.length);
-  }
-  
-  List<String> _getBigrams(String str) {
-    final bigrams = <String>[];
-    for (int i = 0; i < str.length - 1; i++) {
-      bigrams.add(str.substring(i, i + 2));
-    }
-    return bigrams;
-  }
-
-  String _normalizeTitle(String title) {
-    return title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
   }
 
   String _getCollectionName(String collection) {
