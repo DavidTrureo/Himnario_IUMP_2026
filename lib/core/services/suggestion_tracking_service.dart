@@ -273,6 +273,60 @@ class SuggestionTrackingService {
     );
   }
 
+  /// Limpia automáticamente de `cantos_sugeridos` los registros aprobados vinculados a un canto
+  /// que acaba de ser eliminado del catálogo oficial (integridad referencial para Admin).
+  static Future<void> cleanupSuggestionsForDeletedHymn({
+    required String collection,
+    required int id,
+  }) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final snap = await firestore
+          .collection('cantos_sugeridos')
+          .where('publishedId', isEqualTo: id)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final pubCol = (data['publishedCollection'] ?? data['collection'] ?? '').toString();
+        if (pubCol == collection) {
+          await doc.reference.delete();
+        }
+      }
+    } catch (_) {
+      // No bloquear la eliminación del canto oficial si falla la limpieza secundaria
+    }
+  }
+
+  /// Actualiza los registros aprobados de `cantos_sugeridos` cuando un canto oficial
+  /// es movido a otra colección / nuevo número, manteniendo los enlaces siempre vivos.
+  static Future<void> updateSuggestionsForMovedHymn({
+    required String oldCollection,
+    required int oldId,
+    required String newCollection,
+    required int newId,
+    required String title,
+  }) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final snap = await firestore
+          .collection('cantos_sugeridos')
+          .where('publishedId', isEqualTo: oldId)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final pubCol = (data['publishedCollection'] ?? data['collection'] ?? '').toString();
+        if (pubCol == oldCollection) {
+          await doc.reference.update({
+            'publishedCollection': newCollection,
+            'publishedId': newId,
+            'publishedTitle': title,
+            'editedByAdmin': true,
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Guarda los datos del hermano/a para autocompletarlos en futuros envíos (+ o Escáner IA)
   static Future<void> saveRequesterProfile({
     required String name,
@@ -411,8 +465,8 @@ class SuggestionTrackingService {
         final item = updatedList[i];
         if (item.docId.isEmpty) return;
 
-        // Si ya fue rechazada con fecha registrada, no es necesario volver a consultar
-        if (item.status == 'rejected' && item.reviewedAt != null) {
+        // Si ya fue rechazada o retirada definitivamente, no es necesario volver a consultar
+        if ((item.status == 'rejected' && item.reviewedAt != null) || item.status == 'removed') {
           return;
         }
 
@@ -433,7 +487,7 @@ class SuggestionTrackingService {
 
           if (snap.exists && snap.data() != null) {
             final data = snap.data()!;
-            final remoteStatus = data['status']?.toString() ?? 'pending';
+            String remoteStatus = data['status']?.toString() ?? 'pending';
             final remotePubId = data['publishedId'] != null
                 ? int.tryParse(data['publishedId'].toString())
                 : null;
@@ -447,7 +501,7 @@ class SuggestionTrackingService {
             String? remoteAdminEditSummary = data['adminEditSummary']?.toString();
 
             // Comparación interna Antes vs. Después contra el canto oficial en catálogo
-            if (remoteStatus == 'approved' && remotePubId != null) {
+            if (remoteStatus == 'approved' && remotePubId != null && officialHymns.isNotEmpty) {
               final effectiveCol = remotePubCol ?? item.collection;
               final publishedHymn = officialHymns
                   .where((h) => !h.isLocalOnly && h.collection == effectiveCol && h.id == remotePubId)
@@ -468,6 +522,9 @@ class SuggestionTrackingService {
                   remoteEditedByAdmin = true;
                   remoteAdminEditSummary = diff.summary ?? remoteAdminEditSummary;
                 }
+              } else {
+                // El canto fue aprobado anteriormente pero ya no existe en el catálogo oficial
+                remoteStatus = 'removed';
               }
             }
 
@@ -494,9 +551,15 @@ class SuggestionTrackingService {
               );
               hasChanges = true;
             }
-          } else if (!snap.exists && item.status == 'pending') {
-            updatedList[i] = item.copyWith(status: 'rejected');
-            hasChanges = true;
+          } else if (!snap.exists) {
+            // Si el documento fue eliminado por el administrador:
+            // - si antes estuvo aprobado -> 'removed' (retirado del catálogo oficial)
+            // - si estaba pendiente -> 'rejected'
+            final nextStatus = item.status == 'approved' ? 'removed' : 'rejected';
+            if (item.status != nextStatus) {
+              updatedList[i] = item.copyWith(status: nextStatus);
+              hasChanges = true;
+            }
           }
         } catch (_) {
           // Mantener el estado local actual si ocurre un error transitorio de red o permisos

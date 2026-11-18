@@ -127,6 +127,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
     required String docId,
     required Map<String, dynamic> data,
     required Hymn? publishedHymn,
+    required bool isRemovedFromCatalog,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final originalTitle = (data['title'] ?? 'Sin título').toString();
@@ -300,69 +301,96 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
               ),
               const SizedBox(height: 12),
 
-              // Bloque de Curaduría Editorial
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                decoration: BoxDecoration(
-                  color: (editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981))
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
+              // Bloque de Curaduría Editorial o Aviso de Retiro
+              if (isRemovedFromCatalog)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.delete_outline_rounded, size: 19, color: Colors.redAccent),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Este canto ya no existe en el catálogo oficial (fue eliminado posteriormente). Puedes quitar este registro del historial.',
+                          style: GoogleFonts.nunito(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
                     color: (editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981))
-                        .withValues(alpha: 0.3),
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: (editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981))
+                          .withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        editedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_outline_rounded,
+                        size: 18,
+                        color: editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              editedByAdmin
+                                  ? 'Publicado con ${editSummary.isNotEmpty ? editSummary : 'ajustes de formato'} por el administrador'
+                                  : 'Publicado sin modificaciones (tal como fue enviado)',
+                              style: GoogleFonts.nunito(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: editedByAdmin ? const Color(0xFF38BDF8) : const Color(0xFF10B981),
+                              ),
+                            ),
+                            if (publishedTitle.trim().toUpperCase() != originalTitle.trim().toUpperCase())
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3),
+                                child: Text(
+                                  'Título original enviado: "$originalTitle"',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white70 : Colors.black54,
+                                  ),
+                                ),
+                              ),
+                            if (pubCol != origCol)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  'Colección sugerida: ${_collectionFullLabel(origCol)} → ${_collectionFullLabel(pubCol)}',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white70 : Colors.black54,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      editedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_outline_rounded,
-                      size: 18,
-                      color: editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            editedByAdmin
-                                ? 'Publicado con ${editSummary.isNotEmpty ? editSummary : 'ajustes de formato'} por el administrador'
-                                : 'Publicado sin modificaciones (tal como fue enviado)',
-                            style: GoogleFonts.nunito(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: editedByAdmin ? const Color(0xFF38BDF8) : const Color(0xFF10B981),
-                            ),
-                          ),
-                          if (publishedTitle.trim().toUpperCase() != originalTitle.trim().toUpperCase())
-                            Padding(
-                              padding: const EdgeInsets.only(top: 3),
-                              child: Text(
-                                'Título original enviado: "$originalTitle"',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 12,
-                                  color: isDark ? Colors.white70 : Colors.black54,
-                                ),
-                              ),
-                            ),
-                          if (pubCol != origCol)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Text(
-                                'Colección sugerida: ${_collectionFullLabel(origCol)} → ${_collectionFullLabel(pubCol)}',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 12,
-                                  color: isDark ? Colors.white70 : Colors.black54,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 18),
 
               // Acciones
@@ -378,7 +406,44 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                       child: const Text('Cerrar'),
                     ),
                   ),
-                  if (pubId != null) ...[
+                  if (isRemovedFromCatalog) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          Navigator.pop(sheetCtx);
+                          try {
+                            await FirebaseFirestore.instance
+                                .collection('cantos_sugeridos')
+                                .doc(docId)
+                                .delete();
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Registro retirado del historial de aprobados.'),
+                              ),
+                            );
+                          } catch (e) {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text('No se pudo eliminar: $e')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.delete_forever_rounded, size: 19),
+                        label: Text(
+                          'Eliminar del historial',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ] else if (pubId != null) ...[
                     const SizedBox(width: 12),
                     Expanded(
                       flex: 2,
@@ -727,7 +792,9 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
   /// Solo guarda/muestra cantos aprobados (los rechazados no ensucian este registro)
   /// permitiendo al administrador ver la Ficha de Trazabilidad y abrir el canto publicado.
   Widget _buildApprovedHistoryTab(bool isDark) {
-    final allHymns = ref.watch(allHymnsGlobalProvider).value ?? [];
+    final allHymnsAsync = ref.watch(allHymnsGlobalProvider);
+    final allHymns = allHymnsAsync.value ?? [];
+    final catalogReady = allHymnsAsync.hasValue && !allHymnsAsync.isLoading;
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -794,6 +861,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                     .where((h) => !h.isLocalOnly && h.collection == pubCol && h.id == pubId)
                     .firstOrNull
                 : null;
+            final isRemovedFromCatalog = catalogReady && pubId != null && publishedHymn == null;
             final liveStatus = _resolveLiveEditStatus(data: data, publishedHymn: publishedHymn);
             final publishedTitle = liveStatus.displayTitle;
             final requesterName = ((data['requesterName'] ?? data['suggestedByName']) as String?)?.trim() ?? '';
@@ -811,7 +879,8 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                     : Colors.white,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.3 : 0.25),
+                  color: (isRemovedFromCatalog ? Colors.redAccent : const Color(0xFF10B981))
+                      .withValues(alpha: isDark ? 0.3 : 0.25),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -828,6 +897,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                   docId: doc.id,
                   data: data,
                   publishedHymn: publishedHymn,
+                  isRemovedFromCatalog: isRemovedFromCatalog,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(15.0),
@@ -840,12 +910,15 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              color: (isRemovedFromCatalog ? Colors.redAccent : const Color(0xFF10B981))
+                                  .withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              editedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_rounded,
-                              color: const Color(0xFF10B981),
+                              isRemovedFromCatalog
+                                  ? Icons.delete_outline_rounded
+                                  : (editedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_rounded),
+                              color: isRemovedFromCatalog ? Colors.redAccent : const Color(0xFF10B981),
                               size: 20,
                             ),
                           ),
@@ -859,6 +932,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                                   style: GoogleFonts.outfit(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15.5,
+                                    decoration: isRemovedFromCatalog ? TextDecoration.lineThrough : null,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -866,23 +940,40 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                                   spacing: 6,
                                   runSpacing: 4,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withValues(alpha: 0.14),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        pubId != null
-                                            ? '${_collectionLabel(pubCol)} · N° $pubId'
-                                            : _collectionLabel(pubCol),
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF10B981),
+                                    if (isRemovedFromCatalog)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.redAccent.withValues(alpha: 0.14),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'RETIRADO DEL CATÁLOGO',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.14),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          pubId != null
+                                              ? '${_collectionLabel(pubCol)} · N° $pubId'
+                                              : _collectionLabel(pubCol),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF10B981),
+                                          ),
                                         ),
                                       ),
-                                    ),
                                     if (editedByAdmin)
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),

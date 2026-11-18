@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/services/local_hymn_storage_service.dart';
+import '../../../core/services/suggestion_tracking_service.dart';
 
 class Hymn {
   final int id;
@@ -1284,6 +1285,10 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
     final firestore = FirebaseFirestore.instance;
     try {
       await firestore.collection(collection).doc(id.toString()).delete();
+      await SuggestionTrackingService.cleanupSuggestionsForDeletedHymn(
+        collection: collection,
+        id: id,
+      );
       ref.read(databaseStatusProvider.notifier).setStatus('Conectado');
     } catch (e) {
       ref.read(databaseStatusProvider.notifier).setStatus('Offline: $e');
@@ -1348,6 +1353,15 @@ class HymnsNotifier extends AsyncNotifier<List<Hymn>> {
       
       // Eliminar de la colección origen
       await firestore.collection(collection).doc(hymn.id.toString()).delete();
+
+      // Mantener sincronizada cualquier sugerencia aprobada vinculada a este canto
+      await SuggestionTrackingService.updateSuggestionsForMovedHymn(
+        oldCollection: collection,
+        oldId: hymn.id,
+        newCollection: targetCollection,
+        newId: nextId,
+        title: hymn.title.trim().toUpperCase(),
+      );
       
       ref.read(databaseStatusProvider.notifier).setStatus('Conectado');
     } catch (e) {

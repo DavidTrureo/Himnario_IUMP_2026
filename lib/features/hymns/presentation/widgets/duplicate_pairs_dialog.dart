@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/services/suggestion_tracking_service.dart';
 import '../../domain/hymn.dart';
 import '../hymn_list_screen.dart';
 
@@ -107,6 +108,10 @@ class _DuplicatePairsDialogState extends ConsumerState<DuplicatePairsDialog> {
     try {
       final firestore = FirebaseFirestore.instance;
       await firestore.collection(hymn.collection).doc(hymn.id.toString()).delete();
+      await SuggestionTrackingService.cleanupSuggestionsForDeletedHymn(
+        collection: hymn.collection,
+        id: hymn.id,
+      );
 
       // También registrar en ignorados para evitar rezagados en caché local
       final docRef = firestore.collection('app_config').doc('ignored_duplicates');

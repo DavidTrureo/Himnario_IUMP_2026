@@ -90,7 +90,9 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final allHymns = ref.watch(allHymnsGlobalProvider).value ?? [];
+    final allHymnsAsync = ref.watch(allHymnsGlobalProvider);
+    final allHymns = allHymnsAsync.value ?? [];
+    final catalogReady = allHymnsAsync.hasValue && !allHymnsAsync.isLoading;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -231,13 +233,17 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                           orElse: () => null,
                         );
 
-                        final bool isApproved = item.status == 'approved' ||
-                            (item.status == 'pending' && matchingHymn != null && item.type != 'correction');
-                        final bool isRejected = !isApproved && item.status == 'rejected';
-
                         final int? openId = item.publishedId ?? matchingHymn?.id;
                         final String openCol = item.publishedCollection ?? matchingHymn?.collection ?? item.collection;
                         final String? finalPublishedTitle = item.publishedTitle ?? matchingHymn?.title;
+
+                        final bool wasApproved = item.status == 'approved' ||
+                            (item.status == 'pending' && matchingHymn != null && item.type != 'correction');
+                        final bool isRemoved = item.status == 'removed' ||
+                            (wasApproved && catalogReady && openId != null && matchingHymn == null);
+                        final bool isApproved = wasApproved && !isRemoved;
+                        final bool isRejected = !wasApproved && !isRemoved && item.status == 'rejected';
+
                         final bool titleChanged = finalPublishedTitle != null &&
                             finalPublishedTitle.trim().toUpperCase() != item.title.trim().toUpperCase();
                         final bool wasPolishedByAdmin = item.editedByAdmin || titleChanged;
@@ -255,7 +261,9 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
 
                         final statusColor = isApproved
                             ? const Color(0xFF10B981)
-                            : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
+                            : isRemoved
+                                ? const Color(0xFF94A3B8)
+                                : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
 
                         final String statusLabel;
                         if (isApproved) {
@@ -266,6 +274,8 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                           } else {
                             statusLabel = 'Aprobado y publicado en el catálogo oficial';
                           }
+                        } else if (isRemoved) {
+                          statusLabel = 'Retirado del catálogo oficial';
                         } else if (isRejected) {
                           statusLabel = 'No publicado por el Administrador';
                         } else {
@@ -274,7 +284,9 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
 
                         final statusIcon = isApproved
                             ? (wasPolishedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_rounded)
-                            : (isRejected ? Icons.cancel_rounded : Icons.hourglass_top_rounded);
+                            : isRemoved
+                                ? Icons.inventory_2_outlined
+                                : (isRejected ? Icons.cancel_rounded : Icons.hourglass_top_rounded);
 
                         // Construir mensaje amable y claro según estado, fecha de incorporación y ajustes
                         String approvedMessage() {
@@ -352,7 +364,7 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                         ),
                                       ),
                                     ),
-                                    if (isApproved || isRejected)
+                                    if (isApproved || isRejected || isRemoved)
                                       Padding(
                                         padding: const EdgeInsets.only(left: 4),
                                         child: InkWell(
@@ -490,7 +502,7 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                         ),
                                       ),
                                     ),
-                                    if (isApproved && openId != null)
+                                    if (isApproved && openId != null && matchingHymn != null)
                                       TextButton.icon(
                                         style: TextButton.styleFrom(
                                           visualDensity: VisualDensity.compact,
@@ -498,9 +510,6 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                           foregroundColor: const Color(0xFF10B981),
                                         ),
                                         onPressed: () {
-                                          if (matchingHymn == null) {
-                                            ref.invalidate(hymnsProvider(openCol));
-                                          }
                                           context.push('/hymn-view/$openCol-$openId');
                                         },
                                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
@@ -521,6 +530,18 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                         fontSize: 12,
                                         height: 1.38,
                                         color: isDark ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                  )
+                                else if (isRemoved)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0, left: 23.0),
+                                    child: Text(
+                                      'Este canto fue retirado posteriormente del catálogo oficial por el administrador.',
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.white60 : Colors.black54,
+                                        fontStyle: FontStyle.italic,
                                       ),
                                     ),
                                   )

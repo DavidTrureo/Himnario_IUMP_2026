@@ -573,8 +573,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     // Buscar el canto objetivo de manera precisa
     Hymn? targetHymn = hymns.where((h) => h.collection == collectionParam && h.id == id).firstOrNull;
-    if (targetHymn == null) {
-      // Fallback: buscar en cualquier colección por ID
+    if (targetHymn == null && parts.length == 1) {
+      // Fallback: buscar en cualquier colección por ID solo cuando no se indicó colección explícita
       targetHymn = hymns.where((h) => h.id == id).firstOrNull;
     }
 
@@ -703,9 +703,15 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
 
     if (_sortedHymns.isEmpty || _currentIndex == null || _pageController == null) {
+      final bool isDefinitelyMissing =
+          hymns.isNotEmpty && !allHymnsAsync.isLoading && !allHymnsAsync.isRefreshing;
+
       return Scaffold(
         appBar: AppBar(
-          title: Text('Cargando alabanza...', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          title: Text(
+            isDefinitelyMissing ? 'Alabanza no disponible' : 'Cargando alabanza...',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () {
@@ -719,28 +725,78 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           ),
         ),
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 18),
-              Text(
-                'Cargando alabanza...',
-                style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 20),
-              TextButton.icon(
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/home');
-                  }
-                },
-                icon: const Icon(Icons.home_outlined),
-                label: const Text('Volver al inicio'),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isDefinitelyMissing) ...[
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.music_off_rounded,
+                      size: 52,
+                      color: Colors.amber,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Esta alabanza ya no está disponible',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(fontSize: 19, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Es posible que haya sido eliminada o movida del catálogo oficial por el administrador.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.nunito(
+                      fontSize: 14,
+                      color: isDark ? Colors.white60 : Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () {
+                      _stopAndDisposeAudio();
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: const Text('Volver atrás'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ] else ...[
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Cargando alabanza...',
+                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 20),
+                  TextButton.icon(
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
+                    icon: const Icon(Icons.home_outlined),
+                    label: const Text('Volver al inicio'),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       );
