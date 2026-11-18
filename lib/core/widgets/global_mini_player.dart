@@ -7,12 +7,22 @@ import '../../features/hymns/presentation/spinning_vinyl.dart';
 import '../services/global_audio_service.dart';
 
 class GlobalMiniPlayer extends ConsumerWidget {
-  const GlobalMiniPlayer({super.key});
+  final String? currentPath;
+
+  const GlobalMiniPlayer({super.key, this.currentPath});
 
   String _formatDuration(Duration d) {
     final minutes = d.inMinutes;
     final seconds = d.inSeconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  String _resolveLivePath(BuildContext context) {
+    try {
+      return GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    } catch (_) {
+      return currentPath ?? '';
+    }
   }
 
   @override
@@ -25,15 +35,13 @@ class GlobalMiniPlayer extends ConsumerWidget {
     }
 
     // En tablets (iPad), la pantalla del canto muestra la tarjeta de estudio expandida (680px),
-    // por lo que ocultamos el mini reproductor únicamente en tablet dentro de /hymn/.
+    // por lo que ocultamos el mini reproductor únicamente en tablet dentro de /hymn/ o /hymn-view/.
     // En teléfonos móviles permanece siempre visible y esbelto sobre la barra de navegación.
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
-    String currentPath = '';
-    try {
-      currentPath = GoRouterState.of(context).uri.path;
-    } catch (_) {}
-    if (isTablet && currentPath.contains('/hymn/')) {
+    final resolvedPath = currentPath ?? _resolveLivePath(context);
+    if (isTablet &&
+        (resolvedPath.contains('/hymn/') || resolvedPath.contains('/hymn-view/'))) {
       return const SizedBox.shrink();
     }
 
@@ -74,11 +82,24 @@ class GlobalMiniPlayer extends ConsumerWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(22),
             onTap: () {
-              // Regresar al canto en reproducción si estamos en otra pantalla
+              // Leer la ruta EN VIVO en el instante del toque (evita rutas cacheadas al pausar o cambiar a Favoritos)
               final hymnKey = '${hymn.collection}-${hymn.id}';
-              if (!currentPath.endsWith(hymnKey)) {
+              final livePath = _resolveLivePath(context);
+              final isAlreadyOnThisHymn =
+                  (livePath.contains('/hymn/') || livePath.contains('/hymn-view/')) &&
+                  livePath.endsWith('/$hymnKey');
+
+              // Avisar a HymnDetailScreen que salte al canto en reproducción (por si el usuario deslizó a otro)
+              ref.read(jumpToPlayingHymnSignalProvider.notifier).trigger();
+
+              if (!isAlreadyOnThisHymn) {
                 try {
-                  context.go('/home/hymn/$hymnKey');
+                  final router = GoRouter.of(context);
+                  if (livePath.startsWith('/favorites')) {
+                    router.go('/favorites/hymn/$hymnKey');
+                  } else {
+                    router.go('/home/hymn/$hymnKey');
+                  }
                 } catch (_) {}
               }
             },

@@ -434,11 +434,6 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
     final sanitized = Hymn.ensureHeadersOnOwnLine(rawLyrics);
     final blocks = _getMergedBlocks(sanitized);
 
-    final RegExp keywordRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro\s+final|coro|final|solista|puente|interludio)(?:\s*:\s*|\s+|$)', 
-      caseSensitive: false
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: blocks.map((block) {
@@ -447,11 +442,11 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
 
         final lines = trimmed.split('\n');
         final firstLine = lines.first.trim();
-        final match = keywordRegExp.firstMatch(firstLine);
-        final isChorus = match != null;
+        final structMatch = Hymn.matchStructuralHeader(firstLine);
+        final isChorus = structMatch != null;
 
         if (isChorus) {
-          String keyword = match.group(1)!.toLowerCase();
+          String keyword = structMatch.header.toLowerCase();
           final RegExp coroRomanRegExp = RegExp(r'^coro\s+([ivx]+)$', caseSensitive: false);
           final coroRomanMatch = coroRomanRegExp.firstMatch(keyword);
           if (coroRomanMatch != null) {
@@ -462,7 +457,7 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
             }
           }
           final String headerText = keyword.toUpperCase();
-          final String firstLineContent = firstLine.substring(match.end).trim();
+          final String firstLineContent = structMatch.rest;
           final List<String> bodyLines = [];
           if (firstLineContent.isNotEmpty) {
             bodyLines.add(firstLineContent);

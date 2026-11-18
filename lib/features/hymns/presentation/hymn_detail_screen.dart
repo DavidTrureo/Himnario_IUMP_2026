@@ -664,6 +664,27 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       }
     });
 
+    // Si el usuario toca el mini-reproductor después de haber deslizado a otro canto en PageView,
+    // regresar inmediatamente a la página del canto que está sonando.
+    ref.listen<int>(jumpToPlayingHymnSignalProvider, (previous, next) {
+      final playingHymn = ref.read(globalAudioProvider).hymn;
+      if (playingHymn == null || !mounted) return;
+      final existingIdx = _sortedHymns.indexWhere(
+        (h) => h.collection == playingHymn.collection && h.id == playingHymn.id,
+      );
+      if (existingIdx != -1) {
+        if (_currentIndex != existingIdx) {
+          setState(() {
+            _currentIndex = existingIdx;
+            _transposeOffset = 0;
+          });
+          if (_pageController != null && _pageController!.hasClients) {
+            _pageController!.jumpToPage(existingIdx);
+          }
+        }
+      }
+    });
+
     // Usar datos previos durante la recarga para evitar pantalla en blanco
     final hymns = allHymnsAsync.whenOrNull(data: (d) => d);
 
@@ -3376,17 +3397,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     final lines = trimmed.split('\n');
     final firstLine = lines.first.trim();
 
-    final RegExp keywordRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro\s+final|coro|solista\s+\d+|solista|puente\s+\d+|puente|interludio|final|pre-?coro|intro(ducción)?|estribillo|outro|coda|hombres|mujeres|todos)(?:\s*:\s*|\s+|$)', 
-      caseSensitive: false
-    );
-    
-    final match = keywordRegExp.firstMatch(firstLine);
-    final isChorus = match != null;
+    final structMatch = Hymn.matchStructuralHeader(firstLine);
+    final isChorus = structMatch != null;
 
     if (isChorus) {
-      String keyword = match.group(1)!.toLowerCase();
-      
+      String keyword = structMatch.header.toLowerCase();
+
       // Convertir coro con número romano (ej: "coro ii" -> "coro 2")
       final RegExp coroRomanRegExp = RegExp(r'^coro\s+([ivx]+)$', caseSensitive: false);
       final coroRomanMatch = coroRomanRegExp.firstMatch(keyword);
@@ -3397,9 +3413,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           keyword = 'coro $decimal';
         }
       }
-      
+
       final String headerText = keyword.toUpperCase();
-      final String firstLineContent = firstLine.substring(match.end).trim();
+      final String firstLineContent = structMatch.rest;
       
       final restOfLines = lines.skip(1).toList();
       final List<String> bodyLines = [];

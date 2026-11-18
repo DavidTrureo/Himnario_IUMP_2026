@@ -229,6 +229,69 @@ class Hymn {
     return formattedText;
   }
 
+  /// Detecta con precisión si una línea comienza con una etiqueta estructural real
+  /// (CORO, CORO 1..10, SOLISTA, PUENTE, TODOS, HOMBRES, MUJERES, SOLO, FINAL, etc.)
+  /// sin confundir versos cotidianos en español como "Todos oímos resonar" o "Solo en Jesús".
+  static ({String header, String rest})? matchStructuralHeader(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. Etiquetas musicales inequívocas (con o sin número / romano / FINAL)
+    final unambiguousRe = RegExp(
+      r'^(CORO(?:\s+(?:\d+|[IVXivx]+|FINAL))?|PRE-?CORO|ESTRIBILLO|SOLISTA(?:\s+\d+)?|INTERLUDIO|INTRODUCCIÓN|INTRODUCCION|INTRO|OUTRO|CODA)(?:(\s*[:\-]\s*)|\s+|$)(.*)$',
+      caseSensitive: false,
+    );
+    final uMatch = unambiguousRe.firstMatch(trimmed);
+    if (uMatch != null) {
+      final rawTag = uMatch.group(1)!.trim();
+      final delim = (uMatch.group(2) ?? '').trim();
+      final rest = (uMatch.group(3) ?? '').trim();
+
+      if (rest.isEmpty) {
+        return (header: rawTag.toUpperCase(), rest: '');
+      }
+      final hasQualifier = rawTag.contains(' ');
+      final isAllCaps = rawTag == rawTag.toUpperCase();
+      if (delim.isNotEmpty || hasQualifier || isAllCaps) {
+        return (header: rawTag.toUpperCase(), rest: rest);
+      }
+      return null;
+    }
+
+    // 2. Etiquetas que también son palabras cotidianas en español
+    //    (TODOS, HOMBRES, MUJERES, SOLO, FINAL, PUENTE)
+    final ambiguousRe = RegExp(
+      r'^(TODOS|HOMBRES|MUJERES|SOLO|FINAL|PUENTE(?:\s+\d+)?)(?:(\s*[:\-]\s*)|\s+|$)(.*)$',
+      caseSensitive: false,
+    );
+    final aMatch = ambiguousRe.firstMatch(trimmed);
+    if (aMatch != null) {
+      final rawTag = aMatch.group(1)!.trim();
+      final delim = (aMatch.group(2) ?? '').trim();
+      final rest = (aMatch.group(3) ?? '').trim();
+      final hasQualifier = rawTag.contains(' ');
+      final isAllCaps = rawTag == rawTag.toUpperCase();
+
+      if (rest.isEmpty) {
+        // Sola en su propia línea: válida en MAYÚSCULAS (como inserta la barra rápida: "TODOS"),
+        // con delimitador explícito ("Todos:") o numerada ("Puente 1").
+        if (isAllCaps || delim.isNotEmpty || hasQualifier) {
+          return (header: rawTag.toUpperCase(), rest: '');
+        }
+        return null;
+      }
+
+      // Con texto en la misma línea: exige delimitador explícito ":" o "-" (ej. "Todos: Aleluya")
+      // o número explícito ("Puente 1 ..."). Jamás parte versos como "Todos oímos resonar".
+      if (delim.isNotEmpty || hasQualifier) {
+        return (header: rawTag.toUpperCase(), rest: rest);
+      }
+      return null;
+    }
+
+    return null;
+  }
+
   /// Garantiza que números de estrofa (1. , 2. ) y cabeceras de coro (CORO:) queden siempre en su propia línea
   static String ensureHeadersOnOwnLine(String lyrics) {
     if (lyrics.trim().isEmpty) return lyrics;
@@ -241,21 +304,14 @@ class Hymn {
       caseSensitive: false,
     );
 
-    final RegExp chorusInlineHeader = RegExp(
-      r'^((?:CORO|PUENTE|FINAL|SOLISTA|INTERLUDIO|PRE-CORO|PRECORO|ESTRIBILLO|INTRO|OUTRO|CODA|HOMBRES|MUJERES|TODOS)(?:\s+(?:\d+|[IVXivx]+|FINAL))?\s*[\.\-:]?)\s+(.+)$',
-      caseSensitive: false,
-    );
-
     for (final line in lines) {
       final trimmed = line.trim();
 
-      final chorusMatch = chorusInlineHeader.firstMatch(trimmed);
-      if (chorusMatch != null) {
-        final header = chorusMatch.group(1)!.trim();
-        final rest = chorusMatch.group(2)!.trim();
-        resultLines.add(header);
-        if (rest.isNotEmpty) {
-          resultLines.add(rest);
+      final structMatch = matchStructuralHeader(trimmed);
+      if (structMatch != null) {
+        resultLines.add(structMatch.header);
+        if (structMatch.rest.isNotEmpty) {
+          resultLines.add(structMatch.rest);
         }
         continue;
       }
@@ -407,33 +463,24 @@ class Hymn {
     
     // Para 'iump' o 'especiales', separamos por bloques
     final blocks = trimmed.split(RegExp(r'\n\s*\n'));
-    final RegExp keywordRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro\s+final|coro|final|solista|puente|interludio)(?:\s*:\s*|\s+|$)', 
-      caseSensitive: false
-    );
-    
     final List<String> formattedBlocks = [];
     for (final block in blocks) {
       final trimmedBlock = block.trim();
       if (trimmedBlock.isEmpty) continue;
-      
+
       final lines = trimmedBlock.split('\n');
-      final firstLine = lines.first.trim();
-      
-      final match = keywordRegExp.firstMatch(firstLine);
-      final formattedLines = lines.map((l) => formatLineCasing(l)).toList();
-      
-      if (match != null) {
-        // Mantenemos la cabecera (CORO, PUENTE, etc.) en mayúsculas
-        final headerMatch = keywordRegExp.firstMatch(formattedLines.first);
-        if (headerMatch != null) {
-          final headerText = headerMatch.group(1)!.toUpperCase();
-          formattedLines[0] = formattedLines[0].replaceFirst(headerMatch.group(1)!, headerText);
+      final formattedLines = lines.map((l) {
+        final structMatch = matchStructuralHeader(l);
+        if (structMatch != null && structMatch.rest.isEmpty) {
+          // Mantener las etiquetas estructurales reales (CORO, TODOS, HOMBRES, PUENTE, etc.) en MAYÚSCULAS
+          return structMatch.header;
         }
-      }
+        return formatLineCasing(l);
+      }).toList();
+
       formattedBlocks.add(formattedLines.join('\n'));
     }
-    
+
     return formattedBlocks.join('\n\n');
   }
 

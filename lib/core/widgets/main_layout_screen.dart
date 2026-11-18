@@ -25,6 +25,10 @@ class MainLayoutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    String currentPath = '';
+    try {
+      currentPath = GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    } catch (_) {}
     
     return PopScope(
       canPop: navigationShell.currentIndex == 0,
@@ -99,7 +103,7 @@ class MainLayoutScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         Expanded(child: ClipRect(child: navigationShell)),
-                        const GlobalMiniPlayer(),
+                        GlobalMiniPlayer(currentPath: currentPath),
                       ],
                     ),
                   ),
@@ -116,7 +120,7 @@ class MainLayoutScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const GlobalMiniPlayer(),
+                  GlobalMiniPlayer(currentPath: currentPath),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                     child: ClipRRect(

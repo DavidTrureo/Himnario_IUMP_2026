@@ -13,21 +13,12 @@ class HymnPdfService {
   static pw.Font? _fontRegular;
   static pw.Font? _fontBold;
 
-  static final RegExp _structuralHeaderRegex = RegExp(
-    r'^(coro(\s+\d+|\s+[ivx]+|\s+final)?|solista(\s+\d+)?|solo|puente(\s+\d+)?|interludio|final|pre-?coro|intro(ducción)?|estribillo|outro|coda|hombres|mujeres|todos)(\s*:\s*|\s+|$)',
-    caseSensitive: false,
-  );
-
   static bool _isStructuralHeader(String line) {
-    final trimmed = line.trim();
-    if (trimmed.isEmpty) return false;
-    return _structuralHeaderRegex.hasMatch(trimmed);
+    return Hymn.matchStructuralHeader(line) != null;
   }
 
-  static Match? _matchStructuralHeader(String line) {
-    final trimmed = line.trim();
-    if (trimmed.isEmpty) return null;
-    return _structuralHeaderRegex.firstMatch(trimmed);
+  static ({String header, String rest})? _matchStructuralHeader(String line) {
+    return Hymn.matchStructuralHeader(line);
   }
 
   /// Genera un documento PDF profesional y hermoso para un canto individual.
@@ -497,8 +488,8 @@ class HymnPdfService {
       String headerTag = firstLine;
       String restOfFirstLine = '';
       if (match != null) {
-        headerTag = firstLine.substring(0, match.end).trim();
-        restOfFirstLine = firstLine.substring(match.end).trim();
+        headerTag = match.header;
+        restOfFirstLine = match.rest;
       }
 
       headerWidget = pw.Container(

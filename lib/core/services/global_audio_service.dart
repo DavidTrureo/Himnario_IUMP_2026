@@ -281,3 +281,17 @@ final globalAudioProvider =
   GlobalAudioNotifier.new,
 );
 
+/// Señal ligera para indicar a HymnDetailScreen que salte de inmediato al canto en reproducción
+/// (útil si el usuario deslizó a otro himno dentro del PageView y luego tocó el mini-reproductor).
+class JumpToPlayingHymnSignalNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void trigger() => state = state + 1;
+}
+
+final jumpToPlayingHymnSignalProvider =
+    NotifierProvider<JumpToPlayingHymnSignalNotifier, int>(
+  JumpToPlayingHymnSignalNotifier.new,
+);
+
