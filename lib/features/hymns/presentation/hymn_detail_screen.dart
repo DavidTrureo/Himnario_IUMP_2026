@@ -4323,6 +4323,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                           );
                         }
 
+                        // Mantener sincronizado el historial de recientes inmediatamente
+                        ref.read(recentHymnsProvider.notifier).updateHymnTone(
+                          '${hymn.collection}-${hymn.id}',
+                          finalToneNote,
+                        );
+
                         messenger.showSnackBar(
                           SnackBar(
                             content: Text('Himno guardado con éxito', style: GoogleFonts.nunito()),

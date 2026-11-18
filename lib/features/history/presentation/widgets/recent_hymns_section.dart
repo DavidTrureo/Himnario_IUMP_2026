@@ -152,9 +152,10 @@ class RecentHymnsSection extends ConsumerWidget {
     }
 
     final notation = ref.watch(notationProvider);
-    final rawTone = (recent.tone != null && recent.tone!.isNotEmpty)
-        ? recent.tone!
-        : hymn.toneNote;
+    // Prioridad absoluta a hymn.toneNote para que refleje de inmediato cualquier edición o corrección del canto
+    final rawTone = hymn.toneNote.isNotEmpty
+        ? hymn.toneNote
+        : ((recent.tone != null && recent.tone!.isNotEmpty) ? recent.tone! : '');
     final parsedNote = Hymn.parseToneComponents(rawTone)['toneNote'] ?? rawTone;
     final normalizedNote = Hymn.normalizeToneNote(parsedNote.isNotEmpty ? parsedNote : rawTone);
     final displayTone = normalizedNote.isNotEmpty

@@ -64,6 +64,33 @@ class RecentHymnsNotifier extends Notifier<List<RecentHymn>> {
     } catch (_) {}
   }
 
+  /// Actualiza de forma reactiva el tono de un canto en el historial (tras una edición de admin)
+  Future<void> updateHymnTone(String key, String newTone) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final current = List<RecentHymn>.from(state);
+      final normalized = Hymn.normalizeToneNote(newTone);
+      bool changed = false;
+
+      for (int i = 0; i < current.length; i++) {
+        if (current[i].key == key) {
+          current[i] = RecentHymn(
+            key: current[i].key,
+            timestamp: current[i].timestamp,
+            tone: normalized.isNotEmpty ? normalized : null,
+          );
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        state = current;
+        final encoded = current.map((item) => jsonEncode(item.toJson())).toList();
+        await prefs.setStringList(_prefsKey, encoded);
+      }
+    } catch (_) {}
+  }
+
   /// Elimina un canto del historial
   Future<void> removeHymn(String key) async {
     try {
