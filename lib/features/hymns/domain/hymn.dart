@@ -180,10 +180,11 @@ class Hymn {
     }
     
     final List<String> wordsToCapitalize = [
+      'hijo de dios', 'hijo del hombre', 'padre celestial',
       'dios', 'jesús', 'jesus', 'cristo', 'jesucristo', 'nazareno', 'maestro', 
       'señor', 'senor', 'salvador', 'redentor', 'mesías', 'mesias', 'jehová', 
       'jehova', 'emanuel', 'shalom', 'santo', 'espíritu', 'espiritu', 'padre', 
-      'hijo', 'rey', 'reyes', 'jerusalén', 'jerusalen', 'sión', 'sion', 'marta', 
+      'rey', 'jerusalén', 'jerusalen', 'sión', 'sion', 'marta', 
       'lázaro', 'lazaro', 'canaán', 'canaan', 'david', 'juan', 'israel',
       'abraham', 'sara', 'sarah', 'isaac', 'jacob', 'josé', 'jose', 'moisés', 'moises',
       'aarón', 'aaron', 'josué', 'josue', 'caleb', 'rut', 'ruth', 'samuel', 'saúl', 'saul',

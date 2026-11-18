@@ -972,7 +972,7 @@ REGLAS OBLIGATORIAS:
 
 2. Mayúsculas de respeto y nombres propios:
    - Nombres propios: Nombres de personas, ciudades, países, montes o regiones geográficas siempre inician con mayúscula (ej.: Jonás, Nínive, Jerusalén, Sinaí).
-   - Nombres de la Deidad: Todas las personas de la Trinidad y sus nombres propios llevan mayúscula inicial (Dios, Jehová, Yahvé, Señor, Padre, Hijo, Jesús, Cristo, Redentor, Salvador, Espíritu Santo, Consolador).
+   - Nombres de la Deidad: Todas las personas de la Trinidad y sus nombres propios llevan mayúscula inicial (Dios, Jehová, Yahvé, Señor, Jesús, Cristo, Redentor, Salvador, Espíritu Santo, Consolador). NOTA CONTEXTUAL: "Hijo" y "Padre" llevan mayúscula ÚNICAMENTE cuando aluden a Dios o a Cristo (ej.: "el Hijo de Dios", "el Padre"). Cuando se refieran a personas humanas o personajes de parábolas (ej.: "el hijo pródigo", "aquel hijo", "sus hijos", "un padre terrenal") DEBEN ir estrictamente en minúscula.
    - Mayúscula reverencial y pronombres referidos a la Deidad: Escribe con mayúscula los pronombres o adjetivos cuando aludan directamente a Dios o a Cristo (Él, Tú, Tuyo, Santo, Creador, Omnipotente). Excepción estricta: Los pronombres posesivos de tercera persona (su, suyo, suya, sus, suyos) DEBEN ir siempre en minúscula (ej: "su amor", no "Su amor").
 
 3. Acentuación y tildes según contexto (RAE):
