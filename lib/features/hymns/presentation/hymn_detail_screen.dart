@@ -1077,11 +1077,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           ),
           title: AutoScrollingAppBarTitle(
             badgeText: moduleBadgeText,
-            titleText: hymn.collection == 'iump'
-                ? 'Himno ${hymn.id} - ${hymn.title}'
-                : (hymn.collection == 'especiales'
-                    ? 'Especial ${hymn.id} - ${hymn.title}'
-                    : 'Coro ${hymn.id} - ${hymn.title}'),
+            titleText: hymn.collection == 'iump' ? 'Himno ${hymn.id} - ${hymn.title}' : hymn.title,
             primaryColor: theme.colorScheme.primary,
           ),
             actions: [
@@ -3126,22 +3122,37 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ],
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  hymn.id > 0 ? hymn.id.toString() : '♫',
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: hymn.id > 999 ? 18 : 22,
-                    letterSpacing: 0.5,
-                    shadows: const [
-                      Shadow(
-                        color: Colors.black45,
-                        offset: Offset(0, 1.5),
-                        blurRadius: 3,
+                child: hymn.collection == 'iump'
+                    ? Text(
+                        hymn.id.toString(),
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 22,
+                          letterSpacing: 0.5,
+                          shadows: const [
+                            Shadow(
+                              color: Colors.black45,
+                              offset: Offset(0, 1.5),
+                              blurRadius: 3,
+                            ),
+                          ],
+                        ),
+                      )
+                    : Icon(
+                        hymn.collection == 'especiales'
+                            ? Icons.music_note_rounded
+                            : Icons.library_music_rounded,
+                        color: Colors.white,
+                        size: 32,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black45,
+                            offset: Offset(0, 1.5),
+                            blurRadius: 3,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
               ),
             );
 

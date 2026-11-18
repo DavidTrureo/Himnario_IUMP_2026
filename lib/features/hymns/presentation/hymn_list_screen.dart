@@ -2266,26 +2266,37 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               ],
                                             ),
                                             alignment: Alignment.center,
-                                            child: Text(
-                                              hymn.id > 0
-                                                  ? hymn.id.toString()
-                                                  : '♫',
-                                              style: GoogleFonts.outfit(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: hymn.id > 999
-                                                    ? 13
-                                                    : 16,
-                                                letterSpacing: 0.2,
-                                                shadows: const [
-                                                  Shadow(
-                                                    color: Colors.black38,
-                                                    offset: Offset(0, 1),
-                                                    blurRadius: 2,
+                                            child: hymn.collection == 'iump'
+                                                ? Text(
+                                                    hymn.id.toString(),
+                                                    style: GoogleFonts.outfit(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.w800,
+                                                      fontSize: 16,
+                                                      letterSpacing: 0.2,
+                                                      shadows: const [
+                                                        Shadow(
+                                                          color: Colors.black38,
+                                                          offset: Offset(0, 1),
+                                                          blurRadius: 2,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  )
+                                                : Icon(
+                                                    hymn.collection == 'especiales'
+                                                        ? Icons.music_note_rounded
+                                                        : Icons.library_music_rounded,
+                                                    color: Colors.white,
+                                                    size: 24,
+                                                    shadows: const [
+                                                      Shadow(
+                                                        color: Colors.black38,
+                                                        offset: Offset(0, 1),
+                                                        blurRadius: 2,
+                                                      ),
+                                                    ],
                                                   ),
-                                                ],
-                                              ),
-                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 14),

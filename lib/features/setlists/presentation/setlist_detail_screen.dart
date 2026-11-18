@@ -476,7 +476,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         subtitle: Text(
           hymn.collection == 'iump' 
             ? 'Himno ${hymn.id}' 
-            : (hymn.collection == 'especiales' ? 'Especial ${hymn.id}' : 'Coro ${hymn.id}'),
+            : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro de Avivamiento'),
           style: GoogleFonts.outfit(
             fontSize: 12,
             fontWeight: FontWeight.w600,

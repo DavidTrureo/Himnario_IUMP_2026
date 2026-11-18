@@ -144,10 +144,10 @@ class RecentHymnsSection extends ConsumerWidget {
       badgeText = 'Himno ${hymn.id}';
     } else if (hymn.collection == 'especiales') {
       badgeColor = const Color(0xFF8B5CF6); // Morado Especiales
-      badgeText = hymn.id > 0 ? 'Especial ${hymn.id}' : 'Especial';
+      badgeText = 'Especial';
     } else {
       badgeColor = const Color(0xFF10B981); // Esmeralda Coros
-      badgeText = hymn.id > 0 ? 'Coro ${hymn.id}' : 'Coro';
+      badgeText = 'Coro';
     }
 
     final displayTone = recent.tone != null && recent.tone!.isNotEmpty
