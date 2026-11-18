@@ -34,16 +34,8 @@ class GlobalMiniPlayer extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    // En tablets (iPad), la pantalla del canto muestra la tarjeta de estudio expandida (680px),
-    // por lo que ocultamos el mini reproductor únicamente en tablet dentro de /hymn/ o /hymn-view/.
-    // En teléfonos móviles permanece siempre visible y esbelto sobre la barra de navegación.
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 600;
-    final resolvedPath = currentPath ?? _resolveLivePath(context);
-    if (isTablet &&
-        (resolvedPath.contains('/hymn/') || resolvedPath.contains('/hymn-view/'))) {
-      return const SizedBox.shrink();
-    }
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -75,13 +67,18 @@ class GlobalMiniPlayer extends ConsumerWidget {
         : hymn.title;
 
     return RepaintBoundary(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(22),
-            onTap: () {
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isTablet ? 780 : double.infinity,
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(14, 0, 14, isTablet ? 10 : 8),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: () {
               // Leer la ruta EN VIVO en el instante del toque (evita rutas cacheadas al pausar o cambiar a Favoritos)
               final hymnKey = '${hymn.collection}-${hymn.id}';
               final livePath = _resolveLivePath(context);
@@ -367,23 +364,61 @@ class GlobalMiniPlayer extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    // Barra de progreso delgada al fondo con color de colección
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(22),
-                        bottomRight: Radius.circular(22),
-                      ),
-                      child: SizedBox(
-                        height: 3,
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.black.withValues(alpha: 0.06),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            accentColor,
-                          ),
-                        ),
+                    // Barra de progreso interactiva y elegante dentro de los márgenes
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapDown: (details) {
+                              if (durationMs > 0 && constraints.maxWidth > 0) {
+                                final ratio = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                                final targetMs = (ratio * durationMs).toInt();
+                                ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: targetMs));
+                              }
+                            },
+                            onHorizontalDragUpdate: (details) {
+                              if (durationMs > 0 && constraints.maxWidth > 0) {
+                                final ratio = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+                                final targetMs = (ratio * durationMs).toInt();
+                                ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: targetMs));
+                              }
+                            },
+                            child: Container(
+                              height: 12,
+                              alignment: Alignment.center,
+                              child: Container(
+                                height: 3.5,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.12)
+                                      : Colors.black.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: FractionallySizedBox(
+                                    widthFactor: progress,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: accentColor,
+                                        borderRadius: BorderRadius.circular(4),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: accentColor.withValues(alpha: 0.5),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -392,6 +427,7 @@ class GlobalMiniPlayer extends ConsumerWidget {
             ),
           ),
         ),
+      ),
     );
   }
 }

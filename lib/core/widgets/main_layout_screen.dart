@@ -103,7 +103,10 @@ class MainLayoutScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         Expanded(child: ClipRect(child: navigationShell)),
-                        GlobalMiniPlayer(currentPath: currentPath),
+                        SafeArea(
+                          top: false,
+                          child: GlobalMiniPlayer(currentPath: currentPath),
+                        ),
                       ],
                     ),
                   ),

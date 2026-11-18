@@ -222,23 +222,9 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   // Modo de vista: 'texto' o 'partitura'
   String _viewMode = 'texto';
 
-  // Variables de estado para reproducción de audio
-  AudioPlayer? _audioPlayer;
-  bool _isPlaying = false;
-  bool _isLooping = false;
-  Duration _duration = Duration.zero;
-  Duration _position = Duration.zero;
-  bool _isLoadingAudio = false;
-  String? _currentAudioUrl;
-  bool _showPlayerCard = false;
-  StreamSubscription? _playerStateSubscription;
-  StreamSubscription? _durationSubscription;
-  StreamSubscription? _positionSubscription;
-
   YoutubePlayerController? _youtubeController;
   String? _activeYoutubeKey;
   StreamSubscription? _youtubeSubscription;
-  bool _isDetailPlayerExpanded = false;
   final Map<int, ScrollController> _pageScrollControllers = {};
   bool _lockSwipe = false;
   bool _isVerticalDragging = false;
@@ -509,28 +495,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     } catch (_) {}
   }
 
-  void _stopAndDisposeAudio() {
-    _playerStateSubscription?.cancel();
-    _playerStateSubscription = null;
-    _durationSubscription?.cancel();
-    _durationSubscription = null;
-    _positionSubscription?.cancel();
-    _positionSubscription = null;
-
-    final player = _audioPlayer;
-    if (player != null) {
-      try {
-        player.stop();
-        player.dispose();
-      } catch (_) {}
-    }
-    if (identical(HymnDetailScreen._activeGlobalAudioPlayer, _audioPlayer)) {
-      HymnDetailScreen._activeGlobalAudioPlayer = null;
-    }
-    _audioPlayer = null;
-    _isPlaying = false;
-  }
-
   @override
   void dispose() {
     _pageHold?.cancel();
@@ -548,7 +512,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       } catch (_) {}
     }
     _pageController?.dispose();
-    _stopAndDisposeAudio();
     _disposeYoutubePlayer(notify: false);
     super.dispose();
   }
@@ -907,7 +870,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () {
-              _stopAndDisposeAudio();
               if (context.canPop()) {
                 context.pop();
               } else {
@@ -953,7 +915,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   const SizedBox(height: 24),
                   FilledButton.icon(
                     onPressed: () {
-                      _stopAndDisposeAudio();
                       if (context.canPop()) {
                         context.pop();
                       } else {
@@ -1141,9 +1102,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                             return false;
                           });
                         } else {
-                          setState(() {
-                            _showPlayerCard = true;
-                          });
                           ref.read(globalAudioProvider.notifier).playHymn(hymn);
                         }
                       },
@@ -1429,9 +1387,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                               setState(() {
                                 _currentIndex = index;
                                 _transposeOffset = 0; // Resetear transposición al cambiar de himno
-                                _showPlayerCard = false;
                               });
-                              _stopAndDisposeAudio(); // Detener el audio al cambiar de canto
                               _disposeYoutubePlayer();
                               _saveLastViewedHymn(_sortedHymns[index]);
                               _startEngagementTracking(_sortedHymns[index]);
@@ -1801,10 +1757,10 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
                     final double bottomPos;
                     if (isTablet) {
-                      bottomPos = (isAudioActive ? 150.0 : 20.0) + MediaQuery.of(context).padding.bottom;
+                      bottomPos = (isAudioActive ? 95.0 : 20.0) + MediaQuery.of(context).padding.bottom;
                     } else {
-                      // En móvil, la barra de navegación mide ~96px; si hay mini reproductor añade ~64px
-                      bottomPos = (isAudioActive ? 170.0 : 100.0) + MediaQuery.of(context).padding.bottom;
+                      // En móvil, la barra de navegación mide ~96px; si hay mini reproductor añade ~70px
+                      bottomPos = (isAudioActive ? 175.0 : 100.0) + MediaQuery.of(context).padding.bottom;
                     }
 
                     return Positioned(
@@ -1840,482 +1796,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ),
                 ),
 
-              // Reproductor de Audio Flotante (Glassmorphic Adaptativo: Compacto en teléfonos, Estudio en tablets)
-              Builder(
-                builder: (context) {
-                  final screenWidth = MediaQuery.of(context).size.width;
-                  final isTablet = screenWidth >= 600;
-
-                  // En teléfonos móviles, el GlobalMiniPlayer persistente se encarga
-                  // de reproducir de forma esbelta y compacta sobre la barra de navegación,
-                  // evitando tarjetas grandes duplicadas que tapen la letra del canto.
-                  if (!isTablet) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final globalAudio = ref.watch(globalAudioProvider);
-                  final isCurrentHymnAudio = globalAudio.hymn?.id == hymn.id && globalAudio.hymn?.collection == hymn.collection;
-                  final shouldShowCard = (_showPlayerCard && isCurrentHymnAudio) || (globalAudio.isVisible && globalAudio.hymn != null);
-
-                  if (!shouldShowCard) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final activeHymn = globalAudio.hymn ?? hymn;
-                  final durationMs = globalAudio.duration.inMilliseconds.toDouble();
-                  final positionMs = globalAudio.position.inMilliseconds.toDouble();
-                  final maxSlider = durationMs > 0 ? durationMs : 1.0;
-                  final valueSlider = positionMs.clamp(0.0, maxSlider);
-
-                  final Color playerAccentColor = activeHymn.collection == 'especiales'
-                      ? const Color(0xFFA855F7)
-                      : (activeHymn.collection == 'coros'
-                          ? const Color(0xFF10B981)
-                          : theme.colorScheme.primary);
-
-                  final displayTitle = activeHymn.collection == 'iump'
-                      ? '${activeHymn.id}. ${activeHymn.title}'
-                      : activeHymn.title;
-
-                  final isCompact = !isTablet && !_isDetailPlayerExpanded;
-
-                  final double bottomPos;
-                  if (_isAtrilMode) {
-                    bottomPos = (_isAtrilControlsMinimized ? 20.0 : 80.0) + MediaQuery.of(context).padding.bottom;
-                  } else if (_showControlPanel) {
-                    bottomPos = (hymn.lyrics.contains('[') ? (isCompact ? 220.0 : 295.0) : (isCompact ? 145.0 : 195.0)) + MediaQuery.of(context).padding.bottom;
-                  } else {
-                    bottomPos = (isCompact ? 14.0 : 20.0) + MediaQuery.of(context).padding.bottom;
-                  }
-
-                  return Positioned(
-                    left: isTablet ? ((screenWidth - 680) / 2).clamp(20.0, screenWidth) : 14,
-                    right: isTablet ? ((screenWidth - 680) / 2).clamp(20.0, screenWidth) : 14,
-                    bottom: bottomPos,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: isDark 
-                                ? [
-                                    const Color(0xFF1E293B).withValues(alpha: 0.94),
-                                    const Color(0xFF0F172A).withValues(alpha: 0.98),
-                                  ]
-                                : [
-                                    Colors.white.withValues(alpha: 0.96),
-                                    const Color(0xFFF8FAFC).withValues(alpha: 0.96),
-                                  ],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: playerAccentColor.withValues(alpha: 0.35),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: playerAccentColor.withValues(alpha: isDark ? 0.20 : 0.08),
-                                blurRadius: 16,
-                                offset: const Offset(0, 4),
-                              ),
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: isCompact
-                              ? Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-                                      child: Row(
-                                        children: [
-                                          SpinningVinyl(
-                                            isPlaying: globalAudio.isPlaying,
-                                            color: playerAccentColor,
-                                            size: 24,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  displayTitle,
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 12.5,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isDark ? Colors.white : Colors.black87,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                                Text(
-                                                  '${_formatDuration(globalAudio.position)} / ${_formatDuration(globalAudio.duration)}',
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: isDark ? Colors.white60 : Colors.black54,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.replay_10_rounded, size: 22),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                            color: isDark ? Colors.white70 : Colors.black54,
-                                            tooltip: 'Retroceder 10s',
-                                            onPressed: () {
-                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: -10));
-                                            },
-                                          ),
-                                          const SizedBox(width: 2),
-                                          GestureDetector(
-                                            onTap: () {
-                                              ref.read(globalAudioProvider.notifier).togglePlayPause();
-                                            },
-                                            child: Container(
-                                              width: 36,
-                                              height: 36,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                gradient: LinearGradient(
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                  colors: [
-                                                    playerAccentColor,
-                                                    playerAccentColor.withValues(alpha: 0.85),
-                                                  ],
-                                                ),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: playerAccentColor.withValues(alpha: 0.45),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Center(
-                                                child: globalAudio.isLoading
-                                                    ? const SizedBox(
-                                                        width: 16,
-                                                        height: 16,
-                                                        child: CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                                        ),
-                                                      )
-                                                    : Icon(
-                                                        globalAudio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                                        size: 22,
-                                                        color: Colors.white,
-                                                      ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 2),
-                                          IconButton(
-                                            icon: const Icon(Icons.forward_10_rounded, size: 22),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                            color: isDark ? Colors.white70 : Colors.black54,
-                                            tooltip: 'Avanzar 10s',
-                                            onPressed: () {
-                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: 10));
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                              globalAudio.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
-                                              size: 20,
-                                              color: globalAudio.isLooping ? playerAccentColor : (isDark ? Colors.white60 : Colors.black54),
-                                            ),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                                            tooltip: globalAudio.isLooping ? 'Repetición activada' : 'Repetir canto',
-                                            onPressed: () {
-                                              ref.read(globalAudioProvider.notifier).toggleLoop();
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 20),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 26, minHeight: 30),
-                                            color: isDark ? Colors.white54 : Colors.black45,
-                                            tooltip: 'Expandir controles',
-                                            onPressed: () {
-                                              setState(() {
-                                                _isDetailPlayerExpanded = true;
-                                              });
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.close_rounded, size: 18),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 26, minHeight: 30),
-                                            color: isDark ? Colors.white54 : Colors.black45,
-                                            tooltip: 'Cerrar reproductor',
-                                            onPressed: () {
-                                              setState(() {
-                                                _showPlayerCard = false;
-                                              });
-                                              ref.read(globalAudioProvider.notifier).stopAndClose();
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        return GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onHorizontalDragUpdate: (details) {
-                                            if (globalAudio.duration.inMilliseconds > 0 && constraints.maxWidth > 0) {
-                                              final ratio = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
-                                              final targetMs = (ratio * globalAudio.duration.inMilliseconds).toInt();
-                                              ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: targetMs));
-                                            }
-                                          },
-                                          onTapDown: (details) {
-                                            if (globalAudio.duration.inMilliseconds > 0 && constraints.maxWidth > 0) {
-                                              final ratio = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
-                                              final targetMs = (ratio * globalAudio.duration.inMilliseconds).toInt();
-                                              ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: targetMs));
-                                            }
-                                          },
-                                          child: Container(
-                                            height: 3.5,
-                                            width: double.infinity,
-                                            color: isDark ? Colors.white12 : Colors.black12,
-                                            alignment: Alignment.centerLeft,
-                                            child: FractionallySizedBox(
-                                              widthFactor: (globalAudio.duration.inMilliseconds > 0)
-                                                  ? (globalAudio.position.inMilliseconds / globalAudio.duration.inMilliseconds).clamp(0.0, 1.0)
-                                                  : 0.0,
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color: playerAccentColor,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: playerAccentColor.withValues(alpha: 0.6),
-                                                      blurRadius: 4,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                )
-                              : Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          SpinningVinyl(
-                                            isPlaying: globalAudio.isPlaying,
-                                            color: playerAccentColor,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              'Reproduciendo: $displayTitle',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 13.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: isDark ? Colors.white : Colors.black87,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          if (globalAudio.isLoading)
-                                            SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor: AlwaysStoppedAnimation<Color>(playerAccentColor),
-                                              ),
-                                            )
-                                          else ...[
-                                            if (!isTablet)
-                                              IconButton(
-                                                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 21),
-                                                constraints: const BoxConstraints(),
-                                                padding: const EdgeInsets.all(4),
-                                                tooltip: 'Minimizar a barra compacta',
-                                                onPressed: () {
-                                                  setState(() {
-                                                    _isDetailPlayerExpanded = false;
-                                                  });
-                                                },
-                                              ),
-                                            IconButton(
-                                              icon: const Icon(Icons.close_rounded, size: 19),
-                                              constraints: const BoxConstraints(),
-                                              padding: const EdgeInsets.all(4),
-                                              tooltip: 'Cerrar reproductor',
-                                              onPressed: () {
-                                                setState(() {
-                                                  _showPlayerCard = false;
-                                                });
-                                                ref.read(globalAudioProvider.notifier).stopAndClose();
-                                              },
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      const Divider(height: 12),
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.replay_10_rounded, size: 24),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                            color: isDark ? Colors.white70 : Colors.black54,
-                                            tooltip: 'Retroceder 10s',
-                                            onPressed: () {
-                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: -10));
-                                            },
-                                          ),
-                                          const SizedBox(width: 4),
-                                          GestureDetector(
-                                            onTap: () {
-                                              ref.read(globalAudioProvider.notifier).togglePlayPause();
-                                            },
-                                            child: Container(
-                                              width: 40,
-                                              height: 40,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                gradient: LinearGradient(
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                  colors: [
-                                                    playerAccentColor,
-                                                    playerAccentColor.withValues(alpha: 0.85),
-                                                  ],
-                                                ),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: playerAccentColor.withValues(alpha: 0.45),
-                                                    blurRadius: 10,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Center(
-                                                child: Icon(
-                                                  globalAudio.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                                  size: 24,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          IconButton(
-                                            icon: const Icon(Icons.forward_10_rounded, size: 24),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                            color: isDark ? Colors.white70 : Colors.black54,
-                                            tooltip: 'Avanzar 10s',
-                                            onPressed: () {
-                                              ref.read(globalAudioProvider.notifier).seekRelative(const Duration(seconds: 10));
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                              globalAudio.isLooping ? Icons.repeat_one_rounded : Icons.repeat_rounded,
-                                              size: 22,
-                                              color: globalAudio.isLooping ? playerAccentColor : (isDark ? Colors.white60 : Colors.black54),
-                                            ),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                                            tooltip: globalAudio.isLooping ? 'Repetición activada (Loop)' : 'Repetir canto continuamente',
-                                            onPressed: () {
-                                              final willBeLooping = !globalAudio.isLooping;
-                                              ref.read(globalAudioProvider.notifier).toggleLoop();
-                                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    willBeLooping ? '🔂 Repetición continua activada' : 'Repetición continua desactivada',
-                                                    style: GoogleFonts.outfit(),
-                                                  ),
-                                                  duration: const Duration(seconds: 1),
-                                                  behavior: SnackBarBehavior.floating,
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: SliderTheme(
-                                              data: SliderTheme.of(context).copyWith(
-                                                trackHeight: 3.0,
-                                                activeTrackColor: playerAccentColor,
-                                                inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
-                                                thumbColor: playerAccentColor,
-                                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                              ),
-                                              child: Slider(
-                                                min: 0.0,
-                                                max: maxSlider,
-                                                value: valueSlider,
-                                                onChanged: (val) {
-                                                  ref.read(globalAudioProvider.notifier).seek(Duration(milliseconds: val.toInt()));
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              _formatDuration(globalAudio.position),
-                                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
-                                            ),
-                                            Text(
-                                              _formatDuration(globalAudio.duration),
-                                              style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                  ).animate().fadeIn(duration: 200.ms).slideY(begin: 0.1);
-                },
-              ),
 
               // Metrónomo Flotante Interactivo (Ubicación Rápida mediante Botones Dedicados)
               if (_showMetronome)
@@ -2484,107 +1964,6 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     }
   }
 
-  Future<void> _initAudio(String url) async {
-    if (_audioPlayer != null && _currentAudioUrl == url) return;
-
-    setState(() {
-      _isLoadingAudio = true;
-    });
-
-    try {
-      HymnDetailScreen.stopGlobalAudio();
-      _stopAndDisposeAudio();
-
-      final player = AudioPlayer();
-      _audioPlayer = player;
-      HymnDetailScreen._activeGlobalAudioPlayer = player;
-      _currentAudioUrl = url;
-
-      if (_isLooping) {
-        await player.setLoopMode(LoopMode.one);
-      }
-
-      if (kIsWeb) {
-        await player.setUrl(url);
-      } else {
-        final localPath = await _getLocalAudioPath(url);
-        final file = File(localPath);
-        if (await file.exists()) {
-          debugPrint('>>> Reproduciendo audio desde memoria local: $localPath');
-          await player.setFilePath(localPath);
-        } else {
-          try {
-            final audioSource = LockCachingAudioSource(Uri.parse(url));
-            await player.setAudioSource(audioSource);
-          } catch (e) {
-            debugPrint('>>> Error con LockCachingAudioSource (común en Motorola), usando fallback: $e');
-            await player.setAudioSource(AudioSource.uri(Uri.parse(url)));
-          }
-        }
-      }
-
-      _playerStateSubscription = player.playerStateStream.listen((state) {
-        if (mounted) {
-          setState(() {
-            _isPlaying = state.playing;
-            _isLoadingAudio = state.processingState == ProcessingState.loading ||
-                state.processingState == ProcessingState.buffering;
-
-            if (state.processingState == ProcessingState.completed) {
-              if (_isLooping) {
-                player.seek(Duration.zero);
-                player.play();
-              } else {
-                // Cuando termine, pausamos y volvemos a cero
-                _isPlaying = false;
-                player.pause();
-                player.seek(Duration.zero);
-              }
-            }
-          });
-        }
-      });
-
-      _durationSubscription = player.durationStream.listen((d) {
-        if (mounted && d != null) {
-          setState(() {
-            _duration = d;
-          });
-        }
-      });
-
-      _positionSubscription = player.positionStream.listen((p) {
-        if (mounted) {
-          setState(() {
-            _position = p;
-          });
-        }
-      });
-
-
-      setState(() {
-        _isLoadingAudio = false;
-      });
-
-      await player.play();
-    } catch (e) {
-      debugPrint('>>> Error al inicializar audio: $e');
-      _stopAndDisposeAudio();
-      if (mounted) {
-        setState(() {
-          _isLoadingAudio = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No se pudo cargar el audio: $e', style: GoogleFonts.nunito()),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
-    }
-  }
 
   String _formatDuration(Duration d) {
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
