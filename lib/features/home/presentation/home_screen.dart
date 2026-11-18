@@ -452,14 +452,14 @@ class HomeScreen extends ConsumerWidget {
             color: isDark
               ? (kIsWeb
                   ? const Color(0xFF1E293B).withValues(alpha: 0.92)
-                  : Colors.white.withValues(alpha: 0.04))
+                  : const Color(0xFF162032))
               : (kIsWeb
                   ? Colors.white.withValues(alpha: 0.95)
                   : Colors.white.withValues(alpha: 0.75)),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
+                ? const Color(0xFF2A374D).withValues(alpha: 0.7)
                 : Colors.white.withValues(alpha: 0.5),
               width: 1.2,
             ),

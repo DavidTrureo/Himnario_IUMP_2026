@@ -1077,7 +1077,11 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
           ),
           title: AutoScrollingAppBarTitle(
             badgeText: moduleBadgeText,
-            titleText: hymn.collection == 'iump' ? 'Himno ${hymn.id} - ${hymn.title}' : hymn.title,
+            titleText: hymn.collection == 'iump'
+                ? 'Himno ${hymn.id} - ${hymn.title}'
+                : (hymn.collection == 'especiales'
+                    ? 'Especial ${hymn.id} - ${hymn.title}'
+                    : 'Coro ${hymn.id} - ${hymn.title}'),
             primaryColor: theme.colorScheme.primary,
           ),
             actions: [
@@ -3074,49 +3078,71 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             final hasMultiple = _sortedHymns.length > 1;
             final hasPrev = pageIndex > 0;
             final hasNext = pageIndex < _sortedHymns.length - 1;
+            final (List<Color> badgeGradient, Color badgeBorder, Color badgeShadow) = switch (hymn.collection) {
+              'iump' => (
+                [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)],
+                const Color(0xFF60A5FA).withValues(alpha: 0.45),
+                const Color(0xFF2563EB).withValues(alpha: 0.35),
+              ),
+              'especiales' => (
+                [const Color(0xFF6D28D9), const Color(0xFF8B5CF6)],
+                const Color(0xFFA78BFA).withValues(alpha: 0.45),
+                const Color(0xFF7C3AED).withValues(alpha: 0.35),
+              ),
+              'coros' => (
+                [const Color(0xFF047857), const Color(0xFF10B981)],
+                const Color(0xFF34D399).withValues(alpha: 0.45),
+                const Color(0xFF059669).withValues(alpha: 0.35),
+              ),
+              _ => (
+                [const Color(0xFF0284C7), const Color(0xFF0EA5E9)],
+                const Color(0xFF38BDF8).withValues(alpha: 0.45),
+                const Color(0xFF0284C7).withValues(alpha: 0.35),
+              ),
+            };
+
             final badgeHero = Hero(
               tag: 'hymn_icon_${hymn.collection}-${hymn.id}',
-              child: hymn.collection == 'iump'
-                  ? Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.4 : 0.8),
-                            theme.colorScheme.primaryContainer.withValues(alpha: isDark ? 0.1 : 0.4),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.1 : 0.15),
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        hymn.id.toString(),
-                        style: GoogleFonts.outfit(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
-                        ),
-                      ),
-                    )
-                  : Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Icon(
-                        hymn.collection == 'especiales' ? Icons.music_note_rounded : Icons.library_music_rounded,
-                        color: hymn.collection == 'especiales' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981),
-                        size: 32,
-                      ),
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: badgeGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: badgeBorder,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: badgeShadow,
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  hymn.id > 0 ? hymn.id.toString() : '♫',
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: hymn.id > 999 ? 18 : 22,
+                    letterSpacing: 0.5,
+                    shadows: const [
+                      Shadow(
+                        color: Colors.black45,
+                        offset: Offset(0, 1.5),
+                        blurRadius: 3,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             );
 
             if (!hasMultiple) {
@@ -3263,32 +3289,93 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             },
           ),
         
-        // Chip de Tono
-        if (displayedTone.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-            decoration: BoxDecoration(
-              color: isDark 
-                ? Colors.white.withValues(alpha: 0.05) 
-                : theme.colorScheme.primary.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDark 
-                  ? Colors.white.withValues(alpha: 0.08) 
-                  : theme.colorScheme.primary.withValues(alpha: 0.1),
+        // Fila de Metadatos (Colección + Tono Musical)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // Píldora de Colección
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4.5),
+                decoration: BoxDecoration(
+                  color: (switch (hymn.collection) {
+                    'iump' => const Color(0xFF3B82F6),
+                    'especiales' => const Color(0xFF8B5CF6),
+                    'coros' => const Color(0xFF10B981),
+                    _ => const Color(0xFF0EA5E9),
+                  }).withValues(alpha: isDark ? 0.15 : 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: (switch (hymn.collection) {
+                      'iump' => const Color(0xFF60A5FA),
+                      'especiales' => const Color(0xFFA78BFA),
+                      'coros' => const Color(0xFF34D399),
+                      _ => const Color(0xFF38BDF8),
+                    }).withValues(alpha: isDark ? 0.35 : 0.25),
+                    width: 0.9,
+                  ),
+                ),
+                child: Text(
+                  switch (hymn.collection) {
+                    'iump' => 'Himnario IUMP',
+                    'especiales' => 'Alabanza Especial',
+                    'coros' => 'Coro de Avivamiento',
+                    _ => 'Alabanza',
+                  },
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: switch (hymn.collection) {
+                      'iump' => isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                      'especiales' => isDark ? const Color(0xFFD8B4FE) : const Color(0xFF6D28D9),
+                      'coros' => isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                      _ => isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0369A1),
+                    },
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              Hymn.formatToneDisplay(displayedTone, ref.read(notationProvider)),
-              style: GoogleFonts.outfit(
-                fontSize: fontSize * 0.7,
-                fontWeight: FontWeight.bold,
-                color: isDark ? const Color(0xFF818CF8) : theme.colorScheme.primary,
-                letterSpacing: 1.2,
-              ),
-            ),
+
+              // Píldora de Tono Musical
+              if (displayedTone.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0EA5E9).withValues(alpha: isDark ? 0.14 : 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF38BDF8).withValues(alpha: isDark ? 0.35 : 0.22),
+                      width: 0.9,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.music_note_rounded,
+                        size: 13,
+                        color: Color(0xFF38BDF8),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        Hymn.formatToneDisplay(displayedTone, ref.read(notationProvider)),
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7),
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
+        ),
 
         // Toggle Letra / Partitura
         Container(
@@ -3421,8 +3508,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   Widget _buildBottomHymnNavigator(int pageIndex, bool isDark, ThemeData theme) {
     final hasPrev = pageIndex > 0;
     final hasNext = pageIndex < _sortedHymns.length - 1;
-    final cardBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.78);
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06);
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF334155).withValues(alpha: 0.8) : const Color(0xFFE2E8F0);
 
     return Container(
       margin: const EdgeInsets.only(top: 28, bottom: 12),
@@ -3430,7 +3517,14 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor, width: 1),
+        border: Border.all(color: borderColor, width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3597,68 +3691,114 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       
       final chorusWidget = Container(
         width: double.infinity,
-        margin: const EdgeInsets.symmetric(vertical: 14.0),
+        margin: const EdgeInsets.symmetric(vertical: 16.0),
         decoration: BoxDecoration(
-          color: isDark 
-            ? const Color(0xFF6366F1).withValues(alpha: 0.04) 
-            : theme.colorScheme.primary.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.02),
-            width: 1,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [
+                    const Color(0xFF6366F1).withValues(alpha: 0.10),
+                    const Color(0xFF4F46E5).withValues(alpha: 0.03),
+                  ]
+                : [
+                    theme.colorScheme.primary.withValues(alpha: 0.08),
+                    theme.colorScheme.primary.withValues(alpha: 0.02),
+                  ],
           ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF6366F1).withValues(alpha: 0.25)
+                : theme.colorScheme.primary.withValues(alpha: 0.20),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: (isDark ? const Color(0xFF6366F1) : theme.colorScheme.primary).withValues(alpha: isDark ? 0.08 : 0.03),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  width: 4,
-                  color: isDark ? const Color(0xFF6366F1) : theme.colorScheme.primary,
+                  width: 4.5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: isDark
+                          ? [const Color(0xFF818CF8), const Color(0xFF4F46E5)]
+                          : [theme.colorScheme.primary, theme.colorScheme.secondary],
+                    ),
+                  ),
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(18.0),
+                    padding: const EdgeInsets.fromLTRB(18.0, 18.0, 18.0, 20.0),
                     child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF6366F1).withValues(alpha: 0.15) : theme.colorScheme.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              headerText,
-                              style: GoogleFonts.outfit(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFF818CF8) : theme.colorScheme.primary,
-                                letterSpacing: 1.5,
-                              ),
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4.5),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF6366F1).withValues(alpha: 0.22)
+                                : theme.colorScheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF818CF8).withValues(alpha: 0.35)
+                                  : theme.colorScheme.primary.withValues(alpha: 0.25),
+                              width: 0.8,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              for (final line in bodyLines) ...[
-                                Wrap(
-                                  alignment: WrapAlignment.center,
-                                  crossAxisAlignment: WrapCrossAlignment.end,
-                                  children: _buildLineWithChords(Hymn.formatLineCasing(line), fontSize, isDark, theme, isItalic: true),
+                              Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 11,
+                                color: isDark ? const Color(0xFFA5B4FC) : theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                headerText,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? const Color(0xFFC7D2FE) : theme.colorScheme.primary,
+                                  letterSpacing: 2.0,
                                 ),
-                                if (line != bodyLines.last)
-                                  SizedBox(height: _showChords && line.contains('[') ? 10 : 4),
-                              ],
+                              ),
                             ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            for (final line in bodyLines) ...[
+                              Wrap(
+                                alignment: WrapAlignment.center,
+                                crossAxisAlignment: WrapCrossAlignment.end,
+                                children: _buildLineWithChords(Hymn.formatLineCasing(line), fontSize, isDark, theme, isItalic: true),
+                              ),
+                              if (line != bodyLines.last)
+                                SizedBox(height: _showChords && line.contains('[') ? 10 : 4),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                   ),
+                ),
               ],
             ),
           ),
@@ -3709,19 +3849,34 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 26,
-                height: 26,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                  color: isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF1F5F9),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF38BDF8).withValues(alpha: 0.40)
+                        : const Color(0xFF0EA5E9).withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isDark ? const Color(0xFF38BDF8) : Colors.black).withValues(alpha: isDark ? 0.14 : 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   parsedNumber,
                   style: GoogleFonts.outfit(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white38 : Colors.black38,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                   ),
                 ),
               ),

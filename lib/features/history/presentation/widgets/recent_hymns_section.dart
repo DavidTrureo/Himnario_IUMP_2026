@@ -144,10 +144,10 @@ class RecentHymnsSection extends ConsumerWidget {
       badgeText = 'Himno ${hymn.id}';
     } else if (hymn.collection == 'especiales') {
       badgeColor = const Color(0xFF8B5CF6); // Morado Especiales
-      badgeText = 'Especial';
+      badgeText = hymn.id > 0 ? 'Especial ${hymn.id}' : 'Especial';
     } else {
       badgeColor = const Color(0xFF10B981); // Esmeralda Coros
-      badgeText = 'Coro';
+      badgeText = hymn.id > 0 ? 'Coro ${hymn.id}' : 'Coro';
     }
 
     final displayTone = recent.tone != null && recent.tone!.isNotEmpty
@@ -157,15 +157,15 @@ class RecentHymnsSection extends ConsumerWidget {
     return Container(
       width: 195,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: isDark ? const Color(0xFF162032) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          color: isDark ? const Color(0xFF2A374D).withValues(alpha: 0.8) : const Color(0xFFE2E8F0),
           width: 1.1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -207,15 +207,19 @@ class RecentHymnsSection extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                          color: const Color(0xFF0EA5E9).withValues(alpha: isDark ? 0.15 : 0.08),
                           borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFF38BDF8).withValues(alpha: isDark ? 0.30 : 0.20),
+                            width: 0.8,
+                          ),
                         ),
                         child: Text(
                           displayTone,
                           style: GoogleFonts.outfit(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white70 : Colors.black54,
+                            color: isDark ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7),
                           ),
                         ),
                       ),

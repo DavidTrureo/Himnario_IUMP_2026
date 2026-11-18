@@ -426,21 +426,41 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       key: ValueKey('${hymn.collection}-${hymn.id}'),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
+        color: isDark ? const Color(0xFF162032) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+          color: isDark ? const Color(0xFF2A374D).withValues(alpha: 0.8) : const Color(0xFFE2E8F0),
+          width: 1.1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-          foregroundColor: theme.colorScheme.primary,
-          radius: 18,
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: hymn.collection == 'iump'
+                  ? [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)]
+                  : (hymn.collection == 'especiales'
+                      ? [const Color(0xFF6D28D9), const Color(0xFF8B5CF6)]
+                      : [const Color(0xFF047857), const Color(0xFF10B981)]),
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
           child: Text(
             '${index + 1}',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
           ),
         ),
         title: Text(
@@ -455,11 +475,16 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         ),
         subtitle: Text(
           hymn.collection == 'iump' 
-            ? 'Himnario IUMP' 
-            : (hymn.collection == 'especiales' ? 'Alabanza Especial' : 'Coro de Avivamiento'),
+            ? 'Himno ${hymn.id}' 
+            : (hymn.collection == 'especiales' ? 'Especial ${hymn.id}' : 'Coro ${hymn.id}'),
           style: GoogleFonts.outfit(
             fontSize: 12,
-            color: isDark ? Colors.white60 : Colors.black54,
+            fontWeight: FontWeight.w600,
+            color: hymn.collection == 'iump'
+                ? const Color(0xFF60A5FA)
+                : (hymn.collection == 'especiales'
+                    ? const Color(0xFFA78BFA)
+                    : const Color(0xFF34D399)),
           ),
         ),
         trailing: Row(

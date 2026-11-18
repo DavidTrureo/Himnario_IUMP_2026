@@ -2101,16 +2101,47 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                             final isDuplicate =
                                 adminMode && duplicateKeys.contains(key);
 
+                            final (List<Color> badgeGradient, Color badgeBorder, Color badgeShadow, Color badgeTagColor, String collectionName) = switch (hymn.collection) {
+                              'iump' => (
+                                [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)],
+                                const Color(0xFF60A5FA).withValues(alpha: 0.4),
+                                const Color(0xFF2563EB).withValues(alpha: 0.3),
+                                const Color(0xFF3B82F6),
+                                'Himnario IUMP',
+                              ),
+                              'especiales' => (
+                                [const Color(0xFF6D28D9), const Color(0xFF8B5CF6)],
+                                const Color(0xFFA78BFA).withValues(alpha: 0.4),
+                                const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                                const Color(0xFF8B5CF6),
+                                'Especial',
+                              ),
+                              'coros' => (
+                                [const Color(0xFF047857), const Color(0xFF10B981)],
+                                const Color(0xFF34D399).withValues(alpha: 0.4),
+                                const Color(0xFF059669).withValues(alpha: 0.3),
+                                const Color(0xFF10B981),
+                                'Coro',
+                              ),
+                              _ => (
+                                [const Color(0xFF0284C7), const Color(0xFF0EA5E9)],
+                                const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                                const Color(0xFF0284C7).withValues(alpha: 0.3),
+                                const Color(0xFF0EA5E9),
+                                'Alabanza',
+                              ),
+                            };
+
                             final Color defaultCardColor = isDark
-                                ? Colors.white.withValues(alpha: 0.02)
+                                ? const Color(0xFF162032)
                                 : Colors.white;
                             final Color cardColor = isSelected
                                 ? theme.colorScheme.primary.withValues(
-                                    alpha: isDark ? 0.08 : 0.04,
+                                    alpha: isDark ? 0.16 : 0.08,
                                   )
                                 : (isDuplicate
                                       ? Colors.amber.withValues(
-                                          alpha: isDark ? 0.06 : 0.03,
+                                          alpha: isDark ? 0.12 : 0.06,
                                         )
                                       : defaultCardColor);
 
@@ -2124,26 +2155,24 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                       ? theme.colorScheme.primary
                                       : (isDuplicate
                                             ? Colors.amber.withValues(
-                                                alpha: isDark ? 0.4 : 0.25,
+                                                alpha: isDark ? 0.5 : 0.35,
                                               )
                                             : (isDark
-                                                  ? Colors.white.withValues(
-                                                      alpha: 0.04,
+                                                  ? const Color(0xFF2A374D).withValues(
+                                                      alpha: 0.7,
                                                     )
-                                                  : Colors.black.withValues(
-                                                      alpha: 0.02,
-                                                    ))),
+                                                  : const Color(0xFFE2E8F0))),
                                   width: isSelected
                                       ? 1.5
-                                      : (isDuplicate ? 1.5 : 1),
+                                      : (isDuplicate ? 1.5 : 1.1),
                                 ),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withValues(
-                                      alpha: isDark ? 0.2 : 0.02,
+                                      alpha: isDark ? 0.22 : 0.04,
                                     ),
                                     blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                                    offset: const Offset(0, 3),
                                   ),
                                 ],
                               ),
@@ -2213,101 +2242,51 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                         ],
                                         Hero(
                                           tag: 'hymn_icon_$key',
-                                          child: hymn.collection == 'iump'
-                                              ? Container(
-                                                  width: 46,
-                                                  height: 46,
-                                                  decoration: BoxDecoration(
-                                                    gradient: LinearGradient(
-                                                      colors: [
-                                                        theme
-                                                            .colorScheme
-                                                            .primaryContainer
-                                                            .withValues(
-                                                              alpha: isDark
-                                                                  ? 0.4
-                                                                  : 0.8,
-                                                            ),
-                                                        theme
-                                                            .colorScheme
-                                                            .primaryContainer
-                                                            .withValues(
-                                                              alpha: isDark
-                                                                  ? 0.1
-                                                                  : 0.4,
-                                                            ),
-                                                      ],
-                                                      begin: Alignment.topLeft,
-                                                      end:
-                                                          Alignment.bottomRight,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          14,
-                                                        ),
-                                                    border: Border.all(
-                                                      color: theme
-                                                          .colorScheme
-                                                          .primary
-                                                          .withValues(
-                                                            alpha: isDark
-                                                                ? 0.1
-                                                                : 0.15,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                  alignment: Alignment.center,
-                                                  child: Text(
-                                                    hymn.id.toString(),
-                                                    style: GoogleFonts.outfit(
-                                                      color: isDark
-                                                          ? Colors.white
-                                                          : theme
-                                                                .colorScheme
-                                                                .onPrimaryContainer,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 16,
-                                                    ),
-                                                  ),
-                                                )
-                                              : Container(
-                                                  width: 46,
-                                                  height: 46,
-                                                  decoration: BoxDecoration(
-                                                    color: isDark
-                                                        ? Colors.white
-                                                              .withValues(
-                                                                alpha: 0.05,
-                                                              )
-                                                        : Colors.black
-                                                              .withValues(
-                                                                alpha: 0.03,
-                                                              ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          14,
-                                                        ),
-                                                  ),
-                                                  child: Icon(
-                                                    hymn.collection ==
-                                                            'especiales'
-                                                        ? Icons
-                                                              .music_note_rounded
-                                                        : Icons
-                                                              .library_music_rounded,
-                                                    color:
-                                                        hymn.collection ==
-                                                            'especiales'
-                                                        ? const Color(
-                                                            0xFF8B5CF6,
-                                                          )
-                                                        : const Color(
-                                                            0xFF10B981,
-                                                          ),
-                                                    size: 24,
-                                                  ),
+                                          child: Container(
+                                            width: 48,
+                                            height: 48,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: badgeGradient,
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                              border: Border.all(
+                                                color: badgeBorder,
+                                                width: 1.2,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: badgeShadow,
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
                                                 ),
+                                              ],
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              hymn.id > 0
+                                                  ? hymn.id.toString()
+                                                  : '♫',
+                                              style: GoogleFonts.outfit(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: hymn.id > 999
+                                                    ? 13
+                                                    : 16,
+                                                letterSpacing: 0.2,
+                                                shadows: const [
+                                                  Shadow(
+                                                    color: Colors.black38,
+                                                    offset: Offset(0, 1),
+                                                    blurRadius: 2,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                         const SizedBox(width: 14),
                                         // Detalles
@@ -2411,31 +2390,37 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                             vertical: 3,
                                                           ),
                                                       decoration: BoxDecoration(
-                                                        color: theme
-                                                            .colorScheme
-                                                            .primary
+                                                        color: badgeTagColor
                                                             .withValues(
-                                                              alpha: 0.08,
+                                                              alpha: isDark
+                                                                  ? 0.14
+                                                                  : 0.08,
                                                             ),
                                                         borderRadius:
                                                             BorderRadius.circular(
                                                               8,
                                                             ),
+                                                        border: Border.all(
+                                                          color: badgeTagColor
+                                                              .withValues(
+                                                                alpha: isDark
+                                                                    ? 0.3
+                                                                    : 0.2,
+                                                              ),
+                                                          width: 0.8,
+                                                        ),
                                                       ),
                                                       child: Text(
-                                                        hymn.collection ==
-                                                                'iump'
-                                                            ? 'Himnario IUMP'
-                                                            : (hymn.collection ==
-                                                                      'especiales'
-                                                                  ? 'Especial'
-                                                                  : 'Coro'),
+                                                        collectionName,
                                                         style:
-                                                            GoogleFonts.nunito(
+                                                            GoogleFonts.outfit(
                                                               fontSize: 11,
-                                                              color: theme
-                                                                  .colorScheme
-                                                                  .primary,
+                                                              color: isDark
+                                                                  ? badgeTagColor
+                                                                      .withValues(
+                                                                        alpha: 0.95,
+                                                                      )
+                                                                  : badgeTagColor,
                                                               fontWeight:
                                                                   FontWeight
                                                                       .bold,
@@ -2445,40 +2430,71 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                     const SizedBox(width: 8),
                                                   ],
                                                   if (hymn.tone.isNotEmpty)
-                                                    Row(
-                                                      children: [
-                                                        Icon(
-                                                          Icons
-                                                              .music_note_rounded,
-                                                          size: 13,
-                                                          color: theme
-                                                              .colorScheme
-                                                              .onSurfaceVariant
-                                                              .withValues(
-                                                                alpha: 0.5,
-                                                              ),
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
-                                                        Text(
-                                                          Hymn.formatToneDisplay(
-                                                            hymn.tone,
-                                                            notation,
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 7,
+                                                            vertical: 2.5,
                                                           ),
-                                                          style: GoogleFonts.nunito(
-                                                            fontSize: 11,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: theme
-                                                                .colorScheme
-                                                                .onSurfaceVariant
-                                                                .withValues(
-                                                                  alpha: 0.7,
-                                                                ),
-                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                          0xFF0EA5E9,
+                                                        ).withValues(
+                                                          alpha: isDark
+                                                              ? 0.15
+                                                              : 0.08,
                                                         ),
-                                                      ],
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              7,
+                                                            ),
+                                                        border: Border.all(
+                                                          color: const Color(
+                                                            0xFF38BDF8,
+                                                          ).withValues(
+                                                            alpha: isDark
+                                                                ? 0.30
+                                                                : 0.20,
+                                                          ),
+                                                          width: 0.8,
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons
+                                                                .music_note_rounded,
+                                                            size: 11,
+                                                            color: Color(
+                                                              0xFF38BDF8,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 3,
+                                                          ),
+                                                          Text(
+                                                            Hymn.formatToneDisplay(
+                                                              hymn.tone,
+                                                              notation,
+                                                            ),
+                                                            style: GoogleFonts.outfit(
+                                                              fontSize: 11,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color: isDark
+                                                                  ? const Color(
+                                                                      0xFF7DD3FC,
+                                                                    )
+                                                                  : const Color(
+                                                                      0xFF0284C7,
+                                                                    ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
                                                 ],
                                               ),
@@ -2497,16 +2513,13 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                     : Icons
                                                           .favorite_border_rounded,
                                                 color: isFavorite
-                                                    ? theme.colorScheme.primary
+                                                    ? const Color(0xFFF43F5E)
                                                     : (isSuggestion
                                                           ? Colors.amber.shade700
-                                                          : theme
-                                                                .colorScheme
-                                                                .onSurfaceVariant
-                                                                .withValues(
-                                                                  alpha: 0.4,
-                                                                )),
-                                                size: 20,
+                                                          : (isDark
+                                                                ? Colors.white30
+                                                                : Colors.black26)),
+                                                size: 21,
                                               ),
                                               tooltip: isFavorite ? 'En favoritos' : 'Añadir a favoritos',
                                               onPressed: () {
@@ -2996,16 +3009,30 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     String name,
     String activeCategory,
   ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isSelected = activeCategory == name;
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: ChoiceChip(
         label: Text(name),
-        labelStyle: GoogleFonts.nunito(
+        labelStyle: GoogleFonts.outfit(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
           fontSize: 13,
+          color: isSelected
+              ? Colors.white
+              : (isDark ? Colors.white70 : Colors.black87),
         ),
         selected: isSelected,
+        selectedColor: theme.colorScheme.primary,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        side: BorderSide(
+          color: isSelected
+              ? theme.colorScheme.primary
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+          width: isSelected ? 1.2 : 1.0,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         onSelected: (selected) {
           if (selected) {
             ref.read(activeCategoryProvider.notifier).setCategory(name);
