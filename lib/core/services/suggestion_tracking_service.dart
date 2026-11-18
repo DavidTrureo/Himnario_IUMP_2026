@@ -1,6 +1,30 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/hymns/domain/hymn.dart';
+
+/// Resultado de la comparación interna Antes (sugerencia original) vs. Después (versión oficial publicada).
+class SuggestionEditDiff {
+  final bool wasEdited;
+  final String? summary;
+  final bool titleChanged;
+  final bool lyricsChanged;
+  final bool structureChanged;
+  final bool chordsAdded;
+  final bool keyChanged;
+  final bool collectionChanged;
+
+  const SuggestionEditDiff({
+    required this.wasEdited,
+    this.summary,
+    this.titleChanged = false,
+    this.lyricsChanged = false,
+    this.structureChanged = false,
+    this.chordsAdded = false,
+    this.keyChanged = false,
+    this.collectionChanged = false,
+  });
+}
 
 /// Modelo ligero para guardar y rastrear en el dispositivo del usuario
 /// las sugerencias y propuestas que ha enviado al catálogo oficial.
@@ -138,6 +162,117 @@ class SuggestionTrackingService {
   static const String _keyRequesterName = 'last_requester_name_v1';
   static const String _keyRequesterChurch = 'last_requester_church_v1';
 
+  static String _normalizeForDiff(String text) {
+    return text
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .split('\n')
+        .map((line) => line.trimRight())
+        .join('\n')
+        .trim();
+  }
+
+  static bool _hasChords(String text) {
+    return RegExp(
+      r'\[[A-G][#b]?[^\]]*\]|\[(?:DO|RE|MI|FA|SOL|LA|SI)[^\]]*\]',
+      caseSensitive: false,
+    ).hasMatch(text);
+  }
+
+  /// Compara internamente la versión original enviada por el usuario (Antes)
+  /// contra la versión final o actualmente publicada en el catálogo oficial (Después).
+  /// Solo marca `wasEdited: true` cuando existen cambios reales en letra, orden, acordes,
+  /// título, tonalidad o colección (ignorando diferencias invisibles de saltos de línea).
+  static SuggestionEditDiff compareBeforeAfter({
+    required String originalTitle,
+    required String originalLyrics,
+    required String originalCollection,
+    required String originalKey,
+    required String finalTitle,
+    required String finalLyrics,
+    required String finalCollection,
+    required String finalKey,
+  }) {
+    final normOrigTitle = originalTitle.trim();
+    final normFinalTitle = finalTitle.trim();
+    final titleChanged = normOrigTitle.isNotEmpty &&
+        normFinalTitle.isNotEmpty &&
+        normOrigTitle.toUpperCase() != normFinalTitle.toUpperCase();
+
+    final normOrigLyrics = _normalizeForDiff(originalLyrics);
+    final normFinalLyrics = _normalizeForDiff(finalLyrics);
+    final lyricsChanged = normOrigLyrics.isNotEmpty &&
+        normFinalLyrics.isNotEmpty &&
+        normOrigLyrics != normFinalLyrics;
+
+    final chordsAdded =
+        lyricsChanged && !_hasChords(normOrigLyrics) && _hasChords(normFinalLyrics);
+
+    final origBlocks = normOrigLyrics
+        .split(RegExp(r'\n\s*\n'))
+        .where((b) => b.trim().isNotEmpty)
+        .length;
+    final finalBlocks = normFinalLyrics
+        .split(RegExp(r'\n\s*\n'))
+        .where((b) => b.trim().isNotEmpty)
+        .length;
+    final structureRegex = RegExp(
+      r'(?:^|\n)\s*(?:\[?(?:CORO|ESTROFA|PUENTE|INTRO|FINAL|VERSO|PRE-?CORO)\]?|[IVX]{1,4}\.?\s*$|\d+\.)',
+      caseSensitive: false,
+    );
+    final origStructCount = structureRegex.allMatches(normOrigLyrics).length;
+    final finalStructCount = structureRegex.allMatches(normFinalLyrics).length;
+    final structureChanged =
+        lyricsChanged && (origBlocks != finalBlocks || origStructCount != finalStructCount);
+
+    final collectionChanged = originalCollection.trim().isNotEmpty &&
+        finalCollection.trim().isNotEmpty &&
+        originalCollection.trim() != finalCollection.trim();
+
+    final normOrigKey = originalKey.trim().toLowerCase();
+    final normFinalKey = finalKey.trim().toLowerCase();
+    final keyChanged = normFinalKey.isNotEmpty && normOrigKey != normFinalKey;
+
+    final wasEdited = titleChanged || lyricsChanged || collectionChanged || keyChanged;
+    if (!wasEdited) {
+      return const SuggestionEditDiff(wasEdited: false);
+    }
+
+    final parts = <String>[];
+    if (lyricsChanged) {
+      if (structureChanged) {
+        parts.add('orden, ortografía y formato');
+      } else {
+        parts.add('ortografía y formato');
+      }
+    }
+    if (chordsAdded) parts.add('acordes');
+    if (titleChanged) parts.add('título');
+    if (keyChanged) parts.add('tonalidad');
+    if (collectionChanged) parts.add('colección');
+
+    String summary;
+    if (parts.isEmpty) {
+      summary = 'ajustes de formato';
+    } else if (parts.length == 1) {
+      summary = 'ajustes de ${parts.first}';
+    } else {
+      final last = parts.removeLast();
+      summary = 'ajustes de ${parts.join(', ')} y $last';
+    }
+
+    return SuggestionEditDiff(
+      wasEdited: true,
+      summary: summary,
+      titleChanged: titleChanged,
+      lyricsChanged: lyricsChanged,
+      structureChanged: structureChanged,
+      chordsAdded: chordsAdded,
+      keyChanged: keyChanged,
+      collectionChanged: collectionChanged,
+    );
+  }
+
   /// Guarda los datos del hermano/a para autocompletarlos en futuros envíos (+ o Escáner IA)
   static Future<void> saveRequesterProfile({
     required String name,
@@ -252,8 +387,12 @@ class SuggestionTrackingService {
     return null;
   }
 
-  /// Consulta directamente en Cloud Firestore el estado real de cada sugerencia enviada por este dispositivo.
-  static Future<SuggestionSyncResult> syncStatusesFromCloud() async {
+  /// Consulta directamente en Cloud Firestore el estado real de cada sugerencia enviada por este dispositivo,
+  /// y realiza comparación interna Antes vs. Después contra el catálogo oficial para reflejar con precisión
+  /// si el canto fue modificado/ordenado por el administrador (incluso tras ediciones posteriores).
+  static Future<SuggestionSyncResult> syncStatusesFromCloud({
+    List<Hymn> officialHymns = const [],
+  }) async {
     final list = await getSubmittedSuggestions();
     if (list.isEmpty) {
       return const SuggestionSyncResult(
@@ -272,14 +411,8 @@ class SuggestionTrackingService {
         final item = updatedList[i];
         if (item.docId.isEmpty) return;
 
-        // Si ya tiene resolución final completa (incluyendo fecha de revisión), omitir lectura innecesaria
+        // Si ya fue rechazada con fecha registrada, no es necesario volver a consultar
         if (item.status == 'rejected' && item.reviewedAt != null) {
-          return;
-        }
-        if (item.status == 'approved' &&
-            item.publishedId != null &&
-            item.publishedCollection != null &&
-            item.reviewedAt != null) {
           return;
         }
 
@@ -305,13 +438,38 @@ class SuggestionTrackingService {
                 ? int.tryParse(data['publishedId'].toString())
                 : null;
             final remotePubCol = data['publishedCollection']?.toString();
-            final remotePubTitle = data['publishedTitle']?.toString();
+            String? remotePubTitle = data['publishedTitle']?.toString();
             final remoteRejectionReason = data['rejectionReason']?.toString();
             final remoteReviewedAt = _parseFirestoreTimestamp(
               data['approvedAt'] ?? data['reviewedAt'],
             );
-            final remoteEditedByAdmin = data['editedByAdmin'] == true;
-            final remoteAdminEditSummary = data['adminEditSummary']?.toString();
+            bool remoteEditedByAdmin = data['editedByAdmin'] == true;
+            String? remoteAdminEditSummary = data['adminEditSummary']?.toString();
+
+            // Comparación interna Antes vs. Después contra el canto oficial en catálogo
+            if (remoteStatus == 'approved' && remotePubId != null) {
+              final effectiveCol = remotePubCol ?? item.collection;
+              final publishedHymn = officialHymns
+                  .where((h) => !h.isLocalOnly && h.collection == effectiveCol && h.id == remotePubId)
+                  .firstOrNull;
+              if (publishedHymn != null) {
+                remotePubTitle = publishedHymn.title;
+                final diff = compareBeforeAfter(
+                  originalTitle: (data['title'] ?? item.title).toString(),
+                  originalLyrics: (data['lyrics'] ?? '').toString(),
+                  originalCollection: (data['collection'] ?? item.collection).toString(),
+                  originalKey: (data['key'] ?? '').toString(),
+                  finalTitle: publishedHymn.title,
+                  finalLyrics: publishedHymn.lyrics,
+                  finalCollection: publishedHymn.collection,
+                  finalKey: publishedHymn.toneNote,
+                );
+                if (diff.wasEdited) {
+                  remoteEditedByAdmin = true;
+                  remoteAdminEditSummary = diff.summary ?? remoteAdminEditSummary;
+                }
+              }
+            }
 
             if (remoteStatus != item.status ||
                 remotePubId != item.publishedId ||

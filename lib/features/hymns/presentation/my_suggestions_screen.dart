@@ -39,7 +39,11 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
     if (localList.isEmpty) return;
 
     // 2. Consultar en la nube el estado actualizado de cada sugerencia (aprobado / rechazado / pendiente)
-    final result = await SuggestionTrackingService.syncStatusesFromCloud();
+    //    con comparación interna Antes vs. Después contra todo el catálogo oficial
+    final currentHymns = ref.read(allHymnsGlobalProvider).value ?? [];
+    final result = await SuggestionTrackingService.syncStatusesFromCloud(
+      officialHymns: currentHymns,
+    );
 
     // 3. Si hubo nuevos cantos aprobados, refrescar esas colecciones del catálogo oficial
     if (mounted && result.newlyApprovedCollections.isNotEmpty) {
@@ -86,7 +90,7 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final allHymns = ref.watch(allHymnsProvider).value ?? [];
+    final allHymns = ref.watch(allHymnsGlobalProvider).value ?? [];
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,

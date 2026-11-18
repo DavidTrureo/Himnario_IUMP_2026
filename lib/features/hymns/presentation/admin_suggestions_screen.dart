@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:himnario_iump/core/services/gemini_ai_service.dart';
+import 'package:himnario_iump/core/services/suggestion_tracking_service.dart';
 import 'package:himnario_iump/features/hymns/domain/hymn.dart';
+import 'hymn_list_screen.dart';
 import 'widgets/hymn_structure_toolbar.dart';
 
 class AdminSuggestionsScreen extends ConsumerStatefulWidget {
@@ -51,7 +53,8 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
     return '';
   }
 
-  /// Detecta automáticamente si el administrador realizó ajustes de formato, letra, título, tono o colección.
+  /// Detecta automáticamente (Antes vs. Después) si el administrador realizó ajustes
+  /// de orden, ortografía, formato, acordes, título, tonalidad o colección.
   ({bool edited, String? summary}) _detectAdminEdits({
     required Map<String, dynamic> originalData,
     required String finalTitle,
@@ -59,38 +62,74 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
     required String finalCollection,
     required String finalKey,
   }) {
-    final origTitle = (originalData['title'] ?? '').toString().trim();
-    final origLyrics = (originalData['lyrics'] ?? '').toString().trim();
-    final origCollection = (originalData['collection'] ?? '').toString().trim();
-    final origKey = (originalData['key'] ?? '').toString().trim();
+    final diff = SuggestionTrackingService.compareBeforeAfter(
+      originalTitle: (originalData['title'] ?? '').toString(),
+      originalLyrics: (originalData['lyrics'] ?? '').toString(),
+      originalCollection: (originalData['collection'] ?? '').toString(),
+      originalKey: (originalData['key'] ?? '').toString(),
+      finalTitle: finalTitle,
+      finalLyrics: finalLyrics,
+      finalCollection: finalCollection,
+      finalKey: finalKey,
+    );
+    return (edited: diff.wasEdited, summary: diff.summary);
+  }
 
-    final titleChanged = origTitle.toLowerCase() != finalTitle.trim().toLowerCase() ||
-        origTitle != finalTitle.trim();
-    final lyricsChanged = origLyrics != finalLyrics.trim();
-    final collectionChanged = origCollection.isNotEmpty && origCollection != finalCollection;
-    final keyChanged = finalKey.trim().isNotEmpty && origKey.toLowerCase() != finalKey.trim().toLowerCase();
+  /// Compara internamente la sugerencia original (Antes) con el canto oficial publicado (Después)
+  /// para determinar con exactitud si fue modificado/ordenado por el administrador.
+  ({bool edited, String summary, String displayTitle}) _resolveLiveEditStatus({
+    required Map<String, dynamic> data,
+    required Hymn? publishedHymn,
+  }) {
+    final originalTitle = (data['title'] ?? 'Sin título').toString();
+    final storedPubTitle = (data['publishedTitle'] ?? originalTitle).toString();
+    final origCol = (data['collection'] ?? 'especiales').toString();
+    final pubCol = (data['publishedCollection'] ?? origCol).toString();
+    final storedEdited = data['editedByAdmin'] == true;
+    final storedSummary = data['adminEditSummary']?.toString().trim() ?? '';
 
-    final edited = titleChanged || lyricsChanged || collectionChanged || keyChanged;
-    if (!edited) return (edited: false, summary: null);
+    if (publishedHymn != null) {
+      final diff = SuggestionTrackingService.compareBeforeAfter(
+        originalTitle: originalTitle,
+        originalLyrics: (data['lyrics'] ?? '').toString(),
+        originalCollection: origCol,
+        originalKey: (data['key'] ?? '').toString(),
+        finalTitle: publishedHymn.title,
+        finalLyrics: publishedHymn.lyrics,
+        finalCollection: publishedHymn.collection,
+        finalKey: publishedHymn.toneNote,
+      );
+      final isEdited = diff.wasEdited || storedEdited;
+      final summary = diff.wasEdited
+          ? (diff.summary ?? 'ajustes de formato')
+          : (storedSummary.isNotEmpty ? storedSummary : 'ajustes de formato');
+      return (
+        edited: isEdited,
+        summary: summary,
+        displayTitle: publishedHymn.title,
+      );
+    }
 
-    final parts = <String>[];
-    if (lyricsChanged) parts.add('ortografía y formato');
-    if (titleChanged) parts.add('título');
-    if (keyChanged) parts.add('tonalidad');
-    if (collectionChanged) parts.add('colección');
-
-    if (parts.isEmpty) return (edited: true, summary: 'ajustes de formato');
-    if (parts.length == 1) return (edited: true, summary: 'ajustes de ${parts.first}');
-    final last = parts.removeLast();
-    return (edited: true, summary: 'ajustes de ${parts.join(', ')} y $last');
+    final fallbackEdited = storedEdited ||
+        storedPubTitle.trim().toUpperCase() != originalTitle.trim().toUpperCase() ||
+        pubCol != origCol;
+    return (
+      edited: fallbackEdited,
+      summary: storedSummary.isNotEmpty ? storedSummary : 'ajustes de formato',
+      displayTitle: storedPubTitle,
+    );
   }
 
   /// Muestra una Ficha de Trazabilidad del Aporte al tocar un registro aprobado,
-  /// con los datos del colaborador, línea de tiempo, curaduría editorial y botón directo al canto.
-  void _showApprovedContributionSheet(BuildContext context, Map<String, dynamic> data) {
+  /// con los datos del colaborador, línea de tiempo, curaduría editorial (Antes vs. Después) y botón directo al canto.
+  void _showApprovedContributionSheet(
+    BuildContext context, {
+    required String docId,
+    required Map<String, dynamic> data,
+    required Hymn? publishedHymn,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final originalTitle = (data['title'] ?? 'Sin título').toString();
-    final publishedTitle = (data['publishedTitle'] ?? originalTitle).toString();
     final origCol = (data['collection'] ?? 'especiales').toString();
     final pubCol = (data['publishedCollection'] ?? origCol).toString();
     final pubId = data['publishedId'] != null ? int.tryParse(data['publishedId'].toString()) : null;
@@ -100,10 +139,21 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
     final source = data['source']?.toString() ?? 'manual';
     final sentDate = _formatTimestamp(data['timestamp']);
     final approvedDate = _formatTimestamp(data['approvedAt']);
-    final editedByAdmin = data['editedByAdmin'] == true ||
-        publishedTitle.trim().toUpperCase() != originalTitle.trim().toUpperCase() ||
-        pubCol != origCol;
-    final editSummary = data['adminEditSummary']?.toString().trim() ?? '';
+
+    final liveStatus = _resolveLiveEditStatus(data: data, publishedHymn: publishedHymn);
+    final publishedTitle = liveStatus.displayTitle;
+    final editedByAdmin = liveStatus.edited;
+    final editSummary = liveStatus.summary;
+
+    // Si detectamos cambios reales (ej. canto aprobado antes de Build 78 o editado después en el catálogo),
+    // sincronizar en segundo plano con Firestore para que el dispositivo del usuario también lo refleje.
+    if (editedByAdmin && (data['editedByAdmin'] != true || data['adminEditSummary'] != editSummary)) {
+      FirebaseFirestore.instance.collection('cantos_sugeridos').doc(docId).update({
+        'editedByAdmin': true,
+        'adminEditSummary': editSummary,
+        'publishedTitle': publishedTitle,
+      }).catchError((_) {});
+    }
 
     final originLabel = type == 'correction'
         ? 'Propuesta de mejora'
@@ -677,6 +727,8 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
   /// Solo guarda/muestra cantos aprobados (los rechazados no ensucian este registro)
   /// permitiendo al administrador ver la Ficha de Trazabilidad y abrir el canto publicado.
   Widget _buildApprovedHistoryTab(bool isDark) {
+    final allHymns = ref.watch(allHymnsGlobalProvider).value ?? [];
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('cantos_sugeridos')
@@ -735,14 +787,20 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
           itemBuilder: (context, index) {
             final doc = docs[index];
             final data = doc.data() as Map<String, dynamic>;
-            final publishedTitle = (data['publishedTitle'] ?? data['title'] ?? 'Sin título').toString();
             final pubCol = (data['publishedCollection'] ?? data['collection'] ?? 'especiales').toString();
             final pubId = data['publishedId'] != null ? int.tryParse(data['publishedId'].toString()) : null;
+            final publishedHymn = pubId != null
+                ? allHymns
+                    .where((h) => !h.isLocalOnly && h.collection == pubCol && h.id == pubId)
+                    .firstOrNull
+                : null;
+            final liveStatus = _resolveLiveEditStatus(data: data, publishedHymn: publishedHymn);
+            final publishedTitle = liveStatus.displayTitle;
             final requesterName = ((data['requesterName'] ?? data['suggestedByName']) as String?)?.trim() ?? '';
             final requesterChurch = ((data['requesterChurch'] ?? data['suggestedByChurch']) as String?)?.trim() ?? '';
             final type = data['type']?.toString() ?? 'new';
             final source = data['source']?.toString() ?? 'manual';
-            final editedByAdmin = data['editedByAdmin'] == true;
+            final editedByAdmin = liveStatus.edited;
             final approvedDate = _formatTimestamp(data['approvedAt'] ?? data['timestamp']);
 
             return Container(
@@ -765,7 +823,12 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
               ),
               child: InkWell(
                 borderRadius: BorderRadius.circular(18),
-                onTap: () => _showApprovedContributionSheet(context, data),
+                onTap: () => _showApprovedContributionSheet(
+                  context,
+                  docId: doc.id,
+                  data: data,
+                  publishedHymn: publishedHymn,
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(15.0),
                   child: Column(
