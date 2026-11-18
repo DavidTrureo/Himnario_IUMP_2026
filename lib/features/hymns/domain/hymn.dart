@@ -88,6 +88,8 @@ class Hymn {
       toneNote = parsed['toneNote'] ?? '';
       beats = parsed['beats'] ?? '';
       timeSignature = parsed['timeSignature'] ?? '';
+    } else if (toneNote.isNotEmpty) {
+      toneNote = Hymn.normalizeToneNote(toneNote);
     }
 
     return Hymn(
@@ -539,6 +541,8 @@ class Hymn {
   }
 
   static String transposeChord(String chord, int semitones) {
+    if (semitones == 0) return normalizeToneNote(chord);
+
     // Limpiar abreviaciones de menor "Mn." / "Mn" a "m"
     final cleaned = chord.replaceAll(RegExp(r'\s*(Mn\.|Mn|mn\.|mn)\b'), 'm');
 
@@ -585,7 +589,7 @@ class Hymn {
         
         // Formatear la nueva nota respetando la capitalización original (ej: Do -> Re, DO -> RE, do -> re)
         final formattedNote = _capitalizeAs(newNote, cleaned.substring(0, noteMatch.length));
-        return '$formattedNote$suffix';
+        return normalizeToneNote('$formattedNote$suffix');
       }
     }
 
@@ -613,11 +617,11 @@ class Hymn {
         final newNote = useFlats ? englishScaleFlats[finalIdx] : englishScale[finalIdx];
         
         final formattedNote = _capitalizeAs(newNote, cleaned.substring(0, noteMatch.length));
-        return '$formattedNote$suffix';
+        return normalizeToneNote('$formattedNote$suffix');
       }
     }
 
-    return cleaned; // Devolver intacto si no coincide
+    return normalizeToneNote(cleaned); // Devolver normalizado si no coincide
   }
 
   // Capitaliza una nota resultante basándose en el estilo de la nota original
@@ -760,11 +764,87 @@ class Hymn {
       }
     }
 
-    // Regla de minúsculas para la compañía del acorde (sufijos: m, sus4, sus2, add9, m7(b5), etc.)
-    final formattedSuffix = suffix.toLowerCase();
+    // Regla de normalización de sufijos armónicos:
+    // 1. Quitar 'MAYOR', 'MAJOR' o 'M' mayúscula sola (los acordes mayores no llevan apellido)
+    suffix = suffix.replaceAll(RegExp(r'\b(MAYOR|MAJOR)\b', caseSensitive: false), '').trim();
+    if (suffix == 'M' || suffix == ' M') {
+      suffix = '';
+    }
+
+    // 2. Convertir 'MENOR' o 'MINOR' a 'm' en minúscula (los acordes menores siempre llevan apellido en minúscula)
+    suffix = suffix.replaceAll(RegExp(r'\b(MENOR|MINOR)\b', caseSensitive: false), 'm').trim();
+
+    // 3. Sufijo armónico en minúsculas (m, sus4, add9, maj7, etc.)
+    final formattedSuffix = suffix.toLowerCase().trim();
 
     // Validar que el resultado no sea solo basura antes de aplicar formato
     if (rootNote.isEmpty) return trimmed;
+
+    return '$rootNote$formattedSuffix';
+  }
+
+  /// Normaliza una nota musical o acorde según la regla oficial del himnario:
+  /// - Los acordes mayores NO llevan apellido (ej: SOL MAYOR -> SOL, DO M -> DO).
+  /// - Los acordes menores SIEMPRE llevan apellido y siempre en minúscula (ej: LA MENOR -> LAm, LAm -> LAm).
+  /// - Tónicas en mayúsculas, bemol en minúscula 'b' y sostenido '#'.
+  static String normalizeToneNote(String rawNote) {
+    final trimmed = rawNote.trim();
+    if (trimmed.isEmpty) return '';
+
+    // Manejo de bajo alternativo (Slash chord) ej: DOm/SOL, SOL MAYOR/SI
+    if (trimmed.contains('/')) {
+      final parts = trimmed.split('/');
+      final main = normalizeToneNote(parts[0]);
+      final bass = normalizeToneNote(parts[1]);
+      return '$main/$bass';
+    }
+
+    final RegExp spanishNoteRegex = RegExp(
+      r'^(DO#|DO|RE#|REb|REB|RE|MI#|MIb|MIB|MI|FA#|FA|SOL#|SOLb|SOLB|SOL|LA#|LAb|LAB|LA|SI#|SIb|SIB|SI)',
+      caseSensitive: false,
+    );
+    final RegExp englishNoteRegex = RegExp(
+      r'^(C#|Db|DB|D#|Eb|EB|E|F#|Gb|GB|G#|Ab|AB|A#|Bb|BB|B|C|D|F|G|A)',
+      caseSensitive: false,
+    );
+
+    String rootNote = '';
+    String suffix = '';
+
+    final spanishMatch = spanishNoteRegex.firstMatch(trimmed);
+    final englishMatch = englishNoteRegex.firstMatch(trimmed);
+
+    if (spanishMatch != null) {
+      final matchText = spanishMatch.group(1)!;
+      suffix = trimmed.substring(matchText.length);
+
+      String base = matchText.toUpperCase();
+      if (base.endsWith('B')) {
+        base = '${base.substring(0, base.length - 1)}b';
+      }
+      rootNote = base;
+    } else if (englishMatch != null) {
+      final matchText = englishMatch.group(1)!;
+      suffix = trimmed.substring(matchText.length);
+
+      String base = matchText.substring(0, 1).toUpperCase();
+      String accidental = matchText.length > 1 ? matchText.substring(1).toLowerCase() : '';
+      rootNote = '$base$accidental';
+    } else {
+      return trimmed;
+    }
+
+    // 1. Quitar 'MAYOR', 'MAJOR' o 'M' mayúscula de Mayor
+    suffix = suffix.replaceAll(RegExp(r'\b(MAYOR|MAJOR)\b', caseSensitive: false), '').trim();
+    if (suffix == 'M' || suffix == ' M') {
+      suffix = '';
+    }
+
+    // 2. Convertir 'MENOR' o 'MINOR' a 'm' en minúscula
+    suffix = suffix.replaceAll(RegExp(r'\b(MENOR|MINOR)\b', caseSensitive: false), 'm').trim();
+
+    // 3. Sufijo armónico en minúsculas
+    final formattedSuffix = suffix.toLowerCase().trim();
 
     return '$rootNote$formattedSuffix';
   }
@@ -840,34 +920,7 @@ class Hymn {
       }
     }
 
-    String cleanNote = toneNote.trim();
-    String suffix = '';
-
-    // Extraer sufijos armónicos conocidos antes de procesar la nota tónica
-    final suffixRegex = RegExp(r'(m7b5|m7\(b5\)|m7|m9|m11|dim7|dim|sus4|sus2|add9|aug|maj7|m|\+|-|\d+)$', caseSensitive: false);
-    final matchSuffix = suffixRegex.firstMatch(cleanNote);
-    if (matchSuffix != null && !cleanNote.toUpperCase().endsWith('MAYOR') && !cleanNote.toUpperCase().endsWith('MAJOR')) {
-      suffix = matchSuffix.group(1)!.toLowerCase();
-      cleanNote = cleanNote.substring(0, cleanNote.length - matchSuffix.group(1)!.length).trim();
-    }
-
-    if (RegExp(r'\b(MENOR|MINOR)\b', caseSensitive: false).hasMatch(cleanNote)) {
-      if (suffix.isEmpty) suffix = 'm';
-    }
-
-    cleanNote = cleanNote.replaceAll(RegExp(r'\b(MAYOR|MAJOR|MENOR|MINOR)\b', caseSensitive: false), '').trim();
-
-    // Procesar la nota raíz respetando bemol en minúscula (b) y sostenido (#)
-    String rootNote = cleanNote;
-    if (rootNote.isNotEmpty) {
-      if (rootNote.toLowerCase().endsWith('b') && rootNote.length > 1) {
-        rootNote = '${rootNote.substring(0, rootNote.length - 1).toUpperCase()}b';
-      } else {
-        rootNote = rootNote.toUpperCase();
-      }
-    }
-
-    String finalNote = '$rootNote$suffix';
+    final String finalNote = normalizeToneNote(toneNote);
 
     return {
       'toneNote': finalNote,
@@ -881,7 +934,7 @@ class Hymn {
     required String beats,
     required String timeSignature,
   }) {
-    final cleanTone = toneNote.trim();
+    final cleanTone = normalizeToneNote(toneNote.trim());
     final cleanBeats = beats.trim();
     final cleanSignature = timeSignature.replaceAll('|', '/').trim();
 

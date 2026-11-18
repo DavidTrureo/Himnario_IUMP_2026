@@ -42,11 +42,13 @@ class RecentHymnsNotifier extends Notifier<List<RecentHymn>> {
       // Eliminar ocurrencia previa para moverlo al inicio
       current.removeWhere((item) => item.key == key);
 
+      final normalizedTone = (tone != null && tone.isNotEmpty) ? Hymn.normalizeToneNote(tone) : null;
+
       // Insertar al inicio con timestamp actual
       current.insert(0, RecentHymn(
         key: key,
         timestamp: DateTime.now(),
-        tone: tone,
+        tone: normalizedTone,
       ));
 
       // Limitar a máximo 30 elementos

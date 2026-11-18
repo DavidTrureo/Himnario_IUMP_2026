@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../hymns/domain/hymn.dart';
+import '../../../hymns/presentation/notation_provider.dart';
 import '../../domain/recent_hymn.dart';
 import '../recent_hymns_provider.dart';
 
@@ -150,9 +151,15 @@ class RecentHymnsSection extends ConsumerWidget {
       badgeText = 'Coro';
     }
 
-    final displayTone = recent.tone != null && recent.tone!.isNotEmpty
+    final notation = ref.watch(notationProvider);
+    final rawTone = (recent.tone != null && recent.tone!.isNotEmpty)
         ? recent.tone!
         : hymn.toneNote;
+    final parsedNote = Hymn.parseToneComponents(rawTone)['toneNote'] ?? rawTone;
+    final normalizedNote = Hymn.normalizeToneNote(parsedNote.isNotEmpty ? parsedNote : rawTone);
+    final displayTone = normalizedNote.isNotEmpty
+        ? Hymn.convertChordNotation(normalizedNote, notation)
+        : '';
 
     return Container(
       width: 195,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../hymns/domain/hymn.dart';
 
 /// Representa un canto entonado registrado en el historial inteligente local.
 class RecentHymn {
@@ -21,7 +22,7 @@ class RecentHymn {
   factory RecentHymn.fromJson(Map<String, dynamic> json) => RecentHymn(
     key: json['key'] as String? ?? '',
     timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
-    tone: json['tone'] as String?,
+    tone: json['tone'] != null ? Hymn.normalizeToneNote(json['tone'] as String) : null,
   );
 
   String get collection {
