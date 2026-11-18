@@ -216,6 +216,14 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,
+      path: '/hymn-view/:id',
+      builder: (context, state) {
+        final hymnId = state.pathParameters['id']!;
+        return HymnDetailScreen(hymnId: hymnId);
+      },
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: '/projector-view/:collection/:id',
       builder: (context, state) {
         final collection = state.pathParameters['collection']!;

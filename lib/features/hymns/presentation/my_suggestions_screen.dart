@@ -234,6 +234,9 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                         final int? openId = item.publishedId ?? matchingHymn?.id;
                         final String openCol = item.publishedCollection ?? matchingHymn?.collection ?? item.collection;
                         final String? finalPublishedTitle = item.publishedTitle ?? matchingHymn?.title;
+                        final bool titleChanged = finalPublishedTitle != null &&
+                            finalPublishedTitle.trim().toUpperCase() != item.title.trim().toUpperCase();
+                        final bool wasPolishedByAdmin = item.editedByAdmin || titleChanged;
 
                         // Si se detectó publicado por coincidencia local y aún estaba pendiente, actualizarlo en caché
                         if (matchingHymn != null && item.status == 'pending' && item.type != 'correction') {
@@ -250,17 +253,43 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                             ? const Color(0xFF10B981)
                             : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
 
-                        final statusLabel = isApproved
-                            ? (item.type == 'correction'
-                                ? 'Aprobado · Canto actualizado en catálogo'
-                                : 'Aprobado · Publicado en catálogo oficial')
-                            : (isRejected
-                                ? 'No publicado por el Administrador'
-                                : 'En revisión por el Administrador');
+                        final String statusLabel;
+                        if (isApproved) {
+                          if (item.type == 'correction') {
+                            statusLabel = 'Aprobado · Canto actualizado en catálogo';
+                          } else if (wasPolishedByAdmin) {
+                            statusLabel = 'Aprobado y publicado (con ajustes de formato)';
+                          } else {
+                            statusLabel = 'Aprobado y publicado en el catálogo oficial';
+                          }
+                        } else if (isRejected) {
+                          statusLabel = 'No publicado por el Administrador';
+                        } else {
+                          statusLabel = 'En revisión por el Administrador';
+                        }
 
                         final statusIcon = isApproved
-                            ? Icons.check_circle_rounded
+                            ? (wasPolishedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_rounded)
                             : (isRejected ? Icons.cancel_rounded : Icons.hourglass_top_rounded);
+
+                        // Construir mensaje amable y claro según estado, fecha de incorporación y ajustes
+                        String approvedMessage() {
+                          final dateFragment = item.reviewedAt != null
+                              ? ' el ${_formatDate(item.reviewedAt!)}'
+                              : '';
+                          final numFragment = openId != null ? ' como N° $openId' : '';
+                          if (wasPolishedByAdmin) {
+                            final editDetail = (item.adminEditSummary != null &&
+                                    item.adminEditSummary!.trim().isNotEmpty)
+                                ? item.adminEditSummary!.trim()
+                                : 'ajustes de ortografía y formato';
+                            final renameNote = titleChanged
+                                ? ' Título oficial: "$finalPublishedTitle".'
+                                : '';
+                            return '¡Gracias por tu aporte! Incorporado$dateFragment$numFragment con $editDetail realizados por el administrador.$renameNote';
+                          }
+                          return '¡Muchas gracias por tu aporte! Incorporado oficialmente$dateFragment$numFragment para toda la congregación.';
+                        }
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12.0),
@@ -296,7 +325,7 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        item.title,
+                                        finalPublishedTitle ?? item.title,
                                         style: GoogleFonts.outfit(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -379,22 +408,55 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                     ),
                                   ),
 
-                                Row(
+                                // Línea de tiempo de fechas (Envío y Incorporación / Revisión)
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Icon(Icons.calendar_today_outlined, size: 13, color: isDark ? Colors.white54 : Colors.black45),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Enviado el ${_formatDate(item.date)}',
-                                      style: GoogleFonts.nunito(
-                                        fontSize: 12,
-                                        color: isDark ? Colors.white54 : Colors.black45,
-                                      ),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.calendar_today_outlined, size: 13, color: isDark ? Colors.white54 : Colors.black45),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Enviado el ${_formatDate(item.date)}',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 12,
+                                            color: isDark ? Colors.white54 : Colors.black45,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    if (item.requesterName.isNotEmpty) ...[
-                                      const Text(' • '),
-                                      Flexible(
+                                    if (item.reviewedAt != null && (isApproved || isRejected))
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
                                         child: Text(
-                                          '${item.requesterName}${item.requesterChurch.isNotEmpty ? ' (${item.requesterChurch})' : ''}',
+                                          isApproved
+                                              ? 'Publicado el ${_formatDate(item.reviewedAt!)}'
+                                              : 'Revisado el ${_formatDate(item.reviewedAt!)}',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: statusColor,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                if (item.requesterName.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.person_outline_rounded, size: 13, color: isDark ? Colors.white54 : Colors.black45),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${item.requesterName}${item.requesterChurch.isNotEmpty ? ' · ${item.requesterChurch}' : ''}',
                                           overflow: TextOverflow.ellipsis,
                                           style: GoogleFonts.nunito(
                                             fontSize: 12,
@@ -403,8 +465,8 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                         ),
                                       ),
                                     ],
-                                  ],
-                                ),
+                                  ),
+                                ],
                                 const SizedBox(height: 12),
                                 const Divider(height: 1),
                                 const SizedBox(height: 10),
@@ -432,8 +494,10 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                           foregroundColor: const Color(0xFF10B981),
                                         ),
                                         onPressed: () {
-                                          ref.invalidate(hymnsProvider(openCol));
-                                          context.push('/home/hymn/$openCol-$openId');
+                                          if (matchingHymn == null) {
+                                            ref.invalidate(hymnsProvider(openCol));
+                                          }
+                                          context.push('/hymn-view/$openCol-$openId');
                                         },
                                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
                                         label: Text(
@@ -448,12 +512,10 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4.0, left: 23.0),
                                     child: Text(
-                                      finalPublishedTitle != null &&
-                                              finalPublishedTitle.toUpperCase() != item.title.toUpperCase()
-                                          ? '¡Gracias por tu aporte! Publicado oficialmente como "$finalPublishedTitle" (N° ${openId ?? ''}).'
-                                          : '¡Muchas gracias por tu aporte! Ya está disponible para toda la congregación.',
+                                      approvedMessage(),
                                       style: GoogleFonts.nunito(
                                         fontSize: 12,
+                                        height: 1.38,
                                         color: isDark ? Colors.white70 : Colors.black54,
                                       ),
                                     ),

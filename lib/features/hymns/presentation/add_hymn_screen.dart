@@ -582,7 +582,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
 
       if (action == _DuplicateAction.viewExisting) {
         if (!mounted) return;
-        context.push('/home/hymn/${duplicate.collection}-${duplicate.id}');
+        context.push('/hymn-view/${duplicate.collection}-${duplicate.id}');
         return;
       } else if (action == _DuplicateAction.saveLocalMedley) {
         isLocal = true;

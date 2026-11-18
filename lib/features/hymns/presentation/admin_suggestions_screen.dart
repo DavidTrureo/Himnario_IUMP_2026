@@ -30,12 +30,373 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
     }
   }
 
+  String _collectionFullLabel(String col) {
+    switch (col) {
+      case 'iump':
+        return 'Himnario IUMP';
+      case 'coros':
+        return 'Coros de Avivamiento';
+      case 'especiales':
+        return 'Alabanzas Especiales';
+      default:
+        return col.toUpperCase();
+    }
+  }
+
   String _formatTimestamp(dynamic ts) {
     if (ts is Timestamp) {
       final dt = ts.toDate();
       return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
     }
     return '';
+  }
+
+  /// Detecta automáticamente si el administrador realizó ajustes de formato, letra, título, tono o colección.
+  ({bool edited, String? summary}) _detectAdminEdits({
+    required Map<String, dynamic> originalData,
+    required String finalTitle,
+    required String finalLyrics,
+    required String finalCollection,
+    required String finalKey,
+  }) {
+    final origTitle = (originalData['title'] ?? '').toString().trim();
+    final origLyrics = (originalData['lyrics'] ?? '').toString().trim();
+    final origCollection = (originalData['collection'] ?? '').toString().trim();
+    final origKey = (originalData['key'] ?? '').toString().trim();
+
+    final titleChanged = origTitle.toLowerCase() != finalTitle.trim().toLowerCase() ||
+        origTitle != finalTitle.trim();
+    final lyricsChanged = origLyrics != finalLyrics.trim();
+    final collectionChanged = origCollection.isNotEmpty && origCollection != finalCollection;
+    final keyChanged = finalKey.trim().isNotEmpty && origKey.toLowerCase() != finalKey.trim().toLowerCase();
+
+    final edited = titleChanged || lyricsChanged || collectionChanged || keyChanged;
+    if (!edited) return (edited: false, summary: null);
+
+    final parts = <String>[];
+    if (lyricsChanged) parts.add('ortografía y formato');
+    if (titleChanged) parts.add('título');
+    if (keyChanged) parts.add('tonalidad');
+    if (collectionChanged) parts.add('colección');
+
+    if (parts.isEmpty) return (edited: true, summary: 'ajustes de formato');
+    if (parts.length == 1) return (edited: true, summary: 'ajustes de ${parts.first}');
+    final last = parts.removeLast();
+    return (edited: true, summary: 'ajustes de ${parts.join(', ')} y $last');
+  }
+
+  /// Muestra una Ficha de Trazabilidad del Aporte al tocar un registro aprobado,
+  /// con los datos del colaborador, línea de tiempo, curaduría editorial y botón directo al canto.
+  void _showApprovedContributionSheet(BuildContext context, Map<String, dynamic> data) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final originalTitle = (data['title'] ?? 'Sin título').toString();
+    final publishedTitle = (data['publishedTitle'] ?? originalTitle).toString();
+    final origCol = (data['collection'] ?? 'especiales').toString();
+    final pubCol = (data['publishedCollection'] ?? origCol).toString();
+    final pubId = data['publishedId'] != null ? int.tryParse(data['publishedId'].toString()) : null;
+    final requesterName = ((data['requesterName'] ?? data['suggestedByName']) as String?)?.trim() ?? '';
+    final requesterChurch = ((data['requesterChurch'] ?? data['suggestedByChurch']) as String?)?.trim() ?? '';
+    final type = data['type']?.toString() ?? 'new';
+    final source = data['source']?.toString() ?? 'manual';
+    final sentDate = _formatTimestamp(data['timestamp']);
+    final approvedDate = _formatTimestamp(data['approvedAt']);
+    final editedByAdmin = data['editedByAdmin'] == true ||
+        publishedTitle.trim().toUpperCase() != originalTitle.trim().toUpperCase() ||
+        pubCol != origCol;
+    final editSummary = data['adminEditSummary']?.toString().trim() ?? '';
+
+    final originLabel = type == 'correction'
+        ? 'Propuesta de mejora'
+        : (source == 'scanner_ia' ? 'Escáner Inteligente IA' : 'Formulario Manual (+)');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            border: Border.all(
+              color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06),
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            MediaQuery.of(sheetCtx).padding.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black26,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Header
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.16),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ficha del Aporte Aprobado',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          publishedTitle,
+                          style: GoogleFonts.outfit(
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          pubId != null
+                              ? '${_collectionFullLabel(pubCol)} · N° $pubId'
+                              : _collectionFullLabel(pubCol),
+                          style: GoogleFonts.nunito(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+
+              // Bloque de Colaborador e Iglesia
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    _buildDetailRow(
+                      icon: Icons.person_rounded,
+                      color: const Color(0xFF38BDF8),
+                      label: 'Colaborador',
+                      value: requesterName.isNotEmpty ? requesterName : 'Sin nombre registrado',
+                      isDark: isDark,
+                    ),
+                    const Divider(height: 16),
+                    _buildDetailRow(
+                      icon: Icons.church_rounded,
+                      color: const Color(0xFF818CF8),
+                      label: 'Iglesia / Local',
+                      value: requesterChurch.isNotEmpty ? requesterChurch : 'Sin iglesia registrada',
+                      isDark: isDark,
+                    ),
+                    const Divider(height: 16),
+                    _buildDetailRow(
+                      icon: source == 'scanner_ia' ? Icons.document_scanner_rounded : Icons.edit_note_rounded,
+                      color: const Color(0xFF8B5CF6),
+                      label: 'Origen del envío',
+                      value: originLabel,
+                      isDark: isDark,
+                    ),
+                    if (sentDate.isNotEmpty || approvedDate.isNotEmpty) ...[
+                      const Divider(height: 16),
+                      _buildDetailRow(
+                        icon: Icons.schedule_rounded,
+                        color: const Color(0xFFF59E0B),
+                        label: 'Línea de tiempo',
+                        value: [
+                          if (sentDate.isNotEmpty) 'Enviado: $sentDate',
+                          if (approvedDate.isNotEmpty) 'Publicado: $approvedDate',
+                        ].join('  →  '),
+                        isDark: isDark,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Bloque de Curaduría Editorial
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  color: (editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981))
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: (editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981))
+                        .withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      editedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_outline_rounded,
+                      size: 18,
+                      color: editedByAdmin ? const Color(0xFF0EA5E9) : const Color(0xFF10B981),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            editedByAdmin
+                                ? 'Publicado con ${editSummary.isNotEmpty ? editSummary : 'ajustes de formato'} por el administrador'
+                                : 'Publicado sin modificaciones (tal como fue enviado)',
+                            style: GoogleFonts.nunito(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: editedByAdmin ? const Color(0xFF38BDF8) : const Color(0xFF10B981),
+                            ),
+                          ),
+                          if (publishedTitle.trim().toUpperCase() != originalTitle.trim().toUpperCase())
+                            Padding(
+                              padding: const EdgeInsets.only(top: 3),
+                              child: Text(
+                                'Título original enviado: "$originalTitle"',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white70 : Colors.black54,
+                                ),
+                              ),
+                            ),
+                          if (pubCol != origCol)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                'Colección sugerida: ${_collectionFullLabel(origCol)} → ${_collectionFullLabel(pubCol)}',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white70 : Colors.black54,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Acciones
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetCtx),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Cerrar'),
+                    ),
+                  ),
+                  if (pubId != null) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetCtx);
+                          context.push('/hymn-view/$pubCol-$pubId');
+                        },
+                        icon: const Icon(Icons.menu_book_rounded, size: 19),
+                        label: Text(
+                          'Abrir Canto N° $pubId',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String value,
+    required bool isDark,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.nunito(
+                  fontSize: 11.5,
+                  color: isDark ? Colors.white54 : Colors.black45,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                value,
+                style: GoogleFonts.nunito(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -314,7 +675,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
 
   /// Pestaña de Registro Histórico de Aportes Aprobados:
   /// Solo guarda/muestra cantos aprobados (los rechazados no ensucian este registro)
-  /// permitiendo al administrador saber siempre quién sugirió cada canto y de qué iglesia.
+  /// permitiendo al administrador ver la Ficha de Trazabilidad y abrir el canto publicado.
   Widget _buildApprovedHistoryTab(bool isDark) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -355,7 +716,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Cada sugerencia que apruebes aparecerá aquí con el nombre del hermano/a, su iglesia y enlace directo al canto publicado.',
+                    'Cada sugerencia que apruebes aparecerá aquí con el nombre del hermano/a, su iglesia y acceso directo al canto publicado.',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
                       fontSize: 14,
@@ -381,6 +742,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
             final requesterChurch = ((data['requesterChurch'] ?? data['suggestedByChurch']) as String?)?.trim() ?? '';
             final type = data['type']?.toString() ?? 'new';
             final source = data['source']?.toString() ?? 'manual';
+            final editedByAdmin = data['editedByAdmin'] == true;
             final approvedDate = _formatTimestamp(data['approvedAt'] ?? data['timestamp']);
 
             return Container(
@@ -403,9 +765,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
               ),
               child: InkWell(
                 borderRadius: BorderRadius.circular(18),
-                onTap: pubId != null
-                    ? () => context.push('/home/hymn/$pubCol-$pubId')
-                    : null,
+                onTap: () => _showApprovedContributionSheet(context, data),
                 child: Padding(
                   padding: const EdgeInsets.all(15.0),
                   child: Column(
@@ -420,7 +780,11 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                               color: const Color(0xFF10B981).withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                            child: Icon(
+                              editedByAdmin ? Icons.auto_awesome_rounded : Icons.check_circle_rounded,
+                              color: const Color(0xFF10B981),
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -456,6 +820,22 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                                         ),
                                       ),
                                     ),
+                                    if (editedByAdmin)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.14),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'PULIDO ADMIN',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF38BDF8),
+                                          ),
+                                        ),
+                                      ),
                                     if (type == 'correction')
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -493,12 +873,11 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                               ],
                             ),
                           ),
-                          if (pubId != null)
-                            Icon(
-                              Icons.open_in_new_rounded,
-                              size: 18,
-                              color: isDark ? Colors.white38 : Colors.black38,
-                            ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -864,7 +1243,16 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                         onPressed: () async {
                           final finalTitle = titleCtrl.text.trim();
                           final finalLyrics = lyricsCtrl.text.trim();
+                          final finalTone = keyCtrl.text.trim();
                           if (finalTitle.isEmpty || finalLyrics.isEmpty) return;
+
+                          final editInfo = _detectAdminEdits(
+                            originalData: data,
+                            finalTitle: finalTitle,
+                            finalLyrics: finalLyrics,
+                            finalCollection: selectedCollection,
+                            finalKey: finalTone,
+                          );
 
                           setState(() => isProcessing = true);
                           try {
@@ -874,8 +1262,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                                 'title': finalTitle,
                                 'lyrics': finalLyrics,
                               };
-                              final tone = keyCtrl.text.trim();
-                              if (tone.isNotEmpty) updateData['toneNote'] = tone;
+                              if (finalTone.isNotEmpty) updateData['toneNote'] = finalTone;
                               final beats = beatsCtrl.text.trim();
                               if (beats.isNotEmpty) updateData['beats'] = beats;
                               final timeSig = timeSignatureCtrl.text.trim();
@@ -890,13 +1277,22 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
 
                               ref.invalidate(hymnsProvider(selectedCollection));
 
-                              await FirebaseFirestore.instance.collection('cantos_sugeridos').doc(docId).update({
+                              final approvalUpdate = <String, dynamic>{
                                 'status': 'approved',
                                 'approvedAt': FieldValue.serverTimestamp(),
                                 'publishedId': targetHymnId is int ? targetHymnId : int.tryParse(targetHymnId.toString()),
                                 'publishedCollection': selectedCollection,
                                 'publishedTitle': finalTitle,
-                              });
+                                'editedByAdmin': editInfo.edited,
+                              };
+                              if (editInfo.summary != null) {
+                                approvalUpdate['adminEditSummary'] = editInfo.summary;
+                              }
+
+                              await FirebaseFirestore.instance
+                                  .collection('cantos_sugeridos')
+                                  .doc(docId)
+                                  .update(approvalUpdate);
 
                               if (context.mounted) {
                                 Navigator.pop(context);
@@ -931,8 +1327,7 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                                 'collection': selectedCollection,
                               };
 
-                              final tone = keyCtrl.text.trim();
-                              if (tone.isNotEmpty) newHymn['toneNote'] = tone;
+                              if (finalTone.isNotEmpty) newHymn['toneNote'] = finalTone;
                               final beats = beatsCtrl.text.trim();
                               if (beats.isNotEmpty) newHymn['beats'] = beats;
                               final timeSig = timeSignatureCtrl.text.trim();
@@ -952,13 +1347,22 @@ class _AdminSuggestionsScreenState extends ConsumerState<AdminSuggestionsScreen>
                               ref.invalidate(hymnsProvider(selectedCollection));
 
                               // 4. Marcar sugerencia como aprobada (queda en pestaña Aprobados y actualiza al usuario)
-                              await FirebaseFirestore.instance.collection('cantos_sugeridos').doc(docId).update({
+                              final approvalUpdate = <String, dynamic>{
                                 'status': 'approved',
                                 'approvedAt': FieldValue.serverTimestamp(),
                                 'publishedId': nextId,
                                 'publishedCollection': selectedCollection,
                                 'publishedTitle': finalTitle,
-                              });
+                                'editedByAdmin': editInfo.edited,
+                              };
+                              if (editInfo.summary != null) {
+                                approvalUpdate['adminEditSummary'] = editInfo.summary;
+                              }
+
+                              await FirebaseFirestore.instance
+                                  .collection('cantos_sugeridos')
+                                  .doc(docId)
+                                  .update(approvalUpdate);
 
                               if (context.mounted) {
                                 Navigator.pop(context);

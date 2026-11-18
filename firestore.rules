@@ -100,6 +100,8 @@ service cloud.firestore {
     //   - publishedCollection: string in ['iump', 'especiales', 'coros'] or null
     //   - publishedTitle: string (<=200) or null
     //   - rejectionReason: string (<=500) or null
+    //   - editedByAdmin: bool or null
+    //   - adminEditSummary: string (<=200) or null
     function isValidSuggestedHymnCreate() {
       let data = request.resource.data;
       return data.keys().hasAll([
@@ -136,7 +138,8 @@ service cloud.firestore {
       let changed = data.diff(resource.data).affectedKeys();
       return changed.hasOnly([
           'status', 'approvedAt', 'reviewedAt',
-          'publishedId', 'publishedCollection', 'publishedTitle', 'rejectionReason'
+          'publishedId', 'publishedCollection', 'publishedTitle', 'rejectionReason',
+          'editedByAdmin', 'adminEditSummary'
         ])
         && data.status in ['pending', 'approved', 'rejected']
         && (!('approvedAt' in data) || data.approvedAt == null || data.approvedAt is timestamp)
@@ -144,7 +147,9 @@ service cloud.firestore {
         && (!('publishedId' in data) || data.publishedId == null || data.publishedId is int)
         && (!('publishedCollection' in data) || data.publishedCollection == null || data.publishedCollection in ['iump', 'especiales', 'coros'])
         && (!('publishedTitle' in data) || data.publishedTitle == null || (data.publishedTitle is string && data.publishedTitle.size() <= 200))
-        && (!('rejectionReason' in data) || data.rejectionReason == null || (data.rejectionReason is string && data.rejectionReason.size() <= 500));
+        && (!('rejectionReason' in data) || data.rejectionReason == null || (data.rejectionReason is string && data.rejectionReason.size() <= 500))
+        && (!('editedByAdmin' in data) || data.editedByAdmin == null || data.editedByAdmin is bool)
+        && (!('adminEditSummary' in data) || data.adminEditSummary == null || (data.adminEditSummary is string && data.adminEditSummary.size() <= 200));
     }
 
     match /cantos_sugeridos/{docId} {

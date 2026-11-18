@@ -21,6 +21,9 @@ class SubmittedSuggestion {
   final String? publishedCollection;
   final String? publishedTitle;
   final String? rejectionReason;
+  final DateTime? reviewedAt;
+  final bool editedByAdmin;
+  final String? adminEditSummary;
 
   SubmittedSuggestion({
     required this.docId,
@@ -39,6 +42,9 @@ class SubmittedSuggestion {
     this.publishedCollection,
     this.publishedTitle,
     this.rejectionReason,
+    this.reviewedAt,
+    this.editedByAdmin = false,
+    this.adminEditSummary,
   });
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +64,9 @@ class SubmittedSuggestion {
     'publishedCollection': publishedCollection,
     'publishedTitle': publishedTitle,
     'rejectionReason': rejectionReason,
+    'reviewedAt': reviewedAt?.toIso8601String(),
+    'editedByAdmin': editedByAdmin,
+    'adminEditSummary': adminEditSummary,
   };
 
   factory SubmittedSuggestion.fromJson(Map<String, dynamic> json) => SubmittedSuggestion(
@@ -77,6 +86,9 @@ class SubmittedSuggestion {
     publishedCollection: json['publishedCollection']?.toString(),
     publishedTitle: json['publishedTitle']?.toString(),
     rejectionReason: json['rejectionReason']?.toString(),
+    reviewedAt: json['reviewedAt'] != null ? DateTime.tryParse(json['reviewedAt'].toString()) : null,
+    editedByAdmin: json['editedByAdmin'] == true,
+    adminEditSummary: json['adminEditSummary']?.toString(),
   );
 
   SubmittedSuggestion copyWith({
@@ -85,6 +97,9 @@ class SubmittedSuggestion {
     String? publishedCollection,
     String? publishedTitle,
     String? rejectionReason,
+    DateTime? reviewedAt,
+    bool? editedByAdmin,
+    String? adminEditSummary,
   }) => SubmittedSuggestion(
     docId: docId,
     title: title,
@@ -102,6 +117,9 @@ class SubmittedSuggestion {
     publishedCollection: publishedCollection ?? this.publishedCollection,
     publishedTitle: publishedTitle ?? this.publishedTitle,
     rejectionReason: rejectionReason ?? this.rejectionReason,
+    reviewedAt: reviewedAt ?? this.reviewedAt,
+    editedByAdmin: editedByAdmin ?? this.editedByAdmin,
+    adminEditSummary: adminEditSummary ?? this.adminEditSummary,
   );
 }
 
@@ -203,6 +221,9 @@ class SuggestionTrackingService {
     String? publishedCollection,
     String? publishedTitle,
     String? rejectionReason,
+    DateTime? reviewedAt,
+    bool? editedByAdmin,
+    String? adminEditSummary,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -215,11 +236,20 @@ class SuggestionTrackingService {
           publishedCollection: publishedCollection,
           publishedTitle: publishedTitle,
           rejectionReason: rejectionReason,
+          reviewedAt: reviewedAt,
+          editedByAdmin: editedByAdmin,
+          adminEditSummary: adminEditSummary,
         );
         final encoded = list.map((e) => e.toJson()).toList();
         await prefs.setString(_keyHistory, jsonEncode(encoded));
       }
     } catch (_) {}
+  }
+
+  static DateTime? _parseFirestoreTimestamp(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
   }
 
   /// Consulta directamente en Cloud Firestore el estado real de cada sugerencia enviada por este dispositivo.
@@ -242,9 +272,14 @@ class SuggestionTrackingService {
         final item = updatedList[i];
         if (item.docId.isEmpty) return;
 
-        // Si ya tiene resolución final con datos completos, no es imprescindible volver a consultar salvo que falte publishedId
-        if (item.status == 'rejected' ||
-            (item.status == 'approved' && item.publishedId != null && item.publishedCollection != null)) {
+        // Si ya tiene resolución final completa (incluyendo fecha de revisión), omitir lectura innecesaria
+        if (item.status == 'rejected' && item.reviewedAt != null) {
+          return;
+        }
+        if (item.status == 'approved' &&
+            item.publishedId != null &&
+            item.publishedCollection != null &&
+            item.reviewedAt != null) {
           return;
         }
 
@@ -272,12 +307,20 @@ class SuggestionTrackingService {
             final remotePubCol = data['publishedCollection']?.toString();
             final remotePubTitle = data['publishedTitle']?.toString();
             final remoteRejectionReason = data['rejectionReason']?.toString();
+            final remoteReviewedAt = _parseFirestoreTimestamp(
+              data['approvedAt'] ?? data['reviewedAt'],
+            );
+            final remoteEditedByAdmin = data['editedByAdmin'] == true;
+            final remoteAdminEditSummary = data['adminEditSummary']?.toString();
 
             if (remoteStatus != item.status ||
                 remotePubId != item.publishedId ||
                 remotePubCol != item.publishedCollection ||
                 remotePubTitle != item.publishedTitle ||
-                remoteRejectionReason != item.rejectionReason) {
+                remoteRejectionReason != item.rejectionReason ||
+                remoteReviewedAt != item.reviewedAt ||
+                remoteEditedByAdmin != item.editedByAdmin ||
+                remoteAdminEditSummary != item.adminEditSummary) {
               if (remoteStatus == 'approved' && item.status != 'approved') {
                 newlyApprovedCollections.add(remotePubCol ?? item.collection);
               }
@@ -287,12 +330,13 @@ class SuggestionTrackingService {
                 publishedCollection: remotePubCol,
                 publishedTitle: remotePubTitle,
                 rejectionReason: remoteRejectionReason,
+                reviewedAt: remoteReviewedAt,
+                editedByAdmin: remoteEditedByAdmin,
+                adminEditSummary: remoteAdminEditSummary,
               );
               hasChanges = true;
             }
           } else if (!snap.exists && item.status == 'pending') {
-            // Si el documento ya fue eliminado por el administrador sin aprobarse,
-            // marcar como no publicado (si luego coincide en catálogo local, la vista lo promoverá a aprobado).
             updatedList[i] = item.copyWith(status: 'rejected');
             hasChanges = true;
           }
