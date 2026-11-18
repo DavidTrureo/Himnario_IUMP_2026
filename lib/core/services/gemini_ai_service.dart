@@ -367,21 +367,38 @@ JSON esperado:
       }
     }
 
-    // Si la IA de Gemini no pudo responder (fallback offline), aplicamos el corrector local.
-    // Si Gemini ya procesó el canto con éxito, respetamos su análisis contextual de tiempos verbales
-    // para evitar forzar tildes incorrectas en palabras en presente o adjetivos.
+    // UNIFICACIÓN TOTAL DE REGLAS (Ortografía, Tildes RAE, Mayúscula Inicial y Estructuras):
+    // 1. Título siempre en MAYÚSCULAS
+    currentTitle = currentTitle.trim().toUpperCase();
+
+    // 2. Si la IA no asistió, aplicar el motor determinístico de tildes y erratas local
     if (!isAiAssisted) {
       final fallbackCheck = SpanishGrammarCorrector.correctText(
         title: currentTitle,
         lyrics: currentLyrics,
       );
-      currentTitle = fallbackCheck.title;
+      currentTitle = fallbackCheck.title.toUpperCase();
       currentLyrics = fallbackCheck.lyrics;
       totalCorrections += fallbackCheck.correctionsCount;
     } else {
-      currentTitle = currentTitle.toUpperCase();
       currentLyrics = currentLyrics.replaceAll('perdónó', 'perdonó');
     }
+
+    // 3. Garantizar separación de cabeceras estructurales (CORO, PUENTE, FINAL, etc.)
+    currentLyrics = Hymn.ensureHeadersOnOwnLine(currentLyrics);
+
+    // 4. Garantizar DETERMINÍSTICAMENTE que el 100% de los versos comiencen con Mayúscula,
+    //    respetando acordes [DO], barras // y números, y aplicando mayúsculas de respeto en nombres sagrados.
+    final rawLines = currentLyrics.split('\n');
+    final formattedLines = rawLines.map((l) {
+      final trimmed = l.trim();
+      final structMatch = Hymn.matchStructuralHeader(trimmed);
+      if (structMatch != null && structMatch.rest.isEmpty) {
+        return structMatch.header;
+      }
+      return Hymn.formatLineCasing(l);
+    }).toList();
+    currentLyrics = formattedLines.join('\n');
 
     // 2. Abrir el Modal de Resumen de Cambios (Antes vs Después)
     if (!context.mounted) return null;
