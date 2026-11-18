@@ -60,6 +60,18 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
         ? widget.initialCollection
         : 'especiales';
     _prefillNextIdIfIump();
+    _loadSavedRequesterProfile();
+  }
+
+  Future<void> _loadSavedRequesterProfile() async {
+    final profile = await SuggestionTrackingService.getRequesterProfile();
+    if (!mounted) return;
+    if (_nameController.text.isEmpty && profile.name.isNotEmpty) {
+      _nameController.text = profile.name;
+    }
+    if (_churchController.text.isEmpty && profile.church.isNotEmpty) {
+      _churchController.text = profile.church;
+    }
   }
 
   void _prefillNextIdIfIump() {
@@ -644,11 +656,17 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
           'timestamp': FieldValue.serverTimestamp(),
           'status': 'pending',
           'type': suggestionType,
+          'source': 'manual',
           'targetHymnId': targetHymnId,
           'targetTitle': targetHymnTitle,
           'targetCollection': targetHymnCollection,
           'reason': correctionReason,
         });
+
+        await SuggestionTrackingService.saveRequesterProfile(
+          name: requesterName,
+          church: requesterChurch,
+        );
 
         await SuggestionTrackingService.saveSubmittedSuggestion(
           SubmittedSuggestion(
@@ -659,6 +677,7 @@ class _AddHymnScreenState extends ConsumerState<AddHymnScreen> {
             requesterChurch: requesterChurch,
             date: DateTime.now(),
             type: suggestionType,
+            source: 'manual',
             targetHymnId: targetHymnId,
             targetTitle: targetHymnTitle,
             reason: correctionReason,

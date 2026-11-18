@@ -1,4 +1,3 @@
-import 'dart:ui' as dart_ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,20 +17,50 @@ class MySuggestionsScreen extends ConsumerStatefulWidget {
 class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
   List<SubmittedSuggestion> _suggestions = [];
   bool _isLoading = true;
+  bool _isSyncingCloud = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSuggestions();
+    _loadAndSyncSuggestions();
   }
 
-  Future<void> _loadSuggestions() async {
-    setState(() => _isLoading = true);
-    final list = await SuggestionTrackingService.getSubmittedSuggestions();
+  Future<void> _loadAndSyncSuggestions() async {
+    // 1. Mostrar inmediatamente el caché local para respuesta instantánea
+    final localList = await SuggestionTrackingService.getSubmittedSuggestions();
     if (mounted) {
       setState(() {
-        _suggestions = list;
+        _suggestions = localList;
         _isLoading = false;
+        _isSyncingCloud = localList.isNotEmpty;
+      });
+    }
+
+    if (localList.isEmpty) return;
+
+    // 2. Consultar en la nube el estado actualizado de cada sugerencia (aprobado / rechazado / pendiente)
+    final result = await SuggestionTrackingService.syncStatusesFromCloud();
+
+    // 3. Si hubo nuevos cantos aprobados, refrescar esas colecciones del catálogo oficial
+    if (mounted && result.newlyApprovedCollections.isNotEmpty) {
+      for (final col in result.newlyApprovedCollections) {
+        ref.invalidate(hymnsProvider(col));
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _suggestions = result.suggestions;
+        _isSyncingCloud = false;
+      });
+    }
+  }
+
+  Future<void> _removeLocalItem(SubmittedSuggestion item) async {
+    await SuggestionTrackingService.removeSubmittedSuggestion(item.docId);
+    if (mounted) {
+      setState(() {
+        _suggestions = _suggestions.where((s) => s.docId != item.docId).toList();
       });
     }
   }
@@ -41,7 +70,7 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
       case 'iump':
         return 'Himnario IUMP';
       case 'coros':
-        return 'Coros Unidos';
+        return 'Coros de Avivamiento';
       case 'especiales':
         return 'Alabanzas Especiales';
       default:
@@ -68,6 +97,19 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
         ),
         elevation: 0,
         backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            tooltip: 'Actualizar estados',
+            onPressed: _isSyncingCloud ? null : _loadAndSyncSuggestions,
+            icon: _isSyncingCloud
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -129,7 +171,7 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Cuando sugieras agregar o corregir un canto al catálogo oficial, podrás seguir aquí el estado de revisión del administrador.',
+                      'Cuando sugieras agregar o corregir un canto al catálogo oficial (desde el botón + o el Escáner IA), podrás seguir aquí el estado de revisión del administrador.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.nunito(
                         fontSize: 14,
@@ -151,207 +193,306 @@ class _MySuggestionsScreenState extends ConsumerState<MySuggestionsScreen> {
               ),
             )
           else
-            RefreshIndicator(
-              onRefresh: _loadSuggestions,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                itemCount: _suggestions.length,
-                itemBuilder: (context, index) {
-                  final item = _suggestions[index];
+            Column(
+              children: [
+                if (_isSyncingCloud)
+                  const LinearProgressIndicator(minHeight: 2),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadAndSyncSuggestions,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      itemCount: _suggestions.length,
+                      itemBuilder: (context, index) {
+                        final item = _suggestions[index];
 
-                  // Verificar si ya fue publicado en el himnario oficial
-                  final matchingHymn = allHymns.where((h) => !h.isLocalOnly).cast<Hymn?>().firstWhere(
-                    (h) => h != null && (
-                      (item.publishedId != null && h.id == item.publishedId && h.collection == (item.publishedCollection ?? item.collection)) ||
-                      (h.title.toUpperCase() == item.title.toUpperCase())
-                    ),
-                    orElse: () => null,
-                  );
+                        // Respaldo: buscar si ya existe el canto publicado en el catálogo oficial
+                        final targetCol = item.publishedCollection ?? item.collection;
+                        final matchingHymn = allHymns.where((h) => !h.isLocalOnly).cast<Hymn?>().firstWhere(
+                          (h) {
+                            if (h == null) return false;
+                            if (item.publishedId != null &&
+                                h.id == item.publishedId &&
+                                h.collection == targetCol) {
+                              return true;
+                            }
+                            if (item.status == 'pending' &&
+                                item.type != 'correction' &&
+                                h.normalizedTitle == Hymn.normalizeString(item.title)) {
+                              return true;
+                            }
+                            return false;
+                          },
+                          orElse: () => null,
+                        );
 
-                  final bool isPublished = item.status == 'approved' || matchingHymn != null;
-                  final bool isRejected = item.status == 'rejected';
+                        final bool isApproved = item.status == 'approved' ||
+                            (item.status == 'pending' && matchingHymn != null && item.type != 'correction');
+                        final bool isRejected = !isApproved && item.status == 'rejected';
 
-                  // Si se detectó publicado y no estaba marcado, actualizarlo en local
-                  if (matchingHymn != null && item.status != 'approved') {
-                    SuggestionTrackingService.updateSuggestionStatus(
-                      item.docId,
-                      status: 'approved',
-                      publishedId: matchingHymn.id,
-                      publishedCollection: matchingHymn.collection,
-                    );
-                  }
+                        final int? openId = item.publishedId ?? matchingHymn?.id;
+                        final String openCol = item.publishedCollection ?? matchingHymn?.collection ?? item.collection;
+                        final String? finalPublishedTitle = item.publishedTitle ?? matchingHymn?.title;
 
-                  final statusColor = isPublished
-                      ? const Color(0xFF10B981)
-                      : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
+                        // Si se detectó publicado por coincidencia local y aún estaba pendiente, actualizarlo en caché
+                        if (matchingHymn != null && item.status == 'pending' && item.type != 'correction') {
+                          SuggestionTrackingService.updateSuggestionStatus(
+                            item.docId,
+                            status: 'approved',
+                            publishedId: matchingHymn.id,
+                            publishedCollection: matchingHymn.collection,
+                            publishedTitle: matchingHymn.title,
+                          );
+                        }
 
-                  final statusLabel = isPublished
-                      ? 'Gestionado por Administrador (Aprobado)'
-                      : (isRejected ? 'Gestionado por Administrador (No publicado)' : 'En revisión por el Administrador');
+                        final statusColor = isApproved
+                            ? const Color(0xFF10B981)
+                            : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
 
-                  final statusIcon = isPublished
-                      ? Icons.check_circle_rounded
-                      : (isRejected ? Icons.cancel_rounded : Icons.hourglass_top_rounded);
+                        final statusLabel = isApproved
+                            ? (item.type == 'correction'
+                                ? 'Aprobado · Canto actualizado en catálogo'
+                                : 'Aprobado · Publicado en catálogo oficial')
+                            : (isRejected
+                                ? 'No publicado por el Administrador'
+                                : 'En revisión por el Administrador');
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12.0),
-                    decoration: BoxDecoration(
-                      color: isDark 
-                          ? const Color(0xFF1E293B).withValues(alpha: 0.7) 
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: isDark 
-                            ? Colors.white.withValues(alpha: 0.08) 
-                            : Colors.black.withValues(alpha: 0.06),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  item.title,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _collectionLabel(item.collection),
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                ),
+                        final statusIcon = isApproved
+                            ? Icons.check_circle_rounded
+                            : (isRejected ? Icons.cancel_rounded : Icons.hourglass_top_rounded);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12.0),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF1E293B).withValues(alpha: 0.7)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isApproved
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.35)
+                                  : isRejected
+                                      ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                                      : (isDark
+                                          ? Colors.white.withValues(alpha: 0.08)
+                                          : Colors.black.withValues(alpha: 0.06)),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        item.title,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _collectionLabel(openCol),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isApproved || isRejected)
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 4),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(20),
+                                          onTap: () => _removeLocalItem(item),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(2.0),
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              size: 18,
+                                              color: isDark ? Colors.white38 : Colors.black38,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
 
-                          if (item.type == 'correction')
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 6.0),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.build_circle_outlined, size: 14, color: Color(0xFF0EA5E9)),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      'Propuesta de corrección / mejora para: ${item.targetTitle ?? 'Canto existente'}',
+                                if (item.source == 'scanner_ia')
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6.0),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.document_scanner_rounded, size: 13, color: Color(0xFF8B5CF6)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Enviado desde Escáner Inteligente IA',
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF8B5CF6),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                if (item.type == 'correction')
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6.0),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.build_circle_outlined, size: 14, color: Color(0xFF0EA5E9)),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            'Propuesta de corrección / mejora para: ${item.targetTitle ?? 'Canto existente'}',
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: const Color(0xFF0EA5E9),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                Row(
+                                  children: [
+                                    Icon(Icons.calendar_today_outlined, size: 13, color: isDark ? Colors.white54 : Colors.black45),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Enviado el ${_formatDate(item.date)}',
                                       style: GoogleFonts.nunito(
                                         fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: const Color(0xFF0EA5E9),
+                                        color: isDark ? Colors.white54 : Colors.black45,
+                                      ),
+                                    ),
+                                    if (item.requesterName.isNotEmpty) ...[
+                                      const Text(' • '),
+                                      Flexible(
+                                        child: Text(
+                                          '${item.requesterName}${item.requesterChurch.isNotEmpty ? ' (${item.requesterChurch})' : ''}',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 12,
+                                            color: isDark ? Colors.white54 : Colors.black45,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                const Divider(height: 1),
+                                const SizedBox(height: 10),
+
+                                // Estado de la sugerencia
+                                Row(
+                                  children: [
+                                    Icon(statusIcon, size: 17, color: statusColor),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        statusLabel,
+                                        style: GoogleFonts.nunito(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isApproved && openId != null)
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          foregroundColor: const Color(0xFF10B981),
+                                        ),
+                                        onPressed: () {
+                                          ref.invalidate(hymnsProvider(openCol));
+                                          context.push('/home/hymn/$openCol-$openId');
+                                        },
+                                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                                        label: Text(
+                                          'Ver N° $openId',
+                                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+
+                                if (isApproved)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0, left: 23.0),
+                                    child: Text(
+                                      finalPublishedTitle != null &&
+                                              finalPublishedTitle.toUpperCase() != item.title.toUpperCase()
+                                          ? '¡Gracias por tu aporte! Publicado oficialmente como "$finalPublishedTitle" (N° ${openId ?? ''}).'
+                                          : '¡Muchas gracias por tu aporte! Ya está disponible para toda la congregación.',
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                  )
+                                else if (isRejected)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0, left: 23.0),
+                                    child: Text(
+                                      (item.rejectionReason != null && item.rejectionReason!.trim().isNotEmpty)
+                                          ? 'Motivo: ${item.rejectionReason!.trim()}'
+                                          : 'Esta sugerencia no fue incorporada al catálogo oficial (puede ya existir o no corresponder a la colección).',
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.white60 : Colors.black54,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0, left: 23.0),
+                                    child: Text(
+                                      'El administrador revisará la letra, el formato y la agregará próximamente a la base de datos oficial.',
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 11.5,
+                                        color: isDark ? Colors.white54 : Colors.black54,
+                                        fontStyle: FontStyle.italic,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-
-                          Row(
-                            children: [
-                              Icon(Icons.calendar_today_outlined, size: 13, color: isDark ? Colors.white54 : Colors.black45),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Enviado el ${_formatDate(item.date)}',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 12,
-                                  color: isDark ? Colors.white54 : Colors.black45,
-                                ),
-                              ),
-                              if (item.requesterName.isNotEmpty) ...[
-                                const Text(' • '),
-                                Flexible(
-                                  child: Text(
-                                    '${item.requesterName} (${item.requesterChurch})',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.nunito(
-                                      fontSize: 12,
-                                      color: isDark ? Colors.white54 : Colors.black45,
-                                    ),
-                                  ),
-                                ),
                               ],
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          const SizedBox(height: 10),
-
-                          // Estado de la sugerencia
-                          Row(
-                            children: [
-                              Icon(statusIcon, size: 16, color: statusColor),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  statusLabel,
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: statusColor,
-                                  ),
-                                ),
-                              ),
-                              if (isPublished && matchingHymn != null)
-                                TextButton.icon(
-                                  style: TextButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    foregroundColor: const Color(0xFF10B981),
-                                  ),
-                                  onPressed: () {
-                                    context.push('/hymn/${matchingHymn.collection}/${matchingHymn.id}');
-                                  },
-                                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                                  label: Text(
-                                    'Ver N° ${matchingHymn.id}',
-                                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          if (!isPublished && !isRejected)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4.0, left: 22.0),
-                              child: Text(
-                                'El administrador revisará la letra, el formato y la agregará próximamente a la base de datos oficial.',
-                                style: GoogleFonts.nunito(
-                                  fontSize: 11.5,
-                                  color: isDark ? Colors.white54 : Colors.black54,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
                             ),
-                        ],
-                      ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
         ],
       ),

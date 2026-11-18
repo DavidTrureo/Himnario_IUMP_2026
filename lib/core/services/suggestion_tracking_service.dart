@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Modelo ligero para guardar y rastrear en el dispositivo del usuario
@@ -11,12 +12,15 @@ class SubmittedSuggestion {
   final String requesterChurch;
   final DateTime date;
   final String type; // 'new', 'correction', 'medley'
+  final String source; // 'manual', 'scanner_ia'
   final int? targetHymnId;
   final String? targetTitle;
   final String? reason;
   final String status; // 'pending', 'approved', 'rejected'
   final int? publishedId;
   final String? publishedCollection;
+  final String? publishedTitle;
+  final String? rejectionReason;
 
   SubmittedSuggestion({
     required this.docId,
@@ -26,12 +30,15 @@ class SubmittedSuggestion {
     required this.requesterChurch,
     required this.date,
     this.type = 'new',
+    this.source = 'manual',
     this.targetHymnId,
     this.targetTitle,
     this.reason,
     this.status = 'pending',
     this.publishedId,
     this.publishedCollection,
+    this.publishedTitle,
+    this.rejectionReason,
   });
 
   Map<String, dynamic> toJson() => {
@@ -42,12 +49,15 @@ class SubmittedSuggestion {
     'requesterChurch': requesterChurch,
     'date': date.toIso8601String(),
     'type': type,
+    'source': source,
     'targetHymnId': targetHymnId,
     'targetTitle': targetTitle,
     'reason': reason,
     'status': status,
     'publishedId': publishedId,
     'publishedCollection': publishedCollection,
+    'publishedTitle': publishedTitle,
+    'rejectionReason': rejectionReason,
   };
 
   factory SubmittedSuggestion.fromJson(Map<String, dynamic> json) => SubmittedSuggestion(
@@ -58,18 +68,23 @@ class SubmittedSuggestion {
     requesterChurch: json['requesterChurch']?.toString() ?? '',
     date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
     type: json['type']?.toString() ?? 'new',
+    source: json['source']?.toString() ?? 'manual',
     targetHymnId: json['targetHymnId'] != null ? int.tryParse(json['targetHymnId'].toString()) : null,
     targetTitle: json['targetTitle']?.toString(),
     reason: json['reason']?.toString(),
     status: json['status']?.toString() ?? 'pending',
     publishedId: json['publishedId'] != null ? int.tryParse(json['publishedId'].toString()) : null,
     publishedCollection: json['publishedCollection']?.toString(),
+    publishedTitle: json['publishedTitle']?.toString(),
+    rejectionReason: json['rejectionReason']?.toString(),
   );
 
   SubmittedSuggestion copyWith({
     String? status,
     int? publishedId,
     String? publishedCollection,
+    String? publishedTitle,
+    String? rejectionReason,
   }) => SubmittedSuggestion(
     docId: docId,
     title: title,
@@ -78,17 +93,61 @@ class SubmittedSuggestion {
     requesterChurch: requesterChurch,
     date: date,
     type: type,
+    source: source,
     targetHymnId: targetHymnId,
     targetTitle: targetTitle,
     reason: reason,
     status: status ?? this.status,
     publishedId: publishedId ?? this.publishedId,
     publishedCollection: publishedCollection ?? this.publishedCollection,
+    publishedTitle: publishedTitle ?? this.publishedTitle,
+    rejectionReason: rejectionReason ?? this.rejectionReason,
   );
+}
+
+class SuggestionSyncResult {
+  final List<SubmittedSuggestion> suggestions;
+  final Set<String> newlyApprovedCollections;
+
+  const SuggestionSyncResult({
+    required this.suggestions,
+    required this.newlyApprovedCollections,
+  });
 }
 
 class SuggestionTrackingService {
   static const String _keyHistory = 'my_submitted_suggestions_v1';
+  static const String _keyRequesterName = 'last_requester_name_v1';
+  static const String _keyRequesterChurch = 'last_requester_church_v1';
+
+  /// Guarda los datos del hermano/a para autocompletarlos en futuros envíos (+ o Escáner IA)
+  static Future<void> saveRequesterProfile({
+    required String name,
+    required String church,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (name.trim().isNotEmpty) {
+        await prefs.setString(_keyRequesterName, name.trim());
+      }
+      if (church.trim().isNotEmpty) {
+        await prefs.setString(_keyRequesterChurch, church.trim());
+      }
+    } catch (_) {}
+  }
+
+  /// Recupera los últimos datos de nombre e iglesia usados por el usuario
+  static Future<({String name, String church})> getRequesterProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return (
+        name: prefs.getString(_keyRequesterName) ?? '',
+        church: prefs.getString(_keyRequesterChurch) ?? '',
+      );
+    } catch (_) {
+      return (name: '', church: '');
+    }
+  }
 
   /// Guarda una nueva sugerencia enviada por el usuario en su memoria local
   static Future<void> saveSubmittedSuggestion(SubmittedSuggestion suggestion) async {
@@ -125,12 +184,25 @@ class SuggestionTrackingService {
     }
   }
 
-  /// Actualiza el estado local de una sugerencia (ej: cuando se detecta que ya fue aprobada)
+  /// Elimina una sugerencia del historial local del dispositivo
+  static Future<void> removeSubmittedSuggestion(String docId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = await getSubmittedSuggestions();
+      list.removeWhere((item) => item.docId == docId);
+      final encoded = list.map((e) => e.toJson()).toList();
+      await prefs.setString(_keyHistory, jsonEncode(encoded));
+    } catch (_) {}
+  }
+
+  /// Actualiza el estado local de una sugerencia (ej: cuando se detecta que ya fue aprobada o rechazada)
   static Future<void> updateSuggestionStatus(
     String docId, {
     required String status,
     int? publishedId,
     String? publishedCollection,
+    String? publishedTitle,
+    String? rejectionReason,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -141,11 +213,106 @@ class SuggestionTrackingService {
           status: status,
           publishedId: publishedId,
           publishedCollection: publishedCollection,
+          publishedTitle: publishedTitle,
+          rejectionReason: rejectionReason,
         );
         final encoded = list.map((e) => e.toJson()).toList();
         await prefs.setString(_keyHistory, jsonEncode(encoded));
       }
     } catch (_) {}
   }
-}
 
+  /// Consulta directamente en Cloud Firestore el estado real de cada sugerencia enviada por este dispositivo.
+  static Future<SuggestionSyncResult> syncStatusesFromCloud() async {
+    final list = await getSubmittedSuggestions();
+    if (list.isEmpty) {
+      return const SuggestionSyncResult(
+        suggestions: [],
+        newlyApprovedCollections: {},
+      );
+    }
+
+    final firestore = FirebaseFirestore.instance;
+    final updatedList = List<SubmittedSuggestion>.from(list);
+    final newlyApprovedCollections = <String>{};
+    bool hasChanges = false;
+
+    await Future.wait(
+      List.generate(updatedList.length, (i) async {
+        final item = updatedList[i];
+        if (item.docId.isEmpty) return;
+
+        // Si ya tiene resolución final con datos completos, no es imprescindible volver a consultar salvo que falte publishedId
+        if (item.status == 'rejected' ||
+            (item.status == 'approved' && item.publishedId != null && item.publishedCollection != null)) {
+          return;
+        }
+
+        try {
+          DocumentSnapshot<Map<String, dynamic>> snap;
+          try {
+            snap = await firestore
+                .collection('cantos_sugeridos')
+                .doc(item.docId)
+                .get(const GetOptions(source: Source.server));
+          } catch (_) {
+            // Si no hay conexión, intentar leer desde caché local de Firestore
+            snap = await firestore
+                .collection('cantos_sugeridos')
+                .doc(item.docId)
+                .get();
+          }
+
+          if (snap.exists && snap.data() != null) {
+            final data = snap.data()!;
+            final remoteStatus = data['status']?.toString() ?? 'pending';
+            final remotePubId = data['publishedId'] != null
+                ? int.tryParse(data['publishedId'].toString())
+                : null;
+            final remotePubCol = data['publishedCollection']?.toString();
+            final remotePubTitle = data['publishedTitle']?.toString();
+            final remoteRejectionReason = data['rejectionReason']?.toString();
+
+            if (remoteStatus != item.status ||
+                remotePubId != item.publishedId ||
+                remotePubCol != item.publishedCollection ||
+                remotePubTitle != item.publishedTitle ||
+                remoteRejectionReason != item.rejectionReason) {
+              if (remoteStatus == 'approved' && item.status != 'approved') {
+                newlyApprovedCollections.add(remotePubCol ?? item.collection);
+              }
+              updatedList[i] = item.copyWith(
+                status: remoteStatus,
+                publishedId: remotePubId,
+                publishedCollection: remotePubCol,
+                publishedTitle: remotePubTitle,
+                rejectionReason: remoteRejectionReason,
+              );
+              hasChanges = true;
+            }
+          } else if (!snap.exists && item.status == 'pending') {
+            // Si el documento ya fue eliminado por el administrador sin aprobarse,
+            // marcar como no publicado (si luego coincide en catálogo local, la vista lo promoverá a aprobado).
+            updatedList[i] = item.copyWith(status: 'rejected');
+            hasChanges = true;
+          }
+        } catch (_) {
+          // Mantener el estado local actual si ocurre un error transitorio de red o permisos
+        }
+      }),
+    );
+
+    if (hasChanges) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final encoded = updatedList.map((e) => e.toJson()).toList();
+        await prefs.setString(_keyHistory, jsonEncode(encoded));
+      } catch (_) {}
+    }
+
+    return SuggestionSyncResult(
+      suggestions: updatedList,
+      newlyApprovedCollections: newlyApprovedCollections,
+    );
+  }
+}

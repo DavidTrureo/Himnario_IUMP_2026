@@ -72,11 +72,91 @@ service cloud.firestore {
     }
 
     // ── Sugerencias de Himnos ──────────────────────────────────────────────
+    // Assumed Data Model — Collection: cantos_sugeridos/{docId}
+    // Document ID: Firestore auto-generated random ID (saved locally in client SharedPreferences)
+    // Required on create:
+    //   - title: string (1..200)
+    //   - lyrics: string (1..20000)
+    //   - collection: string in ['iump', 'especiales', 'coros']
+    //   - requesterName: string (1..120)
+    //   - requesterChurch: string (1..120)
+    //   - status: string ('pending' on create; admin transitions to 'approved' | 'rejected')
+    //   - timestamp: timestamp (must equal request.time on create; immutable)
+    // Optional on create:
+    //   - key: string (<=60)
+    //   - beats: string (<=30)
+    //   - timeSignature: string (<=30)
+    //   - category: string (<=100)
+    //   - type: string in ['new', 'correction', 'medley']
+    //   - source: string in ['manual', 'scanner_ia']
+    //   - targetHymnId: int or null
+    //   - targetTitle: string (<=200) or null
+    //   - targetCollection: string (<=40) or null
+    //   - reason: string (<=500) or null
+    // Admin-only review fields (forbidden on create, allowed only on admin update):
+    //   - approvedAt: timestamp or null
+    //   - reviewedAt: timestamp or null
+    //   - publishedId: int or null
+    //   - publishedCollection: string in ['iump', 'especiales', 'coros'] or null
+    //   - publishedTitle: string (<=200) or null
+    //   - rejectionReason: string (<=500) or null
+    function isValidSuggestedHymnCreate() {
+      let data = request.resource.data;
+      return data.keys().hasAll([
+          'title', 'lyrics', 'collection', 'requesterName', 'requesterChurch',
+          'status', 'timestamp'
+        ])
+        && data.keys().hasOnly([
+          'title', 'lyrics', 'collection', 'requesterName', 'requesterChurch',
+          'status', 'timestamp',
+          'key', 'beats', 'timeSignature', 'category', 'type', 'source',
+          'targetHymnId', 'targetTitle', 'targetCollection', 'reason'
+        ])
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.lyrics is string && data.lyrics.size() >= 1 && data.lyrics.size() <= 20000
+        && data.collection in ['iump', 'especiales', 'coros']
+        && data.requesterName is string && data.requesterName.size() >= 1 && data.requesterName.size() <= 120
+        && data.requesterChurch is string && data.requesterChurch.size() >= 1 && data.requesterChurch.size() <= 120
+        && data.status == 'pending'
+        && data.timestamp is timestamp && data.timestamp == request.time
+        && (!('key' in data) || (data.key is string && data.key.size() <= 60))
+        && (!('beats' in data) || (data.beats is string && data.beats.size() <= 30))
+        && (!('timeSignature' in data) || (data.timeSignature is string && data.timeSignature.size() <= 30))
+        && (!('category' in data) || (data.category is string && data.category.size() <= 100))
+        && (!('type' in data) || data.type in ['new', 'correction', 'medley'])
+        && (!('source' in data) || data.source in ['manual', 'scanner_ia'])
+        && (!('targetHymnId' in data) || data.targetHymnId == null || data.targetHymnId is int)
+        && (!('targetTitle' in data) || data.targetTitle == null || (data.targetTitle is string && data.targetTitle.size() <= 200))
+        && (!('targetCollection' in data) || data.targetCollection == null || (data.targetCollection is string && data.targetCollection.size() <= 40))
+        && (!('reason' in data) || data.reason == null || (data.reason is string && data.reason.size() <= 500));
+    }
+
+    function isValidSuggestedHymnAdminUpdate() {
+      let data = request.resource.data;
+      let changed = data.diff(resource.data).affectedKeys();
+      return changed.hasOnly([
+          'status', 'approvedAt', 'reviewedAt',
+          'publishedId', 'publishedCollection', 'publishedTitle', 'rejectionReason'
+        ])
+        && data.status in ['pending', 'approved', 'rejected']
+        && (!('approvedAt' in data) || data.approvedAt == null || data.approvedAt is timestamp)
+        && (!('reviewedAt' in data) || data.reviewedAt == null || data.reviewedAt is timestamp)
+        && (!('publishedId' in data) || data.publishedId == null || data.publishedId is int)
+        && (!('publishedCollection' in data) || data.publishedCollection == null || data.publishedCollection in ['iump', 'especiales', 'coros'])
+        && (!('publishedTitle' in data) || data.publishedTitle == null || (data.publishedTitle is string && data.publishedTitle.size() <= 200))
+        && (!('rejectionReason' in data) || data.rejectionReason == null || (data.rejectionReason is string && data.rejectionReason.size() <= 500));
+    }
+
     match /cantos_sugeridos/{docId} {
-      // Cualquiera puede crear una sugerencia
-      allow create: if true;
-      // Solo el admin puede verlas, aprobarlas (actualizar) o rechazarlas (eliminar)
-      allow read, update, delete: if isAdmin();
+      // Un usuario que posee el docId aleatorio exacto puede consultar el estado de su
+      // propia sugerencia (get), pero solo el admin puede listar o consultar la colección.
+      allow get: if true;
+      allow list: if isAdmin();
+      // Cualquiera puede crear una sugerencia válida con estado inicial 'pending'
+      allow create: if isValidSuggestedHymnCreate();
+      // Solo el admin puede aprobar/rechazar (actualizar campos de revisión) o eliminar
+      allow update: if isAdmin() && isValidSuggestedHymnAdminUpdate();
+      allow delete: if isAdmin();
     }
   }
 }

@@ -3,10 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/services/gemini_ai_service.dart';
 import '../../../core/services/local_hymn_storage_service.dart';
+import '../../../core/services/suggestion_tracking_service.dart';
 import '../domain/hymn.dart';
 import 'hymn_list_screen.dart';
 
@@ -72,6 +74,74 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
     );
     _nameCtrl = TextEditingController();
     _churchCtrl = TextEditingController();
+    _loadSavedRequesterProfile();
+  }
+
+  Future<void> _loadSavedRequesterProfile() async {
+    final profile = await SuggestionTrackingService.getRequesterProfile();
+    if (!mounted) return;
+    if (_nameCtrl.text.isEmpty && profile.name.isNotEmpty) {
+      _nameCtrl.text = profile.name;
+    }
+    if (_churchCtrl.text.isEmpty && profile.church.isNotEmpty) {
+      _churchCtrl.text = profile.church;
+    }
+  }
+
+  Future<void> _showSuggestionSuccessDialog({
+    required String title,
+    required String requesterName,
+    required String requesterChurch,
+  }) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '¡Sugerencia Enviada!',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 19),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tu canto "$title" digitalizado con Escáner IA ha sido enviado con tus datos ($requesterName · $requesterChurch).\n\nEl administrador revisará la letra y el formato para incorporarlo próximamente al catálogo oficial.',
+                style: GoogleFonts.nunito(fontSize: 13.5, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '💡 Podrás ver cuándo sea aprobado o gestionado en "Mis Sugerencias Enviadas".',
+                style: GoogleFonts.nunito(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _prefillNextIumpId() {
@@ -120,6 +190,24 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
         const SnackBar(content: Text('Por favor, ingresa título y letra')),
       );
       return;
+    }
+
+    final requesterName = _nameCtrl.text.trim();
+    final requesterChurch = _churchCtrl.text.trim();
+
+    if (!isLocal && !isAdmin) {
+      if (requesterName.isEmpty || requesterChurch.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFF59E0B),
+            content: Text(
+              'Por favor, ingresa tu Nombre y tu Iglesia/Local para enviar la sugerencia al administrador.',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
+            ),
+          ),
+        );
+        return;
+      }
     }
 
     int? explicitIumpId;
@@ -217,7 +305,7 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
           );
         }
       } else {
-        await FirebaseFirestore.instance.collection('cantos_sugeridos').add({
+        final docRef = await FirebaseFirestore.instance.collection('cantos_sugeridos').add({
           'title': title.toUpperCase(),
           'lyrics': lyrics,
           'collection': _selectedCollection,
@@ -225,18 +313,38 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
           'beats': _beatsCtrl.text.trim(),
           'timeSignature': _timeSigCtrl.text.trim(),
           'category': _selectedCategory,
-          'requesterName': _nameCtrl.text.trim().isNotEmpty
-              ? _nameCtrl.text.trim()
-              : 'Usuario (Escáner IA)',
-          'requesterChurch': _churchCtrl.text.trim().isNotEmpty
-              ? _churchCtrl.text.trim()
-              : 'Himnario App',
+          'requesterName': requesterName,
+          'requesterChurch': requesterChurch,
           'timestamp': FieldValue.serverTimestamp(),
           'status': 'pending',
+          'type': 'new',
+          'source': 'scanner_ia',
         });
+
+        await SuggestionTrackingService.saveRequesterProfile(
+          name: requesterName,
+          church: requesterChurch,
+        );
+
+        await SuggestionTrackingService.saveSubmittedSuggestion(
+          SubmittedSuggestion(
+            docId: docRef.id,
+            title: title.toUpperCase(),
+            collection: _selectedCollection,
+            requesterName: requesterName,
+            requesterChurch: requesterChurch,
+            date: DateTime.now(),
+            type: 'new',
+            source: 'scanner_ia',
+            status: 'pending',
+          ),
+        );
+
         if (mounted) {
-          messenger.showSnackBar(
-            const SnackBar(content: Text('Canto sugerido enviado a revisión.')),
+          await _showSuggestionSuccessDialog(
+            title: title.toUpperCase(),
+            requesterName: requesterName,
+            requesterChurch: requesterChurch,
           );
         }
       }
@@ -268,6 +376,14 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
       appBar: AppBar(
         title: Text('Resultados de IA', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
         centerTitle: true,
+        actions: [
+          if (!isAdmin)
+            IconButton(
+              icon: const Icon(Icons.mark_email_read_outlined),
+              tooltip: 'Mis Sugerencias Enviadas',
+              onPressed: () => context.push('/my-suggestions'),
+            ),
+        ],
       ),
       body: Stack(
         children: [
@@ -504,14 +620,26 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
 
                 if (!isAdmin) ...[
                   const SizedBox(height: 20),
-                  _buildLabel('Datos del Sugeridor (Opcional)'),
+                  _buildLabel('Datos del Sugeridor (Obligatorios para Sugerir Oficial)'),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4.0, bottom: 10.0),
+                    child: Text(
+                      'Necesitamos tu nombre y tu iglesia para registrar tu aporte si envías el canto al catálogo oficial (no se exigen para Guardar Local).',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12.5,
+                        color: isDark ? Colors.white60 : Colors.black54,
+                      ),
+                    ),
+                  ),
                   Row(
                     children: [
                       Expanded(
                         child: TextFormField(
                           controller: _nameCtrl,
+                          textCapitalization: TextCapitalization.words,
                           decoration: _buildInputDecoration(theme, isDark).copyWith(
-                            labelText: 'Tu Nombre',
+                            labelText: 'Tu Nombre *',
+                            hintText: 'Ej: Hno. Juan Pérez',
                           ),
                         ),
                       ),
@@ -519,8 +647,10 @@ class _ScannerResultScreenState extends ConsumerState<ScannerResultScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _churchCtrl,
+                          textCapitalization: TextCapitalization.words,
                           decoration: _buildInputDecoration(theme, isDark).copyWith(
-                            labelText: 'Iglesia / Local',
+                            labelText: 'Iglesia / Local *',
+                            hintText: 'Ej: IUMP Central',
                           ),
                         ),
                       ),
