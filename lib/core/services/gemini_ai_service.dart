@@ -18,11 +18,11 @@ class GeminiAiService {
       const String.fromEnvironment('GEMINI_API_KEY');
 
   static const List<String> _activeModels = [
-    'gemini-3.6-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-3.8-flash',
-    'gemini-3.1-flash-lite',
     'gemini-flash-lite-latest',
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-flash-latest',
   ];
 
   static bool _isRetiredSharedKey(String key) {
@@ -206,7 +206,7 @@ class GeminiAiService {
           'title': currentTitle,
           'lyrics': currentLyrics,
           if (apiKey.isNotEmpty) 'apiKey': apiKey,
-        }).timeout(const Duration(seconds: 30));
+        }).timeout(const Duration(seconds: 45));
 
         final data = cfRes.data;
         if (data is Map && data['success'] == true) {
@@ -307,7 +307,7 @@ JSON esperado:
                   'x-goog-api-key': keyToUse,
                 },
                 body: requestBody,
-              ).timeout(const Duration(seconds: 18));
+              ).timeout(const Duration(seconds: 10));
 
               if (res.statusCode == 200) {
                 return res;

@@ -13,23 +13,25 @@ admin.initializeApp();
 
 // Clave API de Gemini exclusiva para Himnario (configurada vía functions/.env o Secret Manager, separada de SIS-Control)
 const SERVER_GEMINI_KEY = (process.env.GEMINI_API_KEY || "").trim();
+const SERVER_GEMINI_KEYS_POOL = (process.env.GEMINI_API_KEYS || "")
+  .split(",")
+  .map((k) => k.trim())
+  .filter((k) => k.length > 0);
 const RETIRED_SHARED_KEY_SHA256 = "313169b173414d3361ce77463c2084bb66fc0c245e30a5349ab761442dfd45b7";
 
 const GEMINI_MODELS = [
-  "gemini-3.6-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-3.8-flash",
-  "gemini-3.1-flash-lite",
   "gemini-flash-lite-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
+  "gemini-3.6-flash",
   "gemini-flash-latest",
 ];
 
 const SEARCH_GEMINI_MODELS = [
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
   "gemini-flash-lite-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
   "gemini-3.6-flash",
-  "gemini-3.8-flash",
   "gemini-flash-latest",
 ];
 
@@ -137,13 +139,18 @@ function getServerEmbeddings() {
 
 function resolveKeysToTry(userApiKey) {
   const keys = [];
-  if (SERVER_GEMINI_KEY) {
+  if (SERVER_GEMINI_KEY && !isRetiredSharedKey(SERVER_GEMINI_KEY)) {
     keys.push(SERVER_GEMINI_KEY);
+  }
+  for (const k of SERVER_GEMINI_KEYS_POOL) {
+    if (!keys.includes(k) && !isRetiredSharedKey(k)) {
+      keys.push(k);
+    }
   }
   const cleanUserKey = (userApiKey || "").trim();
   if (
     cleanUserKey.length > 0 &&
-    cleanUserKey !== SERVER_GEMINI_KEY &&
+    !keys.includes(cleanUserKey) &&
     !isRetiredSharedKey(cleanUserKey)
   ) {
     keys.push(cleanUserKey);
@@ -288,7 +295,7 @@ async function callGeminiApi({
             "x-goog-api-key": currentKey,
           },
           body: requestBody,
-          signal: AbortSignal.timeout(22000),
+          signal: AbortSignal.timeout(8000),
         });
 
         if (res.ok) {
@@ -312,8 +319,8 @@ async function callGeminiApi({
           const errText = await res.text();
           console.warn(`Model ${model} with key ${currentKey.substring(0, 8)}... returned ${res.status}: ${errText}`);
           lastError = `Status ${res.status}: ${errText}`;
-          if (res.status === 400 || res.status === 403) {
-            break; // Clave inválida o sin permisos: pasar a siguiente clave si existe
+          if (res.status === 400 || res.status === 403 || res.status === 429) {
+            break; // Clave inválida, sin permisos o cuota agotada (429): rotar inmediatamente a la siguiente clave del pool
           }
         }
       } catch (e) {
