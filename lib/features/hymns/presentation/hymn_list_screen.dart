@@ -306,6 +306,36 @@ final onlyChordsFilterProvider =
       return OnlyChordsFilterNotifier();
     });
 
+// Notifier para filtro de solo cantos con audio grabado
+class OnlyAudioFilterNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setOnlyAudio(bool onlyAudio) {
+    state = onlyAudio;
+  }
+}
+
+final onlyAudioFilterProvider =
+    NotifierProvider<OnlyAudioFilterNotifier, bool>(() {
+      return OnlyAudioFilterNotifier();
+    });
+
+// Notifier para filtro de solo cantos con partituras o guías
+class OnlyScoresFilterNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setOnlyScores(bool onlyScores) {
+    state = onlyScores;
+  }
+}
+
+final onlyScoresFilterProvider =
+    NotifierProvider<OnlyScoresFilterNotifier, bool>(() {
+      return OnlyScoresFilterNotifier();
+    });
+
 // Provider para filtrar los himnos cargados
 final filteredHymnsProvider = Provider.family<AsyncValue<List<Hymn>>, bool>((
   ref,
@@ -328,6 +358,8 @@ final filteredHymnsProvider = Provider.family<AsyncValue<List<Hymn>>, bool>((
   final activeCategory = ref.watch(activeCategoryProvider);
   final selectedTone = ref.watch(selectedToneFilterProvider);
   final onlyChords = ref.watch(onlyChordsFilterProvider);
+  final onlyAudio = ref.watch(onlyAudioFilterProvider);
+  final onlyScores = ref.watch(onlyScoresFilterProvider);
 
   final Map<String, List<int>> categoryNumbers = {
     'Predicación': [
@@ -498,6 +530,14 @@ final filteredHymnsProvider = Provider.family<AsyncValue<List<Hymn>>, bool>((
 
     if (onlyChords) {
       result = result.where((hymn) => hymn.lyrics.contains('[')).toList();
+    }
+
+    if (onlyAudio) {
+      result = result.where((hymn) => hymn.audioUrl.trim().isNotEmpty).toList();
+    }
+
+    if (onlyScores) {
+      result = result.where((hymn) => hymn.sheetMusicUrls.isNotEmpty).toList();
     }
 
     if (selectedTone != 'Todos') {
@@ -1330,13 +1370,22 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     final notation = ref.watch(notationProvider);
     final activeSearch = ref.watch(_activeSearchProvider);
 
+    final onlyAudio = ref.watch(onlyAudioFilterProvider);
+    final onlyScores = ref.watch(onlyScoresFilterProvider);
+
     final isFilterActive =
-        activeCategory != 'Todos' || selectedTone != 'Todos' || onlyChords;
+        activeCategory != 'Todos' ||
+        selectedTone != 'Todos' ||
+        onlyChords ||
+        onlyAudio ||
+        onlyScores;
     final showFilterBar =
-        !showFavorites &&
-        (activeCollection == 'iump' ||
-            activeCollection == 'especiales' ||
-            activeCollection == 'coros');
+        activeCollection == 'iump' ||
+        activeCollection == 'especiales' ||
+        activeCollection == 'coros' ||
+        activeCollection == 'all' ||
+        activeCollection == 'acordes' ||
+        showFavorites;
 
     String getTitle() {
       if (showFavorites) return 'Mis Favoritos';
@@ -2513,10 +2562,50 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        // Acciones rápidas (Favoritos y Navegación)
+                                        // Acciones rápidas (Indicadores de Audio/Partitura, Favoritos y Navegación)
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
+                                            if (hymn.audioUrl.trim().isNotEmpty) ...[
+                                              Tooltip(
+                                                message: 'Tiene audio de práctica',
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(5),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.amber.withValues(
+                                                      alpha: isDark ? 0.20 : 0.12,
+                                                    ),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.headphones_rounded,
+                                                    size: 15,
+                                                    color: Colors.amber,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            if (hymn.sheetMusicUrls.isNotEmpty) ...[
+                                              Tooltip(
+                                                message: 'Tiene partituras o guías adjuntas',
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(5),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF8B5CF6).withValues(
+                                                      alpha: isDark ? 0.20 : 0.12,
+                                                    ),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.menu_book_rounded,
+                                                    size: 15,
+                                                    color: Color(0xFF8B5CF6),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
                                             IconButton(
                                               icon: Icon(
                                                 isFavorite
@@ -3061,13 +3150,18 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     String activeCollection,
     String activeCategory,
   ) {
+    final onlyAudio = ref.watch(onlyAudioFilterProvider);
+    final onlyScores = ref.watch(onlyScoresFilterProvider);
+    final onlyChords = ref.watch(onlyChordsFilterProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     final List<String> chips;
     if (activeCollection == 'especiales') {
       chips = ['Todos', 'Coro Nacional', 'Coros Unidos'];
     } else if (activeCollection == 'coros') {
       chips = [
         'Todos',
-        'Con Acordes',
         'DO',
         'RE',
         'MI',
@@ -3077,7 +3171,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         'SI',
         'Menores',
       ];
-    } else {
+    } else if (activeCollection == 'iump') {
       chips = [
         'Todos',
         'Predicación',
@@ -3088,20 +3182,126 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
         'Fúnebre',
         'Navidad',
       ];
+    } else {
+      chips = ['Todos'];
     }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: SizedBox(
         height: 40,
-        child: ListView.builder(
+        child: ListView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           physics: const BouncingScrollPhysics(),
-          itemCount: chips.length,
-          itemBuilder: (context, index) {
-            return _buildQuickFilterChip(ref, chips[index], activeCategory);
-          },
+          children: [
+            ...chips.map((c) => _buildQuickFilterChip(ref, c, activeCategory)),
+            // Filtro rápido: Con Audio
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: FilterChip(
+                avatar: Icon(
+                  Icons.headphones_rounded,
+                  size: 16,
+                  color: onlyAudio ? Colors.white : Colors.amber,
+                ),
+                label: const Text('Con Audio'),
+                labelStyle: GoogleFonts.outfit(
+                  fontWeight: onlyAudio ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 13,
+                  color: onlyAudio
+                      ? Colors.white
+                      : (isDark ? Colors.amber[200] : Colors.amber[900]),
+                ),
+                selected: onlyAudio,
+                selectedColor: Colors.amber[700],
+                backgroundColor: isDark
+                    ? Colors.amber.withValues(alpha: 0.12)
+                    : Colors.amber.withValues(alpha: 0.08),
+                side: BorderSide(
+                  color: onlyAudio
+                      ? Colors.amber[700]!
+                      : Colors.amber.withValues(alpha: 0.35),
+                  width: 1.1,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (val) {
+                  ref.read(onlyAudioFilterProvider.notifier).setOnlyAudio(val);
+                  _resetScrollToTop();
+                },
+              ),
+            ),
+            // Filtro rápido: Con Partitura
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: FilterChip(
+                avatar: Icon(
+                  Icons.menu_book_rounded,
+                  size: 16,
+                  color: onlyScores ? Colors.white : const Color(0xFF8B5CF6),
+                ),
+                label: const Text('Con Partitura'),
+                labelStyle: GoogleFonts.outfit(
+                  fontWeight: onlyScores ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 13,
+                  color: onlyScores
+                      ? Colors.white
+                      : (isDark ? const Color(0xFFA78BFA) : const Color(0xFF6D28D9)),
+                ),
+                selected: onlyScores,
+                selectedColor: const Color(0xFF7C3AED),
+                backgroundColor: isDark
+                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.12)
+                    : const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                side: BorderSide(
+                  color: onlyScores
+                      ? const Color(0xFF7C3AED)
+                      : const Color(0xFF8B5CF6).withValues(alpha: 0.35),
+                  width: 1.1,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (val) {
+                  ref.read(onlyScoresFilterProvider.notifier).setOnlyScores(val);
+                  _resetScrollToTop();
+                },
+              ),
+            ),
+            // Filtro rápido: Con Acordes
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: FilterChip(
+                avatar: Icon(
+                  Icons.music_note_rounded,
+                  size: 16,
+                  color: onlyChords ? Colors.white : const Color(0xFF10B981),
+                ),
+                label: const Text('Con Acordes'),
+                labelStyle: GoogleFonts.outfit(
+                  fontWeight: onlyChords ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 13,
+                  color: onlyChords
+                      ? Colors.white
+                      : (isDark ? const Color(0xFF34D399) : const Color(0xFF047857)),
+                ),
+                selected: onlyChords,
+                selectedColor: const Color(0xFF059669),
+                backgroundColor: isDark
+                    ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                    : const Color(0xFF10B981).withValues(alpha: 0.08),
+                side: BorderSide(
+                  color: onlyChords
+                      ? const Color(0xFF059669)
+                      : const Color(0xFF10B981).withValues(alpha: 0.35),
+                  width: 1.1,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (val) {
+                  ref.read(onlyChordsFilterProvider.notifier).setOnlyChords(val);
+                  _resetScrollToTop();
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -3119,6 +3319,8 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
             final activeCategory = ref.watch(activeCategoryProvider);
             final selectedTone = ref.watch(selectedToneFilterProvider);
             final onlyChords = ref.watch(onlyChordsFilterProvider);
+            final onlyAudio = ref.watch(onlyAudioFilterProvider);
+            final onlyScores = ref.watch(onlyScoresFilterProvider);
 
             final List<Map<String, dynamic>> categories;
             if (activeCollection == 'especiales') {
@@ -3287,13 +3489,48 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Text(
-                        'Filtros Avanzados',
-                        style: GoogleFonts.outfit(
-                          fontSize: 21,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurface,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Filtros Avanzados',
+                            style: GoogleFonts.outfit(
+                              fontSize: 21,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          if (activeCategory != 'Todos' ||
+                              selectedTone != 'Todos' ||
+                              onlyChords ||
+                              onlyAudio ||
+                              onlyScores)
+                            TextButton.icon(
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text(
+                                'Restablecer',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () {
+                                ref
+                                    .read(activeCategoryProvider.notifier)
+                                    .setCategory('Todos');
+                                ref
+                                    .read(selectedToneFilterProvider.notifier)
+                                    .setTone('Todos');
+                                ref
+                                    .read(onlyChordsFilterProvider.notifier)
+                                    .setOnlyChords(false);
+                                ref
+                                    .read(onlyAudioFilterProvider.notifier)
+                                    .setOnlyAudio(false);
+                                ref
+                                    .read(onlyScoresFilterProvider.notifier)
+                                    .setOnlyScores(false);
+                                setModalState(() {});
+                              },
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 12),
 
@@ -3382,14 +3619,14 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
-                          'Solo cantos con acordes',
+                          'Solo cantos con acordes 🎸',
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
-                          'Mostrar únicamente himnos y alabanzas con cifrado armónico',
+                          'Mostrar únicamente cantos con cifrado armónico',
                           style: GoogleFonts.nunito(
                             fontSize: 12,
                             color: Colors.grey,
@@ -3400,6 +3637,60 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                           ref
                               .read(onlyChordsFilterProvider.notifier)
                               .setOnlyChords(val);
+                          setModalState(() {});
+                        },
+                      ),
+                      const Divider(height: 12),
+
+                      // Switch de Audio
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          'Solo cantos con audio grabado 🎵',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Mostrar cantos que cuentan con pista o audio de práctica',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        value: onlyAudio,
+                        onChanged: (val) {
+                          ref
+                              .read(onlyAudioFilterProvider.notifier)
+                              .setOnlyAudio(val);
+                          setModalState(() {});
+                        },
+                      ),
+                      const Divider(height: 12),
+
+                      // Switch de Partituras
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          'Solo cantos con partituras o guías 📄',
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Mostrar cantos con documentos o partituras adjuntas',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        value: onlyScores,
+                        onChanged: (val) {
+                          ref
+                              .read(onlyScoresFilterProvider.notifier)
+                              .setOnlyScores(val);
                           setModalState(() {});
                         },
                       ),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/services/cloud_user_sync_service.dart';
 
 class FavoritesNotifier extends Notifier<Set<String>> {
   static const _prefsKey = 'favorite_hymns_v2'; // changed key to avoid parsing errors from v1
@@ -8,6 +9,10 @@ class FavoritesNotifier extends Notifier<Set<String>> {
   Set<String> build() {
     _loadFavorites();
     return {};
+  }
+
+  void setFavoritesFromExternal(Set<String> newFavorites) {
+    state = newFavorites;
   }
 
   Future<void> _loadFavorites() async {
@@ -30,7 +35,6 @@ class FavoritesNotifier extends Notifier<Set<String>> {
     }
   }
 
-
   void reorder(int oldIndex, int newIndex) async {
     final prefs = await SharedPreferences.getInstance();
     final list = state.toList();
@@ -41,6 +45,7 @@ class FavoritesNotifier extends Notifier<Set<String>> {
     list.insert(newIndex, item);
     state = list.toSet();
     await prefs.setStringList(_prefsKey, list);
+    CloudUserSyncService.uploadFavorites(state);
   }
 
   Future<void> toggleFavorite(String idKey) async {
@@ -55,6 +60,7 @@ class FavoritesNotifier extends Notifier<Set<String>> {
 
     state = currentFavorites;
     await prefs.setStringList(_prefsKey, currentFavorites.toList());
+    CloudUserSyncService.uploadFavorites(currentFavorites);
   }
 }
 

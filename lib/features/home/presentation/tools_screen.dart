@@ -88,7 +88,7 @@ class ToolsScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 140.0),
                     physics: const BouncingScrollPhysics(),
                     children: [
-          if (!kIsWeb || isAdmin) ...[
+          if (!kIsWeb && !isAdmin) ...[
             _ToolCard(
               title: 'Escáner Inteligente',
               subtitle: 'Transcribe un canto con IA a partir de una foto',

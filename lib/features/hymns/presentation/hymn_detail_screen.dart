@@ -33,6 +33,7 @@ import '../../setlists/presentation/setlists_provider.dart';
 import '../../setlists/presentation/add_to_setlist_dialog.dart';
 import '../../../core/services/chord_transposer_service.dart';
 import '../../../core/services/local_hymn_storage_service.dart';
+import '../../../core/services/cloud_user_sync_service.dart';
 import 'widgets/chord_diagram_dialog.dart';
 import 'widgets/visual_metronome_widget.dart';
 import 'widgets/hymn_structure_toolbar.dart';
@@ -455,6 +456,12 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('last_hymn_id', '${hymn.collection}-${hymn.id}');
       await prefs.setInt('last_hymn_time', DateTime.now().millisecondsSinceEpoch);
+      CloudUserSyncService.recordHymnHistory(
+        hymnKey: '${hymn.collection}-${hymn.id}',
+        id: hymn.id,
+        title: hymn.title,
+        collection: hymn.collection,
+      );
     } catch (_) {}
   }
 

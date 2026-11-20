@@ -163,5 +163,65 @@ service cloud.firestore {
       allow update: if isAdmin() && isValidSuggestedHymnAdminUpdate();
       allow delete: if isAdmin();
     }
+
+    // ── Sincronización en la Nube de Usuario (user_sync) ────────────────────
+    // Assumed Data Model — Collection: user_sync/{userId} y user_sync/{userId}/data/{docId}
+    // Document ID: Firebase Auth UID del usuario (o subcolección data/{docId})
+    // Reglas de acceso: Solo el usuario autenticado propietario (request.auth.uid == userId) o el Admin.
+    // Campos permitidos en data:
+    //   - favorites: list (<= 2000 elementos, strings con claves de cantos como 'iump-1', 'especiales-10')
+    //   - setlists: list (<= 500 elementos, mapas u objetos con campos de repertorios de culto)
+    //   - history: list (<= 300 elementos, mapas con cantos visualizados recientemente)
+    //   - updatedAt: timestamp o int (timestamp de Firestore o millis Unix > 0)
+    //   - devicePlatform: string opcional (1..50 caracteres)
+    //   - email: string opcional (<= 254 caracteres) o null
+    //   - userId: string opcional (debe coincidir con userId de la ruta si está presente)
+    //   - uid: string opcional (debe coincidir con userId de la ruta si está presente)
+    //   - createdAt: timestamp o int opcional (inmutable tras creación)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isUserSyncOwner(userId) {
+      return isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    function isValidUserSyncData(userId) {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'favorites', 'setlists', 'history', 'updatedAt',
+          'devicePlatform', 'email', 'userId', 'uid', 'createdAt'
+        ])
+        && (!('favorites' in data) || data.favorites == null || (data.favorites is list && data.favorites.size() <= 2000))
+        && (!('setlists' in data) || data.setlists == null || (data.setlists is list && data.setlists.size() <= 500))
+        && (!('history' in data) || data.history == null || (data.history is list && data.history.size() <= 300))
+        && (!('updatedAt' in data) || data.updatedAt is timestamp || (data.updatedAt is int && data.updatedAt > 0))
+        && (!('devicePlatform' in data) || data.devicePlatform == null || (data.devicePlatform is string && data.devicePlatform.size() >= 1 && data.devicePlatform.size() <= 50))
+        && (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 254))
+        && (!('userId' in data) || data.userId == userId)
+        && (!('uid' in data) || data.uid == userId)
+        && (!('createdAt' in data) || data.createdAt is timestamp || (data.createdAt is int && data.createdAt > 0));
+    }
+
+    function isValidUserSyncUpdate(userId) {
+      let data = request.resource.data;
+      let prev = resource.data;
+      return isValidUserSyncData(userId)
+        && (!('createdAt' in prev) || !('createdAt' in data) || data.createdAt == prev.createdAt)
+        && (!('userId' in prev) || !('userId' in data) || data.userId == prev.userId)
+        && (!('uid' in prev) || !('uid' in data) || data.uid == prev.uid);
+    }
+
+    match /user_sync/{userId} {
+      allow read, delete: if isUserSyncOwner(userId);
+      allow create: if isUserSyncOwner(userId) && isValidUserSyncData(userId);
+      allow update: if isUserSyncOwner(userId) && isValidUserSyncUpdate(userId);
+
+      match /data/{docId} {
+        allow read, delete: if isUserSyncOwner(userId);
+        allow create: if isUserSyncOwner(userId) && isValidUserSyncData(userId);
+        allow update: if isUserSyncOwner(userId) && isValidUserSyncUpdate(userId);
+      }
+    }
   }
 }

@@ -20,19 +20,19 @@ const SERVER_GEMINI_KEYS_POOL = (process.env.GEMINI_API_KEYS || "")
 const RETIRED_SHARED_KEY_SHA256 = "313169b173414d3361ce77463c2084bb66fc0c245e30a5349ab761442dfd45b7";
 
 const GEMINI_MODELS = [
-  "gemini-flash-lite-latest",
   "gemini-3.1-flash-lite",
   "gemini-3.5-flash-lite",
-  "gemini-3.6-flash",
   "gemini-flash-latest",
+  "gemini-flash-lite-latest",
+  "gemini-3.6-flash",
 ];
 
 const SEARCH_GEMINI_MODELS = [
-  "gemini-flash-lite-latest",
   "gemini-3.1-flash-lite",
   "gemini-3.5-flash-lite",
-  "gemini-3.6-flash",
   "gemini-flash-latest",
+  "gemini-flash-lite-latest",
+  "gemini-3.6-flash",
 ];
 
 const COLLECTION_ORDER = ["iump", "especiales", "coros"];
@@ -295,7 +295,7 @@ async function callGeminiApi({
             "x-goog-api-key": currentKey,
           },
           body: requestBody,
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(18000),
         });
 
         if (res.ok) {

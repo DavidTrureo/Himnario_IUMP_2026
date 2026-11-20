@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/services/cloud_user_sync_service.dart';
 import '../domain/setlist.dart';
 
 class SetlistsNotifier extends AsyncNotifier<List<Setlist>> {
@@ -72,10 +73,15 @@ class SetlistsNotifier extends AsyncNotifier<List<Setlist>> {
     }
   }
 
+  void setSetlistsFromExternal(List<Setlist> list) {
+    state = AsyncValue.data(list);
+  }
+
   Future<void> _saveToLocal(List<Setlist> list) async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(list.map((s) => s.toJson()).toList());
     await prefs.setString(_localKey, encoded);
+    CloudUserSyncService.uploadSetlists(list);
   }
 
   Future<void> addSetlist(String title, String date, List<String> hymnIds) async {

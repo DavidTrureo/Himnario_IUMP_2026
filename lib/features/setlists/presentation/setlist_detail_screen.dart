@@ -498,6 +498,46 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (hymn.audioUrl.trim().isNotEmpty) ...[
+              Tooltip(
+                message: 'Tiene audio de práctica',
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(
+                      alpha: isDark ? 0.20 : 0.12,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.headphones_rounded,
+                    size: 15,
+                    color: Colors.amber,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (hymn.sheetMusicUrls.isNotEmpty) ...[
+              Tooltip(
+                message: 'Tiene partituras o guías adjuntas',
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8B5CF6).withValues(
+                      alpha: isDark ? 0.20 : 0.12,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.menu_book_rounded,
+                    size: 15,
+                    color: Color(0xFF8B5CF6),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.redAccent),
               onPressed: () => _removeHymnFromSetlist(ref, setlist, index),

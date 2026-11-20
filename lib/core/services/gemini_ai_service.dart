@@ -18,11 +18,11 @@ class GeminiAiService {
       const String.fromEnvironment('GEMINI_API_KEY');
 
   static const List<String> _activeModels = [
-    'gemini-flash-lite-latest',
     'gemini-3.1-flash-lite',
     'gemini-3.5-flash-lite',
-    'gemini-3.6-flash',
     'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3.6-flash',
   ];
 
   static bool _isRetiredSharedKey(String key) {

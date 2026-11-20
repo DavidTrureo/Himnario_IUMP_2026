@@ -19,6 +19,7 @@ import '../../hymns/presentation/admin_suggestions_screen.dart';
 import '../../../core/widgets/app_music_icons.dart';
 import '../../history/presentation/recent_hymns_provider.dart';
 import '../../history/presentation/widgets/recent_hymns_section.dart';
+import '../../../core/services/cloud_user_sync_service.dart';
 
 class AdminTapCountNotifier extends Notifier<int> {
   @override
@@ -44,11 +45,24 @@ final pendingSuggestionsProvider = StreamProvider.autoDispose<int>((ref) {
       .map((snap) => snap.docs.length);
 });
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      CloudUserSyncService.initialize(ref);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
