@@ -396,7 +396,7 @@ JSON esperado:
       if (structMatch != null && structMatch.rest.isEmpty) {
         return structMatch.header;
       }
-      return Hymn.formatLineCasing(l);
+      return Hymn.formatLineCasing(l, preserveInnerCase: isAiAssisted);
     }).toList();
     currentLyrics = formattedLines.join('\n');
 

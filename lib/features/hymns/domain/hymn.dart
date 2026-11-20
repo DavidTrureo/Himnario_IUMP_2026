@@ -144,7 +144,7 @@ class Hymn {
     );
   }
 
-  static String formatLineCasing(String line) {
+  static String formatLineCasing(String line, {bool preserveInnerCase = false}) {
     // Corregir 'el' pronombre sin acento al final de línea o antes de puntuación
     final RegExp pronounElRegExp = RegExp(r'\b[eE][lL]\b(?=\s*($|[,;.:?!)»"“\r\n]))');
     final processedLine = line.replaceAll(pronounElRegExp, 'él');
@@ -160,7 +160,7 @@ class Hymn {
     
     // Si la línea está en MAYÚSCULAS sostenidas, se convierte a minúsculas antes de aplicar formato orativo
     final testStr = formattedText.replaceAll(RegExp(r'___\d+___'), '').trim();
-    if (testStr.length > 3 && testStr == testStr.toUpperCase() && !testStr.startsWith('CORO') && !testStr.startsWith('PUENTE')) {
+    if (!preserveInnerCase && testStr.length > 3 && testStr == testStr.toUpperCase() && !testStr.startsWith('CORO') && !testStr.startsWith('PUENTE')) {
       formattedText = formattedText.toLowerCase();
     }
 
@@ -179,50 +179,55 @@ class Hymn {
       }
     }
     
-    final List<String> wordsToCapitalize = [
-      'hijo de dios', 'hijo del hombre', 'padre celestial',
-      'dios', 'jesús', 'jesus', 'cristo', 'jesucristo', 'nazareno', 'maestro', 
-      'señor', 'senor', 'salvador', 'redentor', 'mesías', 'mesias', 'jehová', 
-      'jehova', 'emanuel', 'shalom', 'santo', 'espíritu', 'espiritu', 'padre', 
-      'rey', 'jerusalén', 'jerusalen', 'sión', 'sion', 'marta', 
-      'lázaro', 'lazaro', 'canaán', 'canaan', 'david', 'juan', 'israel',
-      'abraham', 'sara', 'sarah', 'isaac', 'jacob', 'josé', 'jose', 'moisés', 'moises',
-      'aarón', 'aaron', 'josué', 'josue', 'caleb', 'rut', 'ruth', 'samuel', 'saúl', 'saul',
-      'salomón', 'salomon', 'elías', 'elias', 'eliseo', 'isaías', 'isaias', 'jeremías', 'jeremias',
-      'ezequiel', 'daniel', 'oseas', 'joel', 'amós', 'amos', 'abdías', 'abdias', 'jonás', 'jonas',
-      'miqueas', 'nahúm', 'nahum', 'habacuc', 'sofonías', 'sofonias', 'hageo', 'zacarías', 'zacarias',
-      'malaquías', 'malaquias', 'mateo', 'marcos', 'lucas', 'pedro', 'pablo', 'silas', 'esteban',
-      'felipe', 'tomás', 'tomas', 'simón', 'simon', 'andrés', 'andres', 'santiago', 'bartolomé', 'bartolome',
-      'judas', 'nicodemo', 'zaqueo', 'bernabé', 'bernabe', 'timoteo', 'tito', 'filemón', 'filemon',
-      'sansón', 'sanson', 'goliat', 'job', 'noé', 'noe', 'adán', 'adan', 'eva', 'abel', 'enoc',
-      'matusalén', 'matusalen', 'lot', 'agar', 'ismael', 'rebeca', 'lea', 'raquel', 'miriam', 'jetro',
-      'débora', 'debora', 'barac', 'gedeón', 'gedeon', 'jefté', 'jefte', 'dalila', 'elí', 'eli', 'ana',
-      'jonatán', 'jonatan', 'betsabé', 'betsabe', 'absalón', 'absalon', 'jeroboam', 'roboam', 'acab',
-      'jezabel', 'manasés', 'manases', 'josías', 'josias', 'nabucodonosor', 'belsasar', 'ciro', 'darío', 'dario',
-      'ester', 'mardoqueo', 'nehemías', 'nehemias', 'esdras', 'gabriel', 'miguel', 'herodes', 'pilato',
-      'caifás', 'caifas', 'ananías', 'ananias', 'safira', 'cornelio', 'lidia', 'apolo', 'aquila',
-      'priscila', 'dorcas', 'eutico', 'onesíforo', 'onesiforo', 'diótrefe', 'diotrefes', 'satán', 'satan',
-      'satanás', 'satanas', 'luzbel', 'belén', 'belen', 'nazaret', 'nazareth', 'beulah', 'edén', 'eden',
-      'galilea', 'judea', 'palestina', 'genesaret', 'chile', 'getsemaní', 'getsemani', 'jordán', 'jordan',
-      'betlehem', 'sarón', 'saron', 'calvario', 'horeb', 'sinaí', 'sinai', 'carmelo', 'olivos', 'gólgota', 'golgota',
-      'egipto', 'asiria', 'babilonia', 'roma', 'grecia', 'samaria', 'damasco', 'antioquía', 'antioquia',
-      'tarso', 'éfeso', 'efeso', 'filipos', 'colosas', 'tesalónica', 'tesalonica', 'corinto', 'atenas',
-      'patmos', 'jericó', 'jerico', 'betania', 'betel', 'peniel', 'nínive', 'ninive', 'ur', 'sodoma',
-      'gomorra', 'tiberias', 'efrata', 'sicar', 'siloé', 'siloe', 'siquem', 'cedrón', 'cedron', 'silo',
-      'galaad', 'basán', 'basan', 'moab', 'edom', 'amón', 'amon', 'fenicia', 'tiro', 'sidón', 'sidon',
-      'nilo', 'éufrates', 'eufrates', 'samaritano', 'pentecostés', 'pentecostes',
-      'oh', 'amén', 'amen', 'aleluya'
-    ];
-    
-    for (final word in wordsToCapitalize) {
-      final RegExp wordRegExp = RegExp(
-        r'(?<=^|[^a-zA-ZáéíóúÁÉÍÓÚñÑ])' + RegExp.escape(word) + r'(?=$|[^a-zA-ZáéíóúÁÉÍÓÚñÑ])',
-        caseSensitive: false
-      );
-      formattedText = formattedText.replaceAllMapped(wordRegExp, (match) {
-        final matched = match.group(0)!;
-        return matched[0].toUpperCase() + matched.substring(1);
-      });
+    // Si la línea ya fue procesada por la IA con análisis contextual gramatical,
+    // se preservan las mayúsculas/minúsculas internas intactas y no se aplican reemplazos ciegos
+    if (!preserveInnerCase) {
+      final List<String> wordsToCapitalize = [
+        'hijo de dios', 'hijo del hombre', 'padre celestial', 'padre nuestro', 'padre santo', 'santo padre', 'dios padre',
+        'dios', 'jesús', 'jesus', 'cristo', 'jesucristo', 'nazareno', 'maestro', 
+        'señor', 'senor', 'salvador', 'redentor', 'mesías', 'mesias', 'jehová', 
+        'jehova', 'emanuel', 'shalom', 'espíritu santo', 'espiritu santo',
+        'rey de reyes', 'rey de gloria', 'cristo rey',
+        'jerusalén', 'jerusalen', 'sión', 'sion', 'marta', 
+        'lázaro', 'lazaro', 'canaán', 'canaan', 'david', 'juan', 'israel',
+        'abraham', 'sara', 'sarah', 'isaac', 'jacob', 'josé', 'jose', 'moisés', 'moises',
+        'aarón', 'aaron', 'josué', 'josue', 'caleb', 'rut', 'ruth', 'samuel', 'saúl', 'saul',
+        'salomón', 'salomon', 'elías', 'elias', 'eliseo', 'isaías', 'isaias', 'jeremías', 'jeremias',
+        'ezequiel', 'daniel', 'oseas', 'joel', 'amós', 'amos', 'abdías', 'abdias', 'jonás', 'jonas',
+        'miqueas', 'nahúm', 'nahum', 'habacuc', 'sofonías', 'sofonias', 'hageo', 'zacarías', 'zacarias',
+        'malaquías', 'malaquias', 'mateo', 'marcos', 'lucas', 'pedro', 'pablo', 'silas', 'esteban',
+        'felipe', 'tomás', 'tomas', 'simón', 'simon', 'andrés', 'andres', 'santiago', 'bartolomé', 'bartolome',
+        'judas', 'nicodemo', 'zaqueo', 'bernabé', 'bernabe', 'timoteo', 'tito', 'filemón', 'filemon',
+        'sansón', 'sanson', 'goliat', 'job', 'noé', 'noe', 'adán', 'adan', 'eva', 'abel', 'enoc',
+        'matusalén', 'matusalen', 'lot', 'agar', 'ismael', 'rebeca', 'lea', 'raquel', 'miriam', 'jetro',
+        'débora', 'debora', 'barac', 'gedeón', 'gedeon', 'jefté', 'jefte', 'dalila', 'elí', 'eli', 'ana',
+        'jonatán', 'jonatan', 'betsabé', 'betsabe', 'absalón', 'absalon', 'jeroboam', 'roboam', 'acab',
+        'jezabel', 'manasés', 'manases', 'josías', 'josias', 'nabucodonosor', 'belsasar', 'ciro', 'darío', 'dario',
+        'ester', 'mardoqueo', 'nehemías', 'nehemias', 'esdras', 'gabriel', 'miguel', 'herodes', 'pilato',
+        'caifás', 'caifas', 'ananías', 'ananias', 'safira', 'cornelio', 'lidia', 'apolo', 'aquila',
+        'priscila', 'dorcas', 'eutico', 'onesíforo', 'onesiforo', 'diótrefe', 'diotrefes', 'satán', 'satan',
+        'satanás', 'satanas', 'luzbel', 'belén', 'belen', 'nazaret', 'nazareth', 'beulah', 'edén', 'eden',
+        'galilea', 'judea', 'palestina', 'genesaret', 'chile', 'getsemaní', 'getsemani', 'jordán', 'jordan',
+        'betlehem', 'sarón', 'saron', 'calvario', 'horeb', 'sinaí', 'sinai', 'carmelo', 'olivos', 'gólgota', 'golgota',
+        'egipto', 'asiria', 'babilonia', 'roma', 'grecia', 'samaria', 'damasco', 'antioquía', 'antioquia',
+        'tarso', 'éfeso', 'efeso', 'filipos', 'colosas', 'tesalónica', 'tesalonica', 'corinto', 'atenas',
+        'patmos', 'jericó', 'jerico', 'betania', 'betel', 'peniel', 'nínive', 'ninive', 'ur', 'sodoma',
+        'gomorra', 'tiberias', 'efrata', 'sicar', 'siloé', 'siloe', 'siquem', 'cedrón', 'cedron', 'silo',
+        'galaad', 'basán', 'basan', 'moab', 'edom', 'amón', 'amon', 'fenicia', 'tiro', 'sidón', 'sidon',
+        'nilo', 'éufrates', 'eufrates', 'samaritano', 'pentecostés', 'pentecostes',
+        'oh', 'amén', 'amen', 'aleluya'
+      ];
+      
+      for (final word in wordsToCapitalize) {
+        final RegExp wordRegExp = RegExp(
+          r'(?<=^|[^a-zA-ZáéíóúÁÉÍÓÚñÑ])' + RegExp.escape(word) + r'(?=$|[^a-zA-ZáéíóúÁÉÍÓÚñÑ])',
+          caseSensitive: false
+        );
+        formattedText = formattedText.replaceAllMapped(wordRegExp, (match) {
+          final matched = match.group(0)!;
+          return matched[0].toUpperCase() + matched.substring(1);
+        });
+      }
     }
     
     for (int i = 0; i < chords.length; i++) {
