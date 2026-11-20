@@ -187,8 +187,8 @@ class SpanishGrammarCorrector {
 
     // Correcciones Contextuales de Acentuación RAE (ej: me amo -> me amó)
     RegExp(r'\bnadie\s+me\s+amo\b', caseSensitive: false): 'nadie me amó',
-    RegExp(r'\bél\s+me\s+amo\b', caseSensitive: false): 'Él me amó',
-    RegExp(r'\bel\s+me\s+amo\b', caseSensitive: false): 'Él me amó',
+    RegExp(r'\bél\s+me\s+amo\b', caseSensitive: false): 'él me amó',
+    RegExp(r'\bel\s+me\s+amo\b', caseSensitive: false): 'él me amó',
     RegExp(r'\bdios\s+me\s+amo\b', caseSensitive: false): 'Dios me amó',
     RegExp(r'\bjesus\s+me\s+amo\b', caseSensitive: false): 'Jesús me amó',
     RegExp(r'\bjesús\s+me\s+amo\b', caseSensitive: false): 'Jesús me amó',
@@ -279,12 +279,12 @@ class SpanishGrammarCorrector {
         }
         trimmed = accentWords.join(' ');
 
-        // Pronombres diacríticos: "El calmara" -> "Él calmará", "Tu eres" -> "Tú eres"
+        // Pronombres diacríticos (RAE / RVR1960: acentuación diacrítica obligatoria y minúscula interna)
         trimmed = trimmed.replaceAllMapped(
           RegExp(r'\b([Ee]l)\s+(calmará|salvará|guiará|curará|sanará|amará|hará|vendrá|llegará|triunfará|reinará|vencerá|estará|está|están|es|fue|dijo|escucha|ama|vive|reina)\b'),
           (match) {
             count++;
-            return 'Él ${match.group(2)}';
+            return 'él ${match.group(2)}';
           },
         );
 
@@ -292,7 +292,7 @@ class SpanishGrammarCorrector {
           RegExp(r'\b([Tt]u)\s+(eres|sabes|me|has|tienes|reinas|sanas|salvas|guias|guías)\b'),
           (match) {
             count++;
-            return 'Tú ${match.group(2)}';
+            return 'tú ${match.group(2)}';
           },
         );
 
