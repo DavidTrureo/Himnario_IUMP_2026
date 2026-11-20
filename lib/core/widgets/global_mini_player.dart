@@ -226,15 +226,25 @@ class GlobalMiniPlayer extends ConsumerWidget {
                                         ),
                                       ),
                                       const SizedBox(width: 6),
-                                      Text(
-                                        '${_formatDuration(audioState.position)} / ${_formatDuration(audioState.duration)}',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 10.5,
-                                          color: isDark
-                                              ? Colors.white60
-                                              : Colors.black54,
+                                      if (audioState.errorMessage != null)
+                                        Text(
+                                          audioState.errorMessage!,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10.5,
+                                            color: Colors.amberAccent,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        )
+                                      else
+                                        Text(
+                                          '${_formatDuration(audioState.position)} / ${_formatDuration(audioState.duration)}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10.5,
+                                            color: isDark
+                                                ? Colors.white60
+                                                : Colors.black54,
+                                          ),
                                         ),
-                                      ),
                                       const SizedBox(width: 4),
                                       // Botón interactivo de repetición continua (Loop)
                                       InkWell(
