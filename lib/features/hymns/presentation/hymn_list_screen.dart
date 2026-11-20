@@ -2378,7 +2378,11 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                 ),
                                               ),
                                               const SizedBox(height: 5),
-                                              Row(
+                                              Wrap(
+                                                spacing: 6,
+                                                runSpacing: 4,
+                                                crossAxisAlignment:
+                                                    WrapCrossAlignment.center,
                                                 children: [
                                                   if (isDuplicate) ...[
                                                     Container(
@@ -2438,7 +2442,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                         ],
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
                                                   ],
                                                   if (showFavorites ||
                                                       activeCollection ==
@@ -2487,7 +2490,6 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                             ),
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
                                                   ],
                                                   if (hymn.tone.isNotEmpty)
                                                     Container(
@@ -2562,15 +2564,15 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        // Acciones rápidas (Indicadores de Audio/Partitura, Favoritos y Navegación)
+                                        // Acciones rápidas (Indicadores de Audio/YouTube/Partitura, Favoritos y Navegación)
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            if (hymn.audioUrl.trim().isNotEmpty) ...[
+                                            if (hymn.hasAudioFile) ...[
                                               Tooltip(
-                                                message: 'Tiene audio de práctica',
+                                                message: 'Tiene pista o audio de práctica',
                                                 child: Container(
-                                                  padding: const EdgeInsets.all(5),
+                                                  padding: const EdgeInsets.all(4.5),
                                                   decoration: BoxDecoration(
                                                     color: Colors.amber.withValues(
                                                       alpha: isDark ? 0.20 : 0.12,
@@ -2579,8 +2581,28 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                   ),
                                                   child: const Icon(
                                                     Icons.headphones_rounded,
-                                                    size: 15,
+                                                    size: 14,
                                                     color: Colors.amber,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            if (hymn.hasYoutube) ...[
+                                              Tooltip(
+                                                message: 'Tiene video oficial en YouTube',
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4.5),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEF4444).withValues(
+                                                      alpha: isDark ? 0.20 : 0.12,
+                                                    ),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.play_circle_fill_rounded,
+                                                    size: 14,
+                                                    color: Color(0xFFEF4444),
                                                   ),
                                                 ),
                                               ),
@@ -2590,7 +2612,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               Tooltip(
                                                 message: 'Tiene partituras o guías adjuntas',
                                                 child: Container(
-                                                  padding: const EdgeInsets.all(5),
+                                                  padding: const EdgeInsets.all(4.5),
                                                   decoration: BoxDecoration(
                                                     color: const Color(0xFF8B5CF6).withValues(
                                                       alpha: isDark ? 0.20 : 0.12,
@@ -2599,7 +2621,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                   ),
                                                   child: const Icon(
                                                     Icons.menu_book_rounded,
-                                                    size: 15,
+                                                    size: 14,
                                                     color: Color(0xFF8B5CF6),
                                                   ),
                                                 ),
@@ -2607,6 +2629,9 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                               const SizedBox(width: 4),
                                             ],
                                             IconButton(
+                                              visualDensity: VisualDensity.compact,
+                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              padding: EdgeInsets.zero,
                                               icon: Icon(
                                                 isFavorite
                                                     ? Icons.favorite_rounded
@@ -2619,7 +2644,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
                                                           : (isDark
                                                                 ? Colors.white30
                                                                 : Colors.black26)),
-                                                size: 21,
+                                                size: 20,
                                               ),
                                               tooltip: isFavorite ? 'En favoritos' : 'Añadir a favoritos',
                                               onPressed: () {

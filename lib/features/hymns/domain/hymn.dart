@@ -77,6 +77,17 @@ class Hymn {
     );
   }
 
+  bool get isYoutube =>
+      audioUrl.contains('youtube.com') || audioUrl.contains('youtu.be');
+
+  bool get hasAudioFile =>
+      audioUrl.trim().isNotEmpty && !isYoutube;
+
+  bool get hasYoutube =>
+      audioUrl.trim().isNotEmpty && isYoutube;
+
+  bool get hasSheetMusic => sheetMusicUrls.isNotEmpty;
+
   factory Hymn.fromJson(Map<String, dynamic> json, String collection) {
     final rawTone = json['tone'] as String? ?? '';
     String toneNote = json['toneNote'] as String? ?? '';

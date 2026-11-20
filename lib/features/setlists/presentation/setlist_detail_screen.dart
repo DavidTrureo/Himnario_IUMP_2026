@@ -498,11 +498,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (hymn.audioUrl.trim().isNotEmpty) ...[
+            if (hymn.hasAudioFile) ...[
               Tooltip(
-                message: 'Tiene audio de práctica',
+                message: 'Tiene pista o audio de práctica',
                 child: Container(
-                  padding: const EdgeInsets.all(5),
+                  padding: const EdgeInsets.all(4.5),
                   decoration: BoxDecoration(
                     color: Colors.amber.withValues(
                       alpha: isDark ? 0.20 : 0.12,
@@ -511,8 +511,28 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                   ),
                   child: const Icon(
                     Icons.headphones_rounded,
-                    size: 15,
+                    size: 14,
                     color: Colors.amber,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (hymn.hasYoutube) ...[
+              Tooltip(
+                message: 'Tiene video oficial en YouTube',
+                child: Container(
+                  padding: const EdgeInsets.all(4.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withValues(
+                      alpha: isDark ? 0.20 : 0.12,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.play_circle_fill_rounded,
+                    size: 14,
+                    color: Color(0xFFEF4444),
                   ),
                 ),
               ),
