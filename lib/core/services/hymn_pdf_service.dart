@@ -332,11 +332,18 @@ class HymnPdfService {
       isChorusList.add(currentIsChorus);
     }
 
-    // Si NO se fuerzan a 1 sola columna (ej. "Solo Letra", sin acordes)
-    // Usamos 2 columnas para que quepa bonito y ahorre papel.
-    // Solo lo hacemos si hay hasta 14 bloques y un máximo manejable de líneas por columna,
-    // garantizando que quepa en 1 sola página sin desbordar ni provocar salto de página vacío.
-    if (!forceSingleColumn && blocks.length > 2 && blocks.length <= 14) {
+    // Criterio de Diseño Editorial y UX/UI:
+    // 1 Columna es SIEMPRE la experiencia de lectura natural y continua para el cantante/músico.
+    // Solo dividimos en 2 columnas cuando el canto sea lo suficientemente extenso (más de 20 líneas totales)
+    // con el propósito exclusivo de evitar que se desborde a una 2da página innecesaria y ahorrar papel.
+    // Si el canto tiene 20 líneas o menos (cantos breves de 2 a 4 estrofas cortas), fluye
+    // naturalmente en 1 columna amplia, cómoda y con interlineado respirable.
+    final bool shouldSplitIntoTwoColumns = !forceSingleColumn &&
+        totalLines > 20 &&
+        blocks.length > 2 &&
+        blocks.length <= 14;
+
+    if (shouldSplitIntoTwoColumns) {
       final int halfIndex = (blocks.length / 2).ceil();
       final leftBlocks = blocks.sublist(0, halfIndex);
       final rightBlocks = blocks.sublist(halfIndex);
