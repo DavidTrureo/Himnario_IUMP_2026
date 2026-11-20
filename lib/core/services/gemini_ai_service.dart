@@ -403,7 +403,27 @@ JSON esperado:
     }).toList();
     currentLyrics = formattedLines.join('\n');
 
-    // 2. Abrir el Modal de Resumen de Cambios (Antes vs Después)
+    // 5. Calcular ajustes reales si la IA asistió
+    if (isAiAssisted) {
+      int aiDiffCount = 0;
+      if (title.trim() != currentTitle.trim()) {
+        aiDiffCount++;
+      }
+      final origLines = lyrics.split('\n');
+      final currLines = currentLyrics.split('\n');
+      final minLines = origLines.length < currLines.length ? origLines.length : currLines.length;
+      for (int i = 0; i < minLines; i++) {
+        if (origLines[i].trim() != currLines[i].trim()) {
+          aiDiffCount++;
+        }
+      }
+      aiDiffCount += (origLines.length - currLines.length).abs();
+      if (aiDiffCount > totalCorrections) {
+        totalCorrections = aiDiffCount;
+      }
+    }
+
+    // 6. Abrir el Modal de Resumen de Cambios (Antes vs Después)
     if (!context.mounted) return null;
     return showGrammarReviewDialog(
       context: context,
@@ -414,7 +434,7 @@ JSON esperado:
       correctionsCount: totalCorrections,
       isAiAssisted: isAiAssisted,
       geminiFailed: geminiFailed,
-      noApiKey: apiKey.isEmpty,
+      noApiKey: apiKey.isEmpty && !isAiAssisted,
     );
   }
 
@@ -487,8 +507,12 @@ JSON esperado:
                     ),
                     Text(
                       isAiAssisted
-                          ? 'Mejora con IA Gemini y Motor RAE ($correctionsCount ajustes)'
-                          : 'Corrección Ortográfica RAE ($correctionsCount ajustes)',
+                          ? (correctionsCount == 0
+                              ? 'Mejora con IA Gemini y Motor RAE (Sin errores detectados)'
+                              : 'Mejora con IA Gemini y Motor RAE ($correctionsCount ajustes)')
+                          : (correctionsCount == 0
+                              ? 'Corrección Ortográfica RAE (Sin errores detectados)'
+                              : 'Corrección Ortográfica RAE ($correctionsCount ajustes)'),
                       style: GoogleFonts.nunito(
                         fontSize: 12,
                         color: isAiAssisted ? Colors.amber[800] : Colors.teal[700],
@@ -507,7 +531,37 @@ JSON esperado:
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (geminiFailed) ...[
+                  if (isAiAssisted) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded, color: Colors.amber, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              correctionsCount == 0
+                                  ? '✓ Letra analizada y validada con IA Gemini y Motor RAE: ¡La letra ya cumple todas las normas ortográficas y métricas!'
+                                  : '✓ Letra analizada y optimizada con IA Gemini y Motor RAE (Servidor Oficial).',
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.amber[200]
+                                    : Colors.amber[900],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (geminiFailed) ...[
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(10),
