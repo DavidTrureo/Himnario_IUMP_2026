@@ -352,20 +352,24 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
                               ),
                             if (urls.length > 1)
                               Positioned(
-                                bottom: 16,
-                                left: 0,
-                                right: 0,
-                                child: Center(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '${index + 1} de ${urls.length}',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                    ),
+                                top: 16,
+                                left: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    'Doc. ${index + 1} de ${urls.length}',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                                   ),
                                 ),
                               ),
@@ -540,7 +544,7 @@ class _PdfSheetMusicPreviewState extends State<PdfSheetMusicPreview> {
           onPageChanged: (idx) => setState(() => _currentPage = idx),
           itemBuilder: (context, pIdx) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               child: InteractiveViewer(
                 minScale: 0.8,
                 maxScale: 4.5,
@@ -572,55 +576,108 @@ class _PdfSheetMusicPreviewState extends State<PdfSheetMusicPreview> {
           bottom: 16,
           left: 16,
           right: 16,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_pages.length > 1) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.circular(16),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 480;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_pages.length > 1) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.78),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        'Pág. ${_currentPage + 1} de ${_pages.length}',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: widget.onOpenFullscreen,
+                              icon: const Icon(Icons.fullscreen_rounded, size: 20),
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  isCompact ? 'Ver / Imprimir' : 'Imprimir / Pantalla Completa',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isCompact ? 8 : 16,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: widget.onShare,
+                              icon: const Icon(Icons.share_rounded, size: 18),
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  isCompact ? 'Compartir' : 'Compartir Partitura',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: widget.isDark ? Colors.black54 : Colors.white70,
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isCompact ? 8 : 14,
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    'Pág. ${_currentPage + 1} de ${_pages.length}',
-                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              ElevatedButton.icon(
-                onPressed: widget.onOpenFullscreen,
-                icon: const Icon(Icons.fullscreen_rounded, size: 20),
-                label: Text(
-                  'Imprimir / Pantalla Completa',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 5,
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: widget.onShare,
-                icon: const Icon(Icons.share_rounded, size: 18),
-                label: Text(
-                  'Compartir',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: widget.isDark ? Colors.black54 : Colors.white70,
-                  foregroundColor: Colors.redAccent,
-                  side: const BorderSide(color: Colors.redAccent, width: 1.2),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ],
