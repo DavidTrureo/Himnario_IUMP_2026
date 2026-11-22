@@ -347,12 +347,26 @@ class SpanishGrammarCorrector {
 
   static bool isSectionHeader(String line) {
     final clean = line.replaceAll(RegExp(r'[^a-zA-ZáéíóúÁÉÍÓÚñÑ]'), '').toUpperCase();
-    return clean == 'CORO' ||
+    return clean.startsWith('CORO') ||
+        clean.startsWith('PRECORO') ||
+        clean.startsWith('ESTRIBILLO') ||
+        clean.startsWith('SOLISTA') ||
+        clean.startsWith('INTERLUDIO') ||
+        clean.startsWith('INTRO') ||
+        clean.startsWith('INTRODUCCION') ||
+        clean.startsWith('OUTRO') ||
+        clean.startsWith('CODA') ||
+        clean.startsWith('RECITADO') ||
+        clean.startsWith('HABLADO') ||
+        clean.startsWith('DECLAMACION') ||
+        clean.startsWith('NARRACION') ||
+        clean.startsWith('ESTROFA') ||
+        clean.startsWith('PUENTE') ||
         clean == 'FINAL' ||
-        clean == 'INTRO' ||
-        clean == 'INTRODUCCION' ||
-        clean == 'ESTROFA' ||
-        clean == 'PUENTE';
+        clean == 'TODOS' ||
+        clean == 'HOMBRES' ||
+        clean == 'MUJERES' ||
+        clean == 'SOLO';
   }
 
   static String _addOpeningPunctuation(String line, String symbol) {

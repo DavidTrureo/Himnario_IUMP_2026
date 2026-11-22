@@ -140,13 +140,15 @@ class HymnStructureToolbar extends StatelessWidget {
 
                   _buildCategorySection(
                     ctx,
-                    title: 'Solistas y Partes Vocales',
+                    title: 'Solistas, Partes Vocales y Recitados',
                     icon: Icons.mic_rounded,
                     color: const Color(0xFFEC4899),
                     tags: [
                       'SOLISTA', 'SOLISTA 1', 'SOLISTA 2', 'SOLISTA 3', 
                       'SOLISTA 4', 'SOLISTA 5', 'SOLO',
-                      'HOMBRES', 'MUJERES', 'TODOS'
+                      'HOMBRES', 'MUJERES', 'TODOS',
+                      'RECITADO', 'RECITADO 1', 'RECITADO 2',
+                      'HABLADO', 'DECLAMACIÓN', 'NARRACIÓN'
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -240,15 +242,15 @@ class HymnStructureToolbar extends StatelessWidget {
 
     final List<Map<String, dynamic>> quickTags = [
       {'tag': 'CORO', 'color': const Color(0xFF6366F1)},
-      {'tag': 'CORO 1', 'color': const Color(0xFF6366F1)},
-      {'tag': 'CORO 2', 'color': const Color(0xFF6366F1)},
+      {'tag': 'PRE-CORO', 'color': const Color(0xFF8B5CF6)},
       {'tag': 'SOLISTA', 'color': const Color(0xFFEC4899)},
-      {'tag': 'SOLISTA 1', 'color': const Color(0xFFEC4899)},
+      {'tag': 'RECITADO', 'color': const Color(0xFFF59E0B)},
       {'tag': 'PUENTE', 'color': const Color(0xFF0EA5E9)},
       {'tag': 'FINAL', 'color': const Color(0xFFEF4444)},
-      {'tag': 'PRE-CORO', 'color': const Color(0xFF8B5CF6)},
       {'tag': '1.', 'color': const Color(0xFF10B981)},
       {'tag': '2.', 'color': const Color(0xFF10B981)},
+      {'tag': 'CORO 1', 'color': const Color(0xFF6366F1)},
+      {'tag': 'CORO 2', 'color': const Color(0xFF6366F1)},
     ];
 
     return Container(

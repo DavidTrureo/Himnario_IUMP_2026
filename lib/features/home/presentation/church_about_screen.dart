@@ -765,17 +765,17 @@ class ChurchAboutScreen extends StatelessWidget {
                                       Text(
                                         'Himnario Cristiano • IUMP',
                                         style: GoogleFonts.outfit(
-                                          fontSize: 14.5,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w700,
                                           color: primaryTextColor,
                                         ),
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(height: 4),
                                       Text(
                                         'Desarrollado con dedicación por David Trureo Ahumada',
                                         style: GoogleFonts.nunito(
-                                          fontSize: 12,
-                                          color: secondaryTextColor,
+                                          fontSize: 14.5,
+                                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),

@@ -171,7 +171,7 @@ class Hymn {
     
     // Si la línea está en MAYÚSCULAS sostenidas, se convierte a minúsculas antes de aplicar formato orativo
     final testStr = formattedText.replaceAll(RegExp(r'___\d+___'), '').trim();
-    if (!preserveInnerCase && testStr.length > 3 && testStr == testStr.toUpperCase() && !testStr.startsWith('CORO') && !testStr.startsWith('PUENTE')) {
+    if (!preserveInnerCase && testStr.length > 3 && testStr == testStr.toUpperCase() && matchStructuralHeader(testStr) == null) {
       formattedText = formattedText.toLowerCase();
     }
 
@@ -257,7 +257,7 @@ class Hymn {
 
     // 1. Etiquetas musicales inequívocas (con o sin número / romano / FINAL)
     final unambiguousRe = RegExp(
-      r'^(CORO(?:\s+(?:\d+|[IVXivx]+|FINAL))?|PRE-?CORO|ESTRIBILLO|SOLISTA(?:\s+\d+)?|INTERLUDIO|INTRODUCCIÓN|INTRODUCCION|INTRO|OUTRO|CODA)(?:(\s*[:\-]\s*)|\s+|$)(.*)$',
+      r'^(CORO(?:\s+(?:\d+|[IVXivx]+|FINAL))?|PRE-?CORO|ESTRIBILLO|SOLISTA(?:\s+\d+)?|INTERLUDIO|INTRODUCCIÓN|INTRODUCCION|INTRO|OUTRO|CODA|RECITADO(?:\s+\d+)?|HABLADO|DECLAMACIÓN|DECLAMACION|NARRACIÓN|NARRACION)(?:(\s*[:\-]\s*)|\s+|$)(.*)$',
       caseSensitive: false,
     );
     final uMatch = unambiguousRe.firstMatch(trimmed);
@@ -448,8 +448,7 @@ class Hymn {
       // 4. Formatear oraciones en Mayúsculas sostenidas
       if (line.length > 5 &&
           line == line.toUpperCase() &&
-          !line.startsWith('CORO') &&
-          !line.startsWith('PUENTE') &&
+          matchStructuralHeader(line) == null &&
           !line.contains('[')) {
         line = formatLineCasing(line);
       }

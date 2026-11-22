@@ -397,14 +397,18 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
     return map[clean];
   }
 
+  static bool _hasBlockHeader(String firstLine) {
+    if (Hymn.matchStructuralHeader(firstLine) != null) return true;
+    final RegExp verseRegExp = RegExp(
+      r'^(\d+|[IVXivx]+|estrofa\s*\d+)(?:\s*[\.\-:\s]|$)', 
+      caseSensitive: false,
+    );
+    return verseRegExp.hasMatch(firstLine);
+  }
+
   List<String> _getMergedBlocks(String lyrics) {
     final List<String> rawBlocks = lyrics.split('\n\n');
     final List<String> merged = [];
-    
-    final RegExp prefixRegExp = RegExp(
-      r'^(\d+|[IVXivx]+|coro|final|solista|puente|interludio)(?:\s*[\.\-:\s]|$)', 
-      caseSensitive: false
-    );
 
     for (final block in rawBlocks) {
       final trimmedBlock = block.trim();
@@ -417,8 +421,8 @@ class _LiveWorshipScreenState extends ConsumerState<LiveWorshipScreen> {
         final firstLineLast = lastBlock.split('\n').first.trim();
         final firstLineCurrent = trimmedBlock.split('\n').first.trim();
         
-        final prevHasPrefix = prefixRegExp.hasMatch(firstLineLast);
-        final currentHasPrefix = prefixRegExp.hasMatch(firstLineCurrent);
+        final prevHasPrefix = _hasBlockHeader(firstLineLast);
+        final currentHasPrefix = _hasBlockHeader(firstLineCurrent);
         
         if (prevHasPrefix && !currentHasPrefix) {
           merged[merged.length - 1] = '$lastBlock\n\n$trimmedBlock';

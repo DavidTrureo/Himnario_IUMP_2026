@@ -217,7 +217,7 @@ class SuggestionTrackingService {
         .where((b) => b.trim().isNotEmpty)
         .length;
     final structureRegex = RegExp(
-      r'(?:^|\n)\s*(?:\[?(?:CORO|ESTROFA|PUENTE|INTRO|FINAL|VERSO|PRE-?CORO)\]?|[IVX]{1,4}\.?\s*$|\d+\.)',
+      r'(?:^|\n)\s*(?:\[?(?:CORO|ESTROFA|PUENTE|INTRO|FINAL|VERSO|PRE-?CORO|RECITADO|HABLADO|DECLAMACI[OÓ]N)\]?|[IVX]{1,4}\.?\s*$|\d+\.)',
       caseSensitive: false,
     );
     final origStructCount = structureRegex.allMatches(normOrigLyrics).length;

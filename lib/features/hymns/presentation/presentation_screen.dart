@@ -289,6 +289,14 @@ class _PresentationScreenState extends State<PresentationScreen> {
         foundHeader = 'Coro ';
         break;
       }
+      if (firstLine.startsWith('pre-coro') || firstLine.startsWith('precoro')) {
+        foundHeader = 'Pre-Coro ';
+        break;
+      }
+      if (firstLine.startsWith('recitado') || firstLine.startsWith('hablado') || firstLine.startsWith('declamaci') || firstLine.startsWith('narraci')) {
+        foundHeader = 'Recitado ';
+        break;
+      }
       if (firstLine.startsWith('puente')) {
         foundHeader = 'Puente ';
         break;
@@ -730,7 +738,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${_currentPage + 1} / ${_blocks.length}',
+                          '${_currentPage + 1} de ${_blocks.length}',
                           style: TextStyle(fontFamily: 'Nunito', 
                             color: _themeUiColor,
                             fontSize: 13,
@@ -759,11 +767,13 @@ class _PresentationScreenState extends State<PresentationScreen> {
     final firstLine = lines.first.trim();
     
     final RegExp tagRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro|pre-?coro|recitado(?:\s+\d+)?|hablado|declamaci[oó]n|narraci[oó]n|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
       caseSensitive: false
     );
     final activeHeader = _getBlockLabel(index);
     final isChorus = activeHeader.toLowerCase().startsWith('coro') || 
+                     activeHeader.toLowerCase().startsWith('pre-coro') || 
+                     activeHeader.toLowerCase().startsWith('recitado') || 
                      activeHeader.toLowerCase().startsWith('puente') || 
                      activeHeader.toLowerCase().startsWith('final');
     

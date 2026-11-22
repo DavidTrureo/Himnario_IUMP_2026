@@ -7,6 +7,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../domain/hymn.dart';
 
@@ -174,14 +177,98 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
     }
   }
 
-  void _shareUrl(String url) {
-    Share.share(url, subject: 'Partitura de ${widget.hymn.title}');
+  bool _isOpeningPdf = false;
+  bool _isSharing = false;
+
+  Future<void> _openPdf(String url) async {
+    if (_isOpeningPdf) return;
+    setState(() => _isOpeningPdf = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Text('Abriendo partitura nativa...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        final pdfBytes = response.bodyBytes;
+        await Printing.layoutPdf(
+          onLayout: (format) async => pdfBytes,
+          name: '${widget.hymn.title} - Partitura',
+        );
+      } else {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Error abriendo visor PDF nativo: $e');
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningPdf = false);
+      }
+    }
+  }
+
+  Future<void> _shareDocument(String url) async {
+    if (_isSharing) return;
+    setState(() => _isSharing = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Text('Preparando documento para compartir...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    try {
+      final isPdf = url.toLowerCase().contains('.pdf');
+      final ext = isPdf ? 'pdf' : 'jpg';
+      final tempDir = await getTemporaryDirectory();
+      final safeTitle = widget.hymn.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final localFile = File('${tempDir.path}/Partitura_$safeTitle.$ext');
+      
+      if (!await localFile.exists()) {
+        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+        await localFile.writeAsBytes(response.bodyBytes);
+      }
+
+      await Share.shareXFiles(
+        [XFile(localFile.path, mimeType: isPdf ? 'application/pdf' : 'image/jpeg')],
+        subject: 'Partitura: ${widget.hymn.title}',
+        text: 'Partitura de «${widget.hymn.title}» - Himnario Cristiano IUMP',
+      );
+    } catch (e) {
+      debugPrint('Error compartiendo archivo local: $e');
+      await Share.share(url, subject: 'Partitura de ${widget.hymn.title}');
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final urls = widget.hymn.sheetMusicUrls;
-    final theme = Theme.of(context);
     final isAdmin = ref.watch(adminModeProvider);
 
     Widget body = _isUploading
@@ -238,9 +325,14 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
                                         const Icon(Icons.picture_as_pdf, size: 80, color: Colors.redAccent),
                                         const SizedBox(height: 16),
                                         ElevatedButton.icon(
-                                          onPressed: () => launchUrl(Uri.parse(url)),
+                                          onPressed: _isOpeningPdf ? null : () => _openPdf(url),
                                           icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
-                                          label: Text('Abrir ${_extractFileName(url)}', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          label: Text(
+                                            'Abrir ${_extractFileName(url)}',
+                                            style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.redAccent,
                                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -250,9 +342,12 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
                                         ),
                                         const SizedBox(height: 12),
                                         OutlinedButton.icon(
-                                          onPressed: () => _shareUrl(url),
+                                          onPressed: _isSharing ? null : () => _shareDocument(url),
                                           icon: const Icon(Icons.share_rounded, color: Colors.redAccent),
-                                          label: Text('Compartir Enlace', style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.w500)),
+                                          label: Text(
+                                            'Compartir Partitura',
+                                            style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.w600),
+                                          ),
                                           style: OutlinedButton.styleFrom(
                                             side: const BorderSide(color: Colors.redAccent),
                                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -294,7 +389,7 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
-                                    '${index + 1} / ${urls.length}',
+                                    '${index + 1} de ${urls.length}',
                                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                   ),
                                 ),

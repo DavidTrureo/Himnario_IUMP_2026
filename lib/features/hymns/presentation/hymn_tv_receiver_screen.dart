@@ -113,7 +113,7 @@ class _HymnTvReceiverScreenState extends State<HymnTvReceiverScreen> {
           }
 
           final RegExp tagRegExp = RegExp(
-            r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
+            r'^(coro\s+[ivx]+|coro\s+\d+|coro|pre-?coro|recitado(?:\s+\d+)?|hablado|declamaci[oó]n|narraci[oó]n|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
             caseSensitive: false
           );
 

@@ -106,7 +106,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     }
 
     final RegExp tagRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro|pre-?coro|recitado(?:\s+\d+)?|hablado|declamaci[oó]n|narraci[oó]n|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+|(?:xii|xi|x|ix|viii|vii|vi|v|iv|iii|ii|i)(?:\s|\.|$))\s*:?\s*', 
       caseSensitive: false
     );
     return tagRegExp.hasMatch(text);
@@ -328,7 +328,7 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
     final firstLine = lines.first.trim();
     
     final RegExp tagRegExp = RegExp(
-      r'^(coro\s+[ivx]+|coro\s+\d+|coro|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
+      r'^(coro\s+[ivx]+|coro\s+\d+|coro|pre-?coro|recitado(?:\s+\d+)?|hablado|declamaci[oó]n|narraci[oó]n|puente|final|est\.\s*\d+|estrofa\s+\d+|\d+\.|\d+)\s*:?\s*', 
       caseSensitive: false
     );
 
@@ -341,6 +341,16 @@ class _DetachedProjectorScreenState extends State<DetachedProjectorScreen> {
       if (fl.startsWith('coro')) {
         isChorus = true;
         activeHeader = 'CORO';
+        break;
+      }
+      if (fl.startsWith('pre-coro') || fl.startsWith('precoro')) {
+        isChorus = true;
+        activeHeader = 'PRE-CORO';
+        break;
+      }
+      if (fl.startsWith('recitado') || fl.startsWith('hablado') || fl.startsWith('declamaci') || fl.startsWith('narraci')) {
+        isChorus = true;
+        activeHeader = 'RECITADO';
         break;
       }
       if (fl.startsWith('puente')) {

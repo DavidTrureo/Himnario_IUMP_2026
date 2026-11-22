@@ -44,6 +44,10 @@ class _TvRemoteControlScreenState extends State<TvRemoteControlScreen> {
       String b = _blocks[i].trim().toLowerCase();
       if (b.startsWith('coro')) {
         currentHighlight = 'CORO';
+      } else if (b.startsWith('pre-coro') || b.startsWith('precoro')) {
+        currentHighlight = 'PRE-CORO';
+      } else if (b.startsWith('recitado') || b.startsWith('hablado') || b.startsWith('declamaci') || b.startsWith('narraci')) {
+        currentHighlight = 'RECITADO';
       } else if (b.startsWith('puente')) {
         currentHighlight = 'PUENTE';
       } else if (b.startsWith('final')) {

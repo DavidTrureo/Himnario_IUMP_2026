@@ -2919,7 +2919,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '${pageIndex + 1} / ${_sortedHymns.length}',
+                    '${pageIndex + 1} de ${_sortedHymns.length}',
                     style: GoogleFonts.outfit(
                       fontSize: 12.5,
                       fontWeight: FontWeight.bold,
@@ -2976,14 +2976,18 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     return map[clean];
   }
 
+  static bool _hasBlockHeader(String firstLine) {
+    if (Hymn.matchStructuralHeader(firstLine) != null) return true;
+    final RegExp verseRegExp = RegExp(
+      r'^(\d+|[IVXivx]+|estrofa\s*\d+)(?:\s*[\.\-:\s]|$)', 
+      caseSensitive: false,
+    );
+    return verseRegExp.hasMatch(firstLine);
+  }
+
   List<String> _getMergedBlocks(String lyrics) {
     final List<String> rawBlocks = lyrics.split('\n\n');
     final List<String> merged = [];
-    
-    final RegExp prefixRegExp = RegExp(
-      r'^(\d+|[IVXivx]+|coro|final|solista|puente|interludio)(?:\s*[\.\-:\s]|$)', 
-      caseSensitive: false
-    );
 
     for (final block in rawBlocks) {
       final trimmedBlock = block.trim();
@@ -2996,8 +3000,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
         final firstLineLast = lastBlock.split('\n').first.trim();
         final firstLineCurrent = trimmedBlock.split('\n').first.trim();
         
-        final prevHasPrefix = prefixRegExp.hasMatch(firstLineLast);
-        final currentHasPrefix = prefixRegExp.hasMatch(firstLineCurrent);
+        final prevHasPrefix = _hasBlockHeader(firstLineLast);
+        final currentHasPrefix = _hasBlockHeader(firstLineCurrent);
         
         if (prevHasPrefix && !currentHasPrefix) {
           // Fusionar con el bloque anterior
