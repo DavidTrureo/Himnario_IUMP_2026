@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -9,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/hymn.dart';
@@ -206,6 +208,8 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
         await Printing.layoutPdf(
           onLayout: (format) async => pdfBytes,
           name: '${widget.hymn.title} - Partitura',
+          format: PdfPageFormat.letter,
+          dynamicLayout: false,
         );
       } else {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -319,51 +323,20 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
                           children: [
                             Center(
                               child: isPdf
-                                  ? Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.picture_as_pdf, size: 80, color: Colors.redAccent),
-                                        const SizedBox(height: 16),
-                                        ElevatedButton.icon(
-                                          onPressed: _isOpeningPdf ? null : () => _openPdf(url),
-                                          icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
-                                          label: Text(
-                                            'Abrir ${_extractFileName(url)}',
-                                            style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.redAccent,
-                                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                            elevation: 4,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        OutlinedButton.icon(
-                                          onPressed: _isSharing ? null : () => _shareDocument(url),
-                                          icon: const Icon(Icons.share_rounded, color: Colors.redAccent),
-                                          label: Text(
-                                            'Compartir Partitura',
-                                            style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.w600),
-                                          ),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Colors.redAccent),
-                                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                          ),
-                                        ),
-                                      ],
+                                  ? PdfSheetMusicPreview(
+                                      url: url,
+                                      fileName: _extractFileName(url),
+                                      hymnTitle: widget.hymn.title,
+                                      onOpenFullscreen: () => _openPdf(url),
+                                      onShare: () => _shareDocument(url),
+                                      isDark: Theme.of(context).brightness == Brightness.dark,
                                     )
                                   : InteractiveViewer(
                                       minScale: 0.5,
                                       maxScale: 4.0,
-                                      child: Image.network(url,
-                                        
+                                      child: Image.network(
+                                        url,
                                         fit: BoxFit.contain,
-                                        
-                                        
                                       ),
                                     ),
                             ),
@@ -377,24 +350,25 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
                                   onPressed: () => _deleteAttachment(url),
                                 ),
                               ),
-                            Positioned(
-                              bottom: 16,
-                              left: 0,
-                              right: 0,
-                              child: Center(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black54,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    '${index + 1} de ${urls.length}',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            if (urls.length > 1)
+                              Positioned(
+                                bottom: 16,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${index + 1} de ${urls.length}',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         );
                       },
@@ -429,6 +403,225 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
           onPressed: () => _pickAndUpload(true),
           icon: const Icon(Icons.picture_as_pdf),
           label: const Text('PDF'),
+        ),
+      ],
+    );
+  }
+}
+
+class PdfSheetMusicPreview extends StatefulWidget {
+  final String url;
+  final String fileName;
+  final String hymnTitle;
+  final VoidCallback onOpenFullscreen;
+  final VoidCallback onShare;
+  final bool isDark;
+
+  const PdfSheetMusicPreview({
+    super.key,
+    required this.url,
+    required this.fileName,
+    required this.hymnTitle,
+    required this.onOpenFullscreen,
+    required this.onShare,
+    required this.isDark,
+  });
+
+  @override
+  State<PdfSheetMusicPreview> createState() => _PdfSheetMusicPreviewState();
+}
+
+class _PdfSheetMusicPreviewState extends State<PdfSheetMusicPreview> {
+  List<Uint8List> _pages = [];
+  bool _isLoading = true;
+  bool _hasError = false;
+  int _currentPage = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    _renderPdfPages();
+  }
+
+  Future<void> _renderPdfPages() async {
+    try {
+      final response = await http.get(Uri.parse(widget.url)).timeout(const Duration(seconds: 25));
+      if (response.statusCode == 200) {
+        final pdfBytes = response.bodyBytes;
+        final List<Uint8List> pages = [];
+        await for (final page in Printing.raster(pdfBytes, dpi: 150)) {
+          final pngBytes = await page.toPng();
+          pages.add(pngBytes);
+        }
+        if (mounted) {
+          setState(() {
+            _pages = pages;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() { _isLoading = false; _hasError = true; });
+      }
+    } catch (e) {
+      debugPrint('Error renderizando páginas de partitura: $e');
+      if (mounted) setState(() { _isLoading = false; _hasError = true; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: Colors.redAccent),
+            const SizedBox(height: 18),
+            Text(
+              'Cargando partitura oficial...',
+              style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Preparando vista previa en alta resolución',
+              style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_hasError || _pages.isEmpty) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.picture_as_pdf_rounded, size: 80, color: Colors.redAccent),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: widget.onOpenFullscreen,
+            icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
+            label: Text(
+              'Abrir ${widget.fileName}',
+              style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: widget.onShare,
+            icon: const Icon(Icons.share_rounded, color: Colors.redAccent),
+            label: Text(
+              'Compartir Partitura',
+              style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.redAccent),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: _pages.length,
+          onPageChanged: (idx) => setState(() => _currentPage = idx),
+          itemBuilder: (context, pIdx) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4.5,
+                child: Center(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black38,
+                          blurRadius: 14,
+                          offset: Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.memory(
+                      _pages[pIdx],
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        Positioned(
+          bottom: 16,
+          left: 16,
+          right: 16,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_pages.length > 1) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    'Pág. ${_currentPage + 1} de ${_pages.length}',
+                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              ElevatedButton.icon(
+                onPressed: widget.onOpenFullscreen,
+                icon: const Icon(Icons.fullscreen_rounded, size: 20),
+                label: Text(
+                  'Imprimir / Pantalla Completa',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 5,
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: widget.onShare,
+                icon: const Icon(Icons.share_rounded, size: 18),
+                label: Text(
+                  'Compartir',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: widget.isDark ? Colors.black54 : Colors.white70,
+                  foregroundColor: Colors.redAccent,
+                  side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

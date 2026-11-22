@@ -159,42 +159,57 @@ class GeminiAiService {
 
     bool isAiAssisted = false;
     bool geminiFailed = false;
-    bool isProgressShown = false;
+    BuildContext? progressDialogContext;
+    bool dialogIsOpen = false;
+    bool taskFinished = false;
 
     // Consultar primero vía Cloud Function oficial (sin requerir clave en el cliente)
     {
       if (context.mounted) {
-        isProgressShown = true;
+        dialogIsOpen = true;
         showDialog(
           context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            content: Row(
-              children: [
-                const CircularProgressIndicator(color: Colors.amber),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Puliendo Ortografía y Tildes...',
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Aplicando tildes obligatorias, vocativos (¡Oh, Señor!), comas y acordes intactos.',
-                        style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
+          barrierDismissible: true,
+          useRootNavigator: true,
+          builder: (dialogCtx) {
+            progressDialogContext = dialogCtx;
+            if (taskFinished) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (dialogCtx.mounted) {
+                  Navigator.of(dialogCtx, rootNavigator: true).pop();
+                }
+              });
+            }
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              content: Row(
+                children: [
+                  const CircularProgressIndicator(color: Colors.amber),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Puliendo Ortografía y Tildes...',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Aplicando tildes obligatorias, vocativos (¡Oh, Señor!), comas y acordes intactos.',
+                          style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        );
+                ],
+              ),
+            );
+          },
+        ).then((_) {
+          dialogIsOpen = false;
+        });
       }
 
       try {
@@ -364,8 +379,13 @@ JSON esperado:
         debugPrint('>>> Error en consulta remota Gemini: $e. Se aplicó la corrección ortográfica local.');
         // NUNCA inyectar strings de error técnico en las letras de los cantos
       } finally {
-        if (isProgressShown && context.mounted) {
-          Navigator.pop(context);
+        taskFinished = true;
+        if (dialogIsOpen) {
+          if (progressDialogContext != null && progressDialogContext!.mounted) {
+            Navigator.of(progressDialogContext!, rootNavigator: true).pop();
+          } else if (context.mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
         }
       }
     }
@@ -483,7 +503,8 @@ JSON esperado:
 
     return showDialog<Map<String, String>>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
+      useRootNavigator: true,
       builder: (dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -755,7 +776,7 @@ JSON esperado:
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext, null),
+              onPressed: () => Navigator.of(dialogContext, rootNavigator: true).pop(null),
               child: Text(
                 'Descartar',
                 style: GoogleFonts.nunito(color: Colors.grey[700], fontWeight: FontWeight.bold),
@@ -773,7 +794,7 @@ JSON esperado:
                 style: GoogleFonts.nunito(fontWeight: FontWeight.bold),
               ),
               onPressed: () {
-                Navigator.pop(dialogContext, {
+                Navigator.of(dialogContext, rootNavigator: true).pop({
                   'title': suggestedTitle,
                   'lyrics': suggestedLyrics,
                 });
