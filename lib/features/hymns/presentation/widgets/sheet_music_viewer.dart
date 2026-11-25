@@ -255,14 +255,54 @@ class _SheetMusicViewerState extends ConsumerState<SheetMusicViewer> {
         await localFile.writeAsBytes(response.bodyBytes);
       }
 
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Cálculo de anchor rect para iPadOS / tablets (evita error de popover nulo en iOS)
+      Rect? sharePositionOrigin;
+      try {
+        final box = context.findRenderObject() as RenderBox?;
+        if (box != null && box.hasSize) {
+          final pos = box.localToGlobal(Offset.zero);
+          sharePositionOrigin = Rect.fromLTWH(
+            pos.dx + box.size.width / 4,
+            pos.dy + box.size.height - 80,
+            box.size.width / 2,
+            60,
+          );
+        }
+      } catch (_) {}
+
+      if ((sharePositionOrigin == null || sharePositionOrigin.isEmpty) && mounted) {
+        final size = MediaQuery.of(context).size;
+        sharePositionOrigin = Rect.fromLTWH(
+          size.width / 4,
+          size.height / 2,
+          size.width / 2,
+          60,
+        );
+      }
+
       await Share.shareXFiles(
         [XFile(localFile.path, mimeType: isPdf ? 'application/pdf' : 'image/jpeg')],
         subject: 'Partitura: ${widget.hymn.title}',
         text: 'Partitura de «${widget.hymn.title}» - Himnario Cristiano IUMP',
+        sharePositionOrigin: sharePositionOrigin,
       );
     } catch (e) {
       debugPrint('Error compartiendo archivo local: $e');
-      await Share.share(url, subject: 'Partitura de ${widget.hymn.title}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      Rect? fallbackOrigin;
+      try {
+        final size = MediaQuery.of(context).size;
+        fallbackOrigin = Rect.fromLTWH(size.width / 4, size.height / 2, size.width / 2, 60);
+      } catch (_) {}
+      await Share.share(
+        url,
+        subject: 'Partitura de ${widget.hymn.title}',
+        sharePositionOrigin: fallbackOrigin,
+      );
     } finally {
       if (mounted) {
         setState(() => _isSharing = false);
