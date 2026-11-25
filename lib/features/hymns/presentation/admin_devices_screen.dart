@@ -1553,6 +1553,31 @@ class _VersionAdoptionChart extends StatelessWidget {
     required this.isDark,
   });
 
+  static int _compareVersions(String vA, String vB) {
+    List<int> parseParts(String v) {
+      try {
+        final clean = v.replaceAll('v', '').trim();
+        final splitPlus = clean.split('+');
+        final dotParts = splitPlus[0].split('.').map((p) => int.tryParse(p) ?? 0).toList();
+        final buildNum = splitPlus.length > 1 ? (int.tryParse(splitPlus[1]) ?? 0) : 0;
+        dotParts.add(buildNum);
+        return dotParts;
+      } catch (_) {
+        return [0, 0, 0, 0];
+      }
+    }
+
+    final partsA = parseParts(vA);
+    final partsB = parseParts(vB);
+    final minLen = partsA.length < partsB.length ? partsA.length : partsB.length;
+    for (int i = 0; i < minLen; i++) {
+      if (partsA[i] != partsB[i]) {
+        return partsA[i].compareTo(partsB[i]);
+      }
+    }
+    return partsA.length.compareTo(partsB.length);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (versionBreakdown.isEmpty) return const SizedBox.shrink();
@@ -1561,7 +1586,13 @@ class _VersionAdoptionChart extends StatelessWidget {
     final sortedEntries = versionBreakdown.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    final latestVersion = sortedEntries.isNotEmpty ? sortedEntries.first.key : '';
+    // Determinar la versión oficial más alta semánticamente (ej: 1.0.68+104)
+    String highestVersion = '';
+    for (final v in versionBreakdown.keys) {
+      if (highestVersion.isEmpty || _compareVersions(v, highestVersion) > 0) {
+        highestVersion = v;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1571,12 +1602,12 @@ class _VersionAdoptionChart extends StatelessWidget {
           style: GoogleFonts.nunito(fontSize: 12.5, color: isDark ? Colors.white60 : Colors.black54),
         ),
         const SizedBox(height: 12),
-        ...sortedEntries.take(5).map((entry) {
+        ...sortedEntries.take(6).map((entry) {
           final pct = total > 0 ? (entry.value / total) * 100 : 0.0;
-          final isLatest = entry.key == latestVersion;
+          final isLatest = entry.key == highestVersion;
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 11),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1595,24 +1626,42 @@ class _VersionAdoptionChart extends StatelessWidget {
                                 : (isDark ? Colors.white : Colors.black87),
                           ),
                         ),
-                        if (isLatest) ...[
-                          const SizedBox(width: 6),
+                        const SizedBox(width: 6),
+                        if (isLatest)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: const Color(0xFF10B981).withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                             ),
                             child: const Text(
-                              'ÚLTIMA',
+                              'OFICIAL AL DÍA',
                               style: TextStyle(
-                                fontSize: 9,
+                                fontSize: 8.5,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF10B981),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'ANTERIOR',
+                              style: TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white54 : Colors.black45,
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ),
-                        ],
                       ],
                     ),
                     Text(
@@ -1620,12 +1669,12 @@ class _VersionAdoptionChart extends StatelessWidget {
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white60 : Colors.black54,
+                        color: isLatest ? const Color(0xFF10B981) : (isDark ? Colors.white60 : Colors.black54),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 5),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
