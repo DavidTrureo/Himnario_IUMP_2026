@@ -750,43 +750,48 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
                                           ),
                                         ),
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  _showTechnicalDeviceList
-                                                      ? Icons.keyboard_arrow_up_rounded
-                                                      : Icons.keyboard_arrow_down_rounded,
-                                                  color: isDark ? Colors.white70 : Colors.black87,
-                                                  size: 22,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  _showTechnicalDeviceList
-                                                      ? 'Ocultar listado de registros'
-                                                      : 'Ver listado de registros (${filteredDevices.length})',
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: isDark ? Colors.white : Colors.black87,
-                                                  ),
-                                                ),
-                                              ],
+                                            Icon(
+                                              _showTechnicalDeviceList
+                                                  ? Icons.keyboard_arrow_up_rounded
+                                                  : Icons.keyboard_arrow_down_rounded,
+                                              color: isDark ? Colors.white70 : Colors.black87,
+                                              size: 22,
                                             ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                _showTechnicalDeviceList
+                                                    ? 'Ocultar listado de registros'
+                                                    : 'Ver listado de registros (${filteredDevices.length})',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isDark ? Colors.white : Colors.black87,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                                               decoration: BoxDecoration(
                                                 color: _getFilterColor(_currentFilter).withValues(alpha: 0.16),
                                                 borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: _getFilterColor(_currentFilter).withValues(alpha: 0.3),
+                                                ),
                                               ),
                                               child: Text(
                                                 _getFilterLabel(_currentFilter),
                                                 style: GoogleFonts.outfit(
-                                                  fontSize: 10.5,
+                                                  fontSize: 10,
                                                   fontWeight: FontWeight.bold,
                                                   color: _getFilterColor(_currentFilter),
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],
@@ -1038,20 +1043,20 @@ class _AdminDevicesScreenState extends ConsumerState<AdminDevicesScreen> {
   String _getFilterLabel(String filter) {
     switch (filter) {
       case 'active':
-        return 'FILTRO: ACTIVOS (30d)';
+        return 'ACTIVOS (30d)';
       case 'inactive':
-        return 'FILTRO: INACTIVOS (+30d)';
+        return 'INACTIVOS (+30d)';
       case 'uninstalled':
-        return 'FILTRO: BAJAS FCM';
+        return 'BAJAS FCM';
       case 'android':
-        return 'FILTRO: ANDROID';
+        return 'ANDROID';
       case 'ios':
-        return 'FILTRO: IOS / IPAD';
+        return 'IOS / IPAD';
       case 'web':
-        return 'FILTRO: WEB';
+        return 'WEB';
       case 'all':
       default:
-        return 'FILTRO: TODAS LAS INSTALACIONES';
+        return 'TODAS';
     }
   }
 }
@@ -1243,6 +1248,8 @@ class _InteractivePlatformPill extends StatelessWidget {
             ),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.nunito(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -1289,6 +1296,8 @@ class _SectionCard extends StatelessWidget {
         children: [
           Text(
             title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -1583,16 +1592,28 @@ class _VersionAdoptionChart extends StatelessWidget {
     if (versionBreakdown.isEmpty) return const SizedBox.shrink();
 
     final total = versionBreakdown.values.fold<int>(0, (acc, val) => acc + val);
-    final sortedEntries = versionBreakdown.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
 
-    // Determinar la versión oficial más alta semánticamente (ej: 1.0.68+104)
+    // Determinar la versión oficial más alta semánticamente (ej: 1.0.69+105)
     String highestVersion = '';
     for (final v in versionBreakdown.keys) {
       if (highestVersion.isEmpty || _compareVersions(v, highestVersion) > 0) {
         highestVersion = v;
       }
     }
+
+    // Aseguramos que la versión oficial más alta SIEMPRE aparezca primera en la lista
+    final displayEntries = <MapEntry<String, int>>[];
+    if (highestVersion.isNotEmpty && versionBreakdown.containsKey(highestVersion)) {
+      displayEntries.add(MapEntry(highestVersion, versionBreakdown[highestVersion]!));
+    }
+
+    final otherEntries = versionBreakdown.entries
+        .where((e) => e.key != highestVersion)
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // Agregar las siguientes versiones anteriores más adoptadas (hasta 5 más, total 6)
+    displayEntries.addAll(otherEntries.take(5));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1602,7 +1623,7 @@ class _VersionAdoptionChart extends StatelessWidget {
           style: GoogleFonts.nunito(fontSize: 12.5, color: isDark ? Colors.white60 : Colors.black54),
         ),
         const SizedBox(height: 12),
-        ...sortedEntries.take(6).map((entry) {
+        ...displayEntries.map((entry) {
           final pct = total > 0 ? (entry.value / total) * 100 : 0.0;
           final isLatest = entry.key == highestVersion;
 
@@ -1614,56 +1635,64 @@ class _VersionAdoptionChart extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'v${entry.key}',
-                          style: GoogleFonts.outfit(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: isLatest
-                                ? const Color(0xFF10B981)
-                                : (isDark ? Colors.white : Colors.black87),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        if (isLatest)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                            ),
-                            child: const Text(
-                              'OFICIAL AL DÍA',
-                              style: TextStyle(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF10B981),
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
                             child: Text(
-                              'ANTERIOR',
-                              style: TextStyle(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white54 : Colors.black45,
-                                letterSpacing: 0.3,
+                              'v${entry.key}',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: isLatest
+                                    ? const Color(0xFF10B981)
+                                    : (isDark ? Colors.white : Colors.black87),
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                      ],
+                          const SizedBox(width: 6),
+                          if (isLatest)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                              ),
+                              child: const Text(
+                                'OFICIAL AL DÍA',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF10B981),
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'ANTERIOR',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white54 : Colors.black45,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '${entry.value} disp. (${pct.toStringAsFixed(1)}%)',
                       style: GoogleFonts.outfit(
