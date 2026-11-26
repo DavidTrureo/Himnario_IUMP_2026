@@ -629,9 +629,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
+        final bottomInset = MediaQuery.of(ctx).padding.bottom;
         return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.82,
+          ),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -643,7 +650,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               ),
             ],
           ),
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + bottomInset),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,58 +702,66 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              ..._atrilScrollSpeeds.map((spd) {
-                final isSelected = (_atrilScrollSpeed - spd).abs() < 0.01;
-                return InkWell(
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _setAtrilScrollSpeed(spd);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    margin: const EdgeInsets.only(bottom: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? theme.colorScheme.primary.withValues(alpha: 0.4)
-                            : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          '${spd}x',
-                          style: GoogleFonts.outfit(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _getAtrilScrollSpeedLabel(spd),
-                            style: GoogleFonts.nunito(
-                              fontSize: 13.5,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              Flexible(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _atrilScrollSpeeds.map((spd) {
+                      final isSelected = (_atrilScrollSpeed - spd).abs() < 0.01;
+                      return InkWell(
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          _setAtrilScrollSpeed(spd);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          margin: const EdgeInsets.only(bottom: 6),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
                               color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : (isDark ? Colors.white70 : Colors.black87),
+                                  ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                                  : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
                             ),
                           ),
+                          child: Row(
+                            children: [
+                              Text(
+                                '${spd}x',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _getAtrilScrollSpeedLabel(spd),
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 13.5,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                    color: isSelected
+                                        ? theme.colorScheme.primary
+                                        : (isDark ? Colors.white70 : Colors.black87),
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 20),
+                            ],
+                          ),
                         ),
-                        if (isSelected)
-                          Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 20),
-                      ],
-                    ),
+                      );
+                    }).toList(),
                   ),
-                );
-              }),
+                ),
+              ),
             ],
           ),
         );
