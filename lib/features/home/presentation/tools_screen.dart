@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -128,6 +127,14 @@ class ToolsScreen extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 16),
+          _ToolCard(
+            title: 'Guía: Las 2 Formas de Proyectar',
+            subtitle: 'Aprende a proyectar con cable HDMI (PC) o inalámbrico (Smart TV)',
+            icon: Icons.cast_connected_rounded,
+            iconColor: const Color(0xFF38BDF8),
+            onTap: () => _showProjectionGuideSheet(context, isDark, theme),
+          ),
+          const SizedBox(height: 16),
 
           if (!isAdmin) ...[
             _ToolCard(
@@ -169,6 +176,273 @@ class ToolsScreen extends ConsumerWidget {
             },
           ),
         ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showProjectionGuideSheet(BuildContext context, bool isDark, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, scrollController) => Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(
+                color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06),
+                width: 1,
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.black12,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.cast_connected_rounded, color: Color(0xFF0EA5E9), size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Las 2 Formas de Proyectar',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 19,
+                                      color: isDark ? Colors.white : Colors.black87,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Guía oficial para cabina multimedia o púlpito',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 12.5,
+                                      color: isDark ? Colors.white60 : Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _buildModeGuideCard(
+                          isDark: isDark,
+                          badgeText: 'MODO 1 • CONEXIÓN POR CABLE',
+                          badgeColor: const Color(0xFF3B82F6),
+                          icon: Icons.laptop_mac_rounded,
+                          title: 'Proyector Directo (PC / Mac / HDMI / OBS)',
+                          description: 'Diseñado para cuando una laptop en cabina está conectada físicamente por cable HDMI o VGA al proyector.',
+                          steps: [
+                            'Conecta tu laptop o PC al proyector por cable HDMI.',
+                            'Abre el Himnario Web en: himnario-vito-2026.web.app',
+                            'Entra a cualquier canto y en el menú de 3 puntos pulsa "Modo Proyector (PC/Mac)".',
+                            'Presiona el botón "Despegar Proyector" (icono de ventana externa en la barra superior) y arrastra la ventana limpia al proyector.',
+                            'Desde tu laptop controlas las estrofas, fuentes, temas y el botón de Pantalla Negra (Blank).',
+                          ],
+                          tipText: 'Ventaja: Cero latencia e independencia de internet durante el servicio.',
+                        ),
+                        const SizedBox(height: 18),
+                        _buildModeGuideCard(
+                          isDark: isDark,
+                          badgeText: 'MODO 2 • CONEXIÓN INALÁMBRICA',
+                          badgeColor: const Color(0xFF10B981),
+                          icon: Icons.connected_tv_rounded,
+                          title: 'Control Remoto en Vivo (Smart TV / Nube)',
+                          description: 'Diseñado para proyectar sin cables desde tu celular o tablet caminando por el templo.',
+                          steps: [
+                            'En el televisor Smart TV o computador frente al templo abre: himnario-vito-2026.web.app/tv',
+                            'En la pantalla gigante aparecerá un Código de Sala de 4 dígitos (ej: 8492).',
+                            'En tu celular, abre el canto, toca los 3 puntos y pulsa "Control Remoto (Smart TV)".',
+                            'Ingresa el código de 4 dígitos y toma el control inalámbrico de estrofas y cantos.',
+                          ],
+                          tipText: 'Ventaja: Libertad total de movimiento para el pastor o director de coro.',
+                        ),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0EA5E9),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () => Navigator.pop(ctx),
+                            icon: const Icon(Icons.check_circle_rounded, size: 18),
+                            label: Text('Entendido', style: GoogleFonts.nunito(fontWeight: FontWeight.bold, fontSize: 15)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModeGuideCard({
+    required bool isDark,
+    required String badgeText,
+    required Color badgeColor,
+    required IconData icon,
+    required String title,
+    required String description,
+    required List<String> steps,
+    required String tipText,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: badgeColor.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  badgeText,
+                  style: GoogleFonts.outfit(
+                    color: badgeColor,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Icon(icon, color: badgeColor, size: 22),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: GoogleFonts.outfit(
+              fontSize: 15.5,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            description,
+            style: GoogleFonts.nunito(
+              fontSize: 12.5,
+              color: isDark ? Colors.white70 : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...steps.asMap().entries.map((entry) {
+            final idx = entry.key + 1;
+            final step = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 7.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 20,
+                    height: 20,
+                    margin: const EdgeInsets.only(top: 2, right: 8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$idx',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: badgeColor,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      step,
+                      style: GoogleFonts.nunito(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: isDark ? Colors.white.withValues(alpha: 0.85) : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: badgeColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lightbulb_outline_rounded, size: 15, color: badgeColor),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    tipText,
+                    style: GoogleFonts.nunito(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : Colors.black87,
+                    ),
                   ),
                 ),
               ],

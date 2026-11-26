@@ -54,14 +54,14 @@ const List<_GuideSlide> _kGuideSlides = [
   ),
   _GuideSlide(
     audience: 'Músicos, Coro y Directores',
-    title: 'Partituras HD, Zoom y Acordes',
+    title: 'Partituras HD, Acordes y Diagramas',
     description:
         'Herramientas profesionales para ensayar, transportar tonalidades y visualizar partituras musicales oficiales.',
     bullets: [
       'Visor de Partituras Oficiales: previsualización de alta definición de la música original de cada alabanza y coro.',
       'Zoom interactivo y paginación: pellizca o haz doble toque para ampliar notas y compases con navegación por páginas.',
-      'Transposición de acordes al vuelo: cambia el tono musical en 1 toque y alterna entre notación americana (C, D, E) y tradicional (Do, Re, Mi).',
-      'Mini-reproductor y YouTube integrado: escucha el audio o video de referencia con bucle continuo y saltos de -10s / +10s.',
+      'Diagramas de Acordes al instante: toca cualquier acorde en la letra para ver la posición exacta en guitarra y teclas de piano.',
+      'Transposición y Metrónomo: transporta tonos en semitonos (+/-) al vuelo y ensaya con guía de tempo visual y auditiva.',
     ],
     icon: Icons.queue_music_rounded,
     accentColor: Color(0xFF10B981),
@@ -81,18 +81,32 @@ const List<_GuideSlide> _kGuideSlides = [
     accentColor: Color(0xFFF43F5E),
   ),
   _GuideSlide(
-    audience: 'Culto en Vivo y Multimedia',
-    title: 'Sincronización en Vivo y Pantalla TV',
+    audience: 'Músicos y Alabanza en Vivo',
+    title: 'Culto en Vivo y Modo Director QR',
     description:
-        'Conecta a los músicos, proyecta en pantallas gigantes y canta en perfecta sincronía durante el servicio.',
+        'Sincroniza a los instrumentistas, coro y congregación para cantar en perfecta armonía durante el servicio.',
     bullets: [
-      'Modo Director con Código QR: genera una sala en vivo para que el coro, los músicos y hermanos se sincronicen al instante.',
-      'Sincronización en tiempo real: los dispositivos conectados siguen automáticamente el avance de estrofas y cantos.',
-      'Receptor de TV / Proyector: abre el himnario en Smart TV o PC mediante código de sala y contrólalo desde tu celular o tableta.',
+      'Modo Director con Código QR: genera una sala en vivo para que el coro y los músicos se sincronicen al instante desde el altar.',
+      'Sincronización en tiempo real: los dispositivos conectados siguen automáticamente el cambio de cantos y el avance de estrofas.',
+      'Listas de Culto (Setlists): organiza el programa completo de alabanzas del domingo, expórtalo a PDF o compártelo en la nube.',
       'Himnario Web Oficial: enlace interactivo universal accesible desde navegadores en computadoras o iPhone sin instalar nada.',
     ],
+    icon: Icons.qr_code_scanner_rounded,
+    accentColor: Color(0xFFEAB308),
+  ),
+  _GuideSlide(
+    audience: 'Multimedia y Pantallas Gigantes',
+    title: 'Las 2 Formas de Proyectar (PC vs TV)',
+    description:
+        'Proyecta las letras en el templo con dos métodos adaptados a la tecnología de tu congregación.',
+    bullets: [
+      'Modo 1: Proyector Directo (PC/Mac/OBS): ideal con cable HDMI. Desde el canto elige "Modo Proyector (PC/Mac)" y pulsa "Despegar Proyector" para abrir una ventana limpia en la segunda pantalla.',
+      'Modo 2: Control Remoto en Vivo (Smart TV): ideal para proyectar sin cables. En la TV abre himnario-vito-2026.web.app/tv, mira el código de 4 dígitos y contrólalo desde tu celular caminando por el templo.',
+      'Ventana Despegada Independiente: proyección 100% limpia sin barras, menús ni botones visibles para la congregación.',
+      'Pantalla Negra (Blackout) en 1 toque: oculta la letra al instante durante la oración o la predicación sin apagar el proyector.',
+    ],
     icon: Icons.tv_rounded,
-    accentColor: Color(0xFFF59E0B),
+    accentColor: Color(0xFF0EA5E9),
   ),
   _GuideSlide(
     audience: 'Edición y Asistencia IA',

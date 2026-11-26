@@ -639,6 +639,13 @@ class _PresentationScreenState extends State<PresentationScreen> {
 
                       Row(
                         children: [
+                          // Botón Ayuda / Instrucciones Proyector
+                          IconButton(
+                            icon: const Icon(Icons.help_outline_rounded, color: Colors.amberAccent, size: 26),
+                            tooltip: '¿Cómo Proyectar a Pantalla Secundaria?',
+                            onPressed: () => _showProjectionHelpDialog(context),
+                          ),
+                          const SizedBox(width: 4),
                           // Botón Despegar (Siempre visible para depuración)
                           IconButton(
                             icon: const Icon(Icons.open_in_new_rounded, color: Colors.blueAccent, size: 28),
@@ -891,6 +898,93 @@ class _PresentationScreenState extends State<PresentationScreen> {
         ),
       ),
     ).animate().fadeIn(duration: 200.ms);
+  }
+
+  void _showProjectionHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: const Color(0xFF0F172A),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amberAccent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.laptop_mac_rounded, color: Colors.amberAccent, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Modo Proyector (Doble Pantalla)',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '¿Cómo proyectar a tu segunda pantalla o TV por cable?',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+            ),
+            const SizedBox(height: 12),
+            _buildHelpStep('1', 'Haz clic en el botón azul de ventana externa ("Despegar Proyector").'),
+            _buildHelpStep('2', 'Se abrirá una ventana limpia con la letra del canto (sin menús ni botones).'),
+            _buildHelpStep('3', 'Arrastra esa ventana a la pantalla de tu proyector o televisor conectado por HDMI.'),
+            _buildHelpStep('4', 'Usa esta pantalla como consola de control: avanza estrofas, cambia el tamaño de letra o usa el botón "Blank" para ocultar la letra durante la oración.'),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amberAccent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Colors.white24,
+              shape: BoxShape.circle,
+            ),
+            child: Text(number, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.3),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
