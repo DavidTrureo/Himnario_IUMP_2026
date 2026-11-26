@@ -68,7 +68,8 @@ class _TvRemoteControlScreenState extends State<TvRemoteControlScreen> {
         ? '${widget.hymn.id}. ${widget.hymn.title}'
         : widget.hymn.title;
         
-    await FirebaseFirestore.instance.collection('tv_rooms').doc(widget.roomId).update({
+    // Escritura optimista directa en Firestore con timestamp cliente (evita round-trip serverTimestamp)
+    FirebaseFirestore.instance.collection('tv_rooms').doc(widget.roomId).set({
       'hymnId': widget.hymn.id,
       'hymnTitle': title,
       'currentBlock': block,
@@ -77,7 +78,9 @@ class _TvRemoteControlScreenState extends State<TvRemoteControlScreen> {
       'isBlank': _isBlank,
       'fontSize': _fontSize,
       'theme': _theme,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'clientTimestamp': DateTime.now().millisecondsSinceEpoch,
+    }, SetOptions(merge: true)).catchError((e) {
+      debugPrint('Error en _syncWithTv: $e');
     });
   }
 
@@ -128,11 +131,11 @@ class _TvRemoteControlScreenState extends State<TvRemoteControlScreen> {
     if (confirm != true) return;
 
     // Clear the screen on TV
-    await FirebaseFirestore.instance.collection('tv_rooms').doc(widget.roomId).update({
+    await FirebaseFirestore.instance.collection('tv_rooms').doc(widget.roomId).set({
       'currentBlock': '',
       'hymnTitle': '',
       'isBlank': false,
-    });
+    }, SetOptions(merge: true));
 
     // Forget the room on this device
     final prefs = await SharedPreferences.getInstance();

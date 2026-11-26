@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class HymnTvReceiverScreen extends StatefulWidget {
   const HymnTvReceiverScreen({super.key});
@@ -17,7 +18,18 @@ class _HymnTvReceiverScreenState extends State<HymnTvReceiverScreen> {
   @override
   void initState() {
     super.initState();
+    try {
+      WakelockPlus.enable();
+    } catch (_) {}
     _generateRoom();
+  }
+
+  @override
+  void dispose() {
+    try {
+      WakelockPlus.disable();
+    } catch (_) {}
+    super.dispose();
   }
 
   Future<void> _generateRoom() async {
@@ -27,13 +39,13 @@ class _HymnTvReceiverScreenState extends State<HymnTvReceiverScreen> {
       _roomId = code;
     });
 
-    // Create room in Firestore
+    // Create room in Firestore with instant client timestamp
     await FirebaseFirestore.instance.collection('tv_rooms').doc(code).set({
       'hymnId': '',
       'hymnTitle': '',
       'currentBlock': '',
       'isBlank': false,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
 

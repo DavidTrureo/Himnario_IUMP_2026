@@ -124,10 +124,18 @@ void main() async {
     unawaited(AppTelemetryService.initAnalyticsSilently());
     unawaited(AppTelemetryService.syncDeviceRegistration());
 
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
+    if (kIsWeb) {
+      // En Web y Smart TV, la persistencia IndexedDB causa bloqueos de I/O y latencia.
+      // La caché en memoria permite transmisión directa ultrarrápida por WebSockets.
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: false,
+      );
+    } else {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    }
     
     try {
       WakelockPlus.enable();
