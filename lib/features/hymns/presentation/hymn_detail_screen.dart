@@ -224,15 +224,16 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     2.0,
   ];
 
-  static const Map<double, String> _atrilScrollSpeedLabels = {
-    0.2: 'Ultra lenta (Adagio)',
-    0.3: 'Muy lenta',
-    0.5: 'Lenta suave',
-    0.7: 'Lenta moderada',
-    1.0: 'Normal (1.0x)',
-    1.5: 'Rápida (1.5x)',
-    2.0: 'Muy rápida (2.0x)',
-  };
+  static String _getAtrilScrollSpeedLabel(double spd) {
+    if ((spd - 0.2).abs() < 0.01) return 'Ultra lenta (Adagio)';
+    if ((spd - 0.3).abs() < 0.01) return 'Muy lenta';
+    if ((spd - 0.5).abs() < 0.01) return 'Lenta suave';
+    if ((spd - 0.7).abs() < 0.01) return 'Lenta moderada';
+    if ((spd - 1.0).abs() < 0.01) return 'Normal (1.0x)';
+    if ((spd - 1.5).abs() < 0.01) return 'Rápida (1.5x)';
+    if ((spd - 2.0).abs() < 0.01) return 'Muy rápida (2.0x)';
+    return '${spd}x';
+  }
 
   bool _isAtrilMode = false;
   bool _isAtrilControlsMinimized = false;
@@ -729,7 +730,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            _atrilScrollSpeedLabels[spd] ?? '',
+                            _getAtrilScrollSpeedLabel(spd),
                             style: GoogleFonts.nunito(
                               fontSize: 13.5,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
