@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../hymns/domain/hymn.dart';
 
 const String kFeatureGuideSeenKey = 'feature_guide_seen_v1';
 
@@ -46,7 +48,7 @@ const List<_GuideSlide> _kGuideSlides = [
     bullets: [
       'Navegación por deslizamiento: desliza a la izquierda o derecha para pasar al canto anterior o siguiente con suavidad.',
       'Fijar canto en pantalla: bloquea el gesto táctil cuando estés en el púlpito para evitar cambios involuntarios de página.',
-      'Modo Atril / Culto: lectura a pantalla completa sin distracciones, ideal para apoyar tu dispositivo en el atril de adoración.',
+      'Modo Atril / Culto: lectura a pantalla completa sin distracciones, con autoscroll manos libres y velocidades lentas desde 0.2x hasta 2.0x.',
       'Ajuste personalizado de tamaño de letra y brillo, memorizados automáticamente para proteger tu vista.',
     ],
     icon: Icons.menu_book_rounded,
@@ -122,23 +124,24 @@ const List<_GuideSlide> _kGuideSlides = [
     icon: Icons.auto_fix_high_rounded,
     accentColor: Color(0xFF8B5CF6),
   ),
-  _GuideSlide(
-    audience: 'Administración y Liderazgo',
-    title: 'Panel Ejecutivo y Métricas en Vivo',
-    description:
-        'Supervisa la adopción congregacional, el repertorio oficial y la salud técnica de todo el ecosistema.',
-    bullets: [
-      'Pulso del Himnario en Tiempo Real: total de instalaciones registradas, cantos catalogados y usuarios activos del último mes.',
-      'Ecosistema y Distribución: visualización proporcional de la comunidad en Android, iOS / iPad y la versión Himnario Web.',
-      'Salud y Retención Congregacional: índice de actividad continua que supera el 96% de fidelidad de uso en el culto.',
-      'Adopción de Versiones: control de actualizaciones con insignias inteligentes "OFICIAL AL DÍA" y auditoría técnica de dispositivos.',
-    ],
-    icon: Icons.analytics_rounded,
-    accentColor: Color(0xFF06B6D4),
-  ),
 ];
 
-class FeatureGuideScreen extends StatefulWidget {
+const _GuideSlide _kAdminMetricsSlide = _GuideSlide(
+  audience: 'Administración y Liderazgo',
+  title: 'Panel Ejecutivo y Métricas en Vivo',
+  description:
+      'Supervisa la adopción congregacional, el repertorio oficial y la salud técnica de todo el ecosistema.',
+  bullets: [
+    'Pulso del Himnario en Tiempo Real: total de instalaciones registradas, cantos catalogados y usuarios activos del último mes.',
+    'Ecosistema y Distribución: visualización proporcional de la comunidad en Android, iOS / iPad y la versión Himnario Web.',
+    'Salud y Retención Congregacional: índice de actividad continua que supera el 96% de fidelidad de uso en el culto.',
+    'Adopción de Versiones: control de actualizaciones con insignias inteligentes "OFICIAL AL DÍA" y auditoría técnica de dispositivos.',
+  ],
+  icon: Icons.analytics_rounded,
+  accentColor: Color(0xFF06B6D4),
+);
+
+class FeatureGuideScreen extends ConsumerStatefulWidget {
   final bool isOnboarding;
 
   const FeatureGuideScreen({
@@ -147,10 +150,10 @@ class FeatureGuideScreen extends StatefulWidget {
   });
 
   @override
-  State<FeatureGuideScreen> createState() => _FeatureGuideScreenState();
+  ConsumerState<FeatureGuideScreen> createState() => _FeatureGuideScreenState();
 }
 
-class _FeatureGuideScreenState extends State<FeatureGuideScreen> {
+class _FeatureGuideScreenState extends ConsumerState<FeatureGuideScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
@@ -184,8 +187,13 @@ class _FeatureGuideScreenState extends State<FeatureGuideScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeSlide = _kGuideSlides[_currentPage];
-    final isLastPage = _currentPage == _kGuideSlides.length - 1;
+    final isAdmin = ref.watch(adminModeProvider);
+    final slides = [
+      ..._kGuideSlides,
+      if (isAdmin) _kAdminMetricsSlide,
+    ];
+    final activeSlide = slides[_currentPage.clamp(0, slides.length - 1)];
+    final isLastPage = _currentPage >= slides.length - 1;
 
     return Scaffold(
       body: Stack(
@@ -246,12 +254,12 @@ class _FeatureGuideScreenState extends State<FeatureGuideScreen> {
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
-                    itemCount: _kGuideSlides.length,
+                    itemCount: slides.length,
                     onPageChanged: (index) {
                       setState(() => _currentPage = index);
                     },
                     itemBuilder: (context, index) {
-                      final slide = _kGuideSlides[index];
+                      final slide = slides[index];
                       return SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                         child: Column(
@@ -382,7 +390,7 @@ class _FeatureGuideScreenState extends State<FeatureGuideScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
-                          _kGuideSlides.length,
+                          slides.length,
                           (index) => AnimatedContainer(
                             duration: const Duration(milliseconds: 220),
                             margin: const EdgeInsets.symmetric(horizontal: 4),

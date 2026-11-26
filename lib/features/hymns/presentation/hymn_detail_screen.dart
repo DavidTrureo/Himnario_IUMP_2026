@@ -214,6 +214,26 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   bool _metronomeVertical = false;
 
   // Modo Atril / Culto (Pantalla limpia sin distracciones)
+  static const List<double> _atrilScrollSpeeds = [
+    0.2,
+    0.3,
+    0.5,
+    0.7,
+    1.0,
+    1.5,
+    2.0,
+  ];
+
+  static const Map<double, String> _atrilScrollSpeedLabels = {
+    0.2: 'Ultra lenta (Adagio)',
+    0.3: 'Muy lenta',
+    0.5: 'Lenta suave',
+    0.7: 'Lenta moderada',
+    1.0: 'Normal (1.0x)',
+    1.5: 'Rápida (1.5x)',
+    2.0: 'Muy rápida (2.0x)',
+  };
+
   bool _isAtrilMode = false;
   bool _isAtrilControlsMinimized = false;
   Timer? _atrilAutoScrollTimer;
@@ -441,6 +461,8 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
       _showChords = prefs.getBool('pref_show_chords') ?? true;
       _notation = prefs.getString('pref_chords_notation') ?? 'spanish';
       _lockSwipe = prefs.getBool('pref_lock_hymn_swipe') ?? false;
+      final savedSpeed = prefs.getDouble('pref_atril_scroll_speed') ?? 1.0;
+      _atrilScrollSpeed = _atrilScrollSpeeds.contains(savedSpeed) ? savedSpeed : 1.0;
     });
   }
 
@@ -449,6 +471,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
     await prefs.setBool('pref_show_chords', _showChords);
     await prefs.setString('pref_chords_notation', _notation);
     await prefs.setBool('pref_lock_hymn_swipe', _lockSwipe);
+    await prefs.setDouble('pref_atril_scroll_speed', _atrilScrollSpeed);
   }
 
   Future<void> _saveLastViewedHymn(Hymn hymn) async {
@@ -581,6 +604,153 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
   void _stopAtrilAutoScroll() {
     _atrilAutoScrollTimer?.cancel();
     _atrilAutoScrollTimer = null;
+  }
+
+  Future<void> _setAtrilScrollSpeed(double speed) async {
+    setState(() {
+      _atrilScrollSpeed = speed;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('pref_atril_scroll_speed', speed);
+    } catch (_) {}
+  }
+
+  void _cycleAtrilScrollSpeed() {
+    final currentIndex = _atrilScrollSpeeds.indexOf(_atrilScrollSpeed);
+    final nextIndex = currentIndex == -1 ? 0 : (currentIndex + 1) % _atrilScrollSpeeds.length;
+    _setAtrilScrollSpeed(_atrilScrollSpeeds[nextIndex]);
+  }
+
+  void _showAtrilSpeedSelectorModal(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.speed_rounded, color: theme.colorScheme.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Velocidad de Autoscroll',
+                          style: GoogleFonts.outfit(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          'Toca para seleccionar el ritmo ideal para tu alabanza',
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ..._atrilScrollSpeeds.map((spd) {
+                final isSelected = (_atrilScrollSpeed - spd).abs() < 0.01;
+                return InkWell(
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _setAtrilScrollSpeed(spd);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                            : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${spd}x',
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _atrilScrollSpeedLabels[spd] ?? '',
+                            style: GoogleFonts.nunito(
+                              fontSize: 13.5,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary, size: 20),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _scrollDownByHalfPage() {
@@ -1538,6 +1708,76 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.speed_rounded,
+                                      size: 18,
+                                      color: isDark ? Colors.white60 : Colors.black45,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Velocidad Autoscroll',
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '${_atrilScrollSpeed}x',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: _atrilScrollSpeeds.map((spd) {
+                                  final isSelected = (_atrilScrollSpeed - spd).abs() < 0.01;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      label: Text(
+                                        '${spd}x',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11.5,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                          color: isSelected ? theme.colorScheme.onPrimary : null,
+                                        ),
+                                      ),
+                                      selected: isSelected,
+                                      selectedColor: theme.colorScheme.primary,
+                                      showCheckmark: false,
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
+                                      onSelected: (val) {
+                                        if (val) _setAtrilScrollSpeed(spd);
+                                      },
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            const Divider(height: 12),
                             if (hymn.lyrics.contains('[')) ...[
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2318,33 +2558,25 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
               // Si está activo el autoscroll, botón selector de velocidad
               if (_isAtrilAutoScrolling) ...[
                 const SizedBox(width: 4),
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    setState(() {
-                      if (_atrilScrollSpeed == 0.7) {
-                        _atrilScrollSpeed = 1.0;
-                      } else if (_atrilScrollSpeed == 1.0) {
-                        _atrilScrollSpeed = 1.5;
-                      } else if (_atrilScrollSpeed == 1.5) {
-                        _atrilScrollSpeed = 2.0;
-                      } else {
-                        _atrilScrollSpeed = 0.7;
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${_atrilScrollSpeed}x',
-                      style: GoogleFonts.outfit(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
+                Tooltip(
+                  message: 'Velocidad ${_atrilScrollSpeed}x (Toca para cambiar, mantén presionado para opciones)',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: _cycleAtrilScrollSpeed,
+                    onLongPress: () => _showAtrilSpeedSelectorModal(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${_atrilScrollSpeed}x',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
                       ),
                     ),
                   ),
