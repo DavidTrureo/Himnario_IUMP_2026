@@ -4686,6 +4686,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -5468,6 +5469,7 @@ class _HymnDetailScreenState extends ConsumerState<HymnDetailScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DraggableScrollableSheet(

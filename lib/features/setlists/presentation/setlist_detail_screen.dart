@@ -33,6 +33,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   void _showPdfOptionsBottomSheet(BuildContext context, Setlist setlist, List<Hymn> hymns) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
         return SafeArea(
@@ -609,6 +610,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   ) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {

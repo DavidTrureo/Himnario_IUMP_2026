@@ -3335,6 +3335,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
   void _showFilterBottomSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
@@ -4259,6 +4260,7 @@ class _HymnListScreenState extends ConsumerState<HymnListScreen> {
     if (!context.mounted) return;
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
